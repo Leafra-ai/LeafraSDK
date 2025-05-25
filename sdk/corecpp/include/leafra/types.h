@@ -79,11 +79,25 @@ struct Point3D {
 struct Matrix3x3 {
     double data[9] = {0.0};
     
-    Matrix3x3();
-    explicit Matrix3x3(const double* values);
+    Matrix3x3() {
+        for (int i = 0; i < 9; ++i) {
+            data[i] = 0.0;
+        }
+    }
     
-    double& operator()(int row, int col);
-    const double& operator()(int row, int col) const;
+    explicit Matrix3x3(const double* values) {
+        for (int i = 0; i < 9; ++i) {
+            data[i] = values[i];
+        }
+    }
+    
+    double& operator()(int row, int col) {
+        return data[row * 3 + col];
+    }
+    
+    const double& operator()(int row, int col) const {
+        return data[row * 3 + col];
+    }
 };
 
 // Event types

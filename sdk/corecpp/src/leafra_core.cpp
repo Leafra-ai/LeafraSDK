@@ -3,172 +3,114 @@
 #include "leafra/math_utils.h"
 #include "leafra/platform_utils.h"
 #include <iostream>
-#include <chrono>
-#include <thread>
-#include <mutex>
+#include <sstream>
 
 namespace leafra {
 
 // Private implementation class (PIMPL pattern)
 class LeafraCore::Impl {
 public:
-    Config config;
-    bool initialized = false;
-    callback_t event_callback;
-    std::unique_ptr<DataProcessor> data_processor;
-    std::unique_ptr<MathUtils> math_utils;
-    mutable std::mutex mutex;
+    Config config_;
+    bool initialized_;
+    callback_t event_callback_;
+    std::unique_ptr<DataProcessor> data_processor_;
+    std::unique_ptr<MathUtils> math_utils_;
     
-    void log(const std::string& message) {
-        if (event_callback) {
-            event_callback("[LeafraCore] " + message);
-        }
-        if (config.debug_mode) {
-            std::cout << "[LeafraCore Debug] " << message << std::endl;
+    Impl() : initialized_(false), event_callback_(nullptr) {
+        data_processor_ = std::make_unique<DataProcessor>();
+        math_utils_ = std::make_unique<MathUtils>();
+    }
+    
+    void send_event(const std::string& message) {
+        if (event_callback_) {
+            event_callback_(message);
         }
     }
 };
 
 LeafraCore::LeafraCore() : pImpl(std::make_unique<Impl>()) {
-    pImpl->log("LeafraCore created");
 }
 
-LeafraCore::~LeafraCore() {
-    if (pImpl && pImpl->initialized) {
-        shutdown();
-    }
-}
+LeafraCore::~LeafraCore() = default;
 
 ResultCode LeafraCore::initialize(const Config& config) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    if (pImpl->initialized) {
-        pImpl->log("Already initialized");
-        return ResultCode::SUCCESS;
+    if (pImpl->initialized_) {
+        return ResultCode::SUCCESS; // Already initialized
     }
     
-    pImpl->config = config;
-    pImpl->log("Initializing LeafraCore with config: " + config.name);
-    
     try {
+        pImpl->config_ = config;
+        
         // Initialize data processor
-        pImpl->data_processor = std::make_unique<DataProcessor>();
-        auto result = pImpl->data_processor->initialize();
-        if (result != ResultCode::SUCCESS) {
-            pImpl->log("Failed to initialize data processor");
-            return result;
+        if (pImpl->data_processor_) {
+            ResultCode result = pImpl->data_processor_->initialize();
+            if (result != ResultCode::SUCCESS) {
+                return result;
+            }
         }
         
-        // Initialize math utils
-        pImpl->math_utils = std::make_unique<MathUtils>();
-        result = pImpl->math_utils->initialize();
-        if (result != ResultCode::SUCCESS) {
-            pImpl->log("Failed to initialize math utils");
-            return result;
-        }
-        
-        pImpl->initialized = true;
-        pImpl->log("LeafraCore initialized successfully");
-        
-        // Trigger initialization event
-        if (pImpl->event_callback) {
-            pImpl->event_callback("SDK initialized successfully");
-        }
+        pImpl->initialized_ = true;
+        pImpl->send_event("LeafraSDK initialized successfully");
         
         return ResultCode::SUCCESS;
-        
     } catch (const std::exception& e) {
-        pImpl->log("Exception during initialization: " + std::string(e.what()));
+        pImpl->send_event("Initialization failed: " + std::string(e.what()));
         return ResultCode::ERROR_INITIALIZATION_FAILED;
     }
 }
 
 ResultCode LeafraCore::shutdown() {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    if (!pImpl->initialized) {
-        return ResultCode::SUCCESS;
-    }
-    
-    pImpl->log("Shutting down LeafraCore");
-    
-    // Cleanup resources
-    pImpl->data_processor.reset();
-    pImpl->math_utils.reset();
-    pImpl->event_callback = nullptr;
-    
-    pImpl->initialized = false;
-    pImpl->log("LeafraCore shutdown complete");
-    
-    return ResultCode::SUCCESS;
-}
-
-bool LeafraCore::is_initialized() const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    return pImpl->initialized;
-}
-
-const Config& LeafraCore::get_config() const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    return pImpl->config;
-}
-
-ResultCode LeafraCore::process_data(const data_buffer_t& input, data_buffer_t& output) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    if (!pImpl->initialized) {
-        return ResultCode::ERROR_INITIALIZATION_FAILED;
-    }
-    
-    if (input.empty()) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
+    if (!pImpl->initialized_) {
+        return ResultCode::SUCCESS; // Already shutdown
     }
     
     try {
-        // Use data processor to handle the data
-        auto result = pImpl->data_processor->process(input, output);
-        
-        if (result == ResultCode::SUCCESS && pImpl->event_callback) {
-            pImpl->event_callback("Data processed successfully, output size: " + 
-                                std::to_string(output.size()));
-        }
-        
-        return result;
-        
+        pImpl->initialized_ = false;
+        pImpl->send_event("LeafraSDK shutdown completed");
+        return ResultCode::SUCCESS;
     } catch (const std::exception& e) {
-        pImpl->log("Exception during data processing: " + std::string(e.what()));
+        pImpl->send_event("Shutdown failed: " + std::string(e.what()));
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+}
+
+bool LeafraCore::is_initialized() const {
+    return pImpl->initialized_;
+}
+
+const Config& LeafraCore::get_config() const {
+    return pImpl->config_;
+}
+
+ResultCode LeafraCore::process_data(const data_buffer_t& input, data_buffer_t& output) {
+    if (!pImpl->initialized_) {
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    if (!pImpl->data_processor_) {
+        return ResultCode::ERROR_NOT_IMPLEMENTED;
+    }
+    
+    try {
+        return pImpl->data_processor_->process(input, output);
+    } catch (const std::exception& e) {
+        pImpl->send_event("Data processing failed: " + std::string(e.what()));
         return ResultCode::ERROR_PROCESSING_FAILED;
     }
 }
 
 void LeafraCore::set_event_callback(callback_t callback) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->event_callback = callback;
-    pImpl->log("Event callback set");
+    pImpl->event_callback_ = callback;
 }
 
 std::string LeafraCore::get_version() {
-    return std::to_string(LEAFRA_VERSION_MAJOR) + "." + 
-           std::to_string(LEAFRA_VERSION_MINOR) + "." + 
-           std::to_string(LEAFRA_VERSION_PATCH);
+    std::ostringstream oss;
+    oss << LEAFRA_VERSION_MAJOR << "." << LEAFRA_VERSION_MINOR << "." << LEAFRA_VERSION_PATCH;
+    return oss.str();
 }
 
 std::string LeafraCore::get_platform() {
-#ifdef __APPLE__
-    #ifdef TARGET_OS_IPHONE
-        return "iOS";
-    #else
-        return "macOS";
-    #endif
-#elif defined(__ANDROID__)
-    return "Android";
-#elif defined(_WIN32)
-    return "Windows";
-#elif defined(__linux__)
-    return "Linux";
-#else
-    return "Unknown";
-#endif
+    return PlatformUtils::get_platform_name();
 }
 
 shared_ptr<LeafraCore> LeafraCore::create() {
