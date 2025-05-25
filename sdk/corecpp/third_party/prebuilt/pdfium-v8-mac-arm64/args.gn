@@ -1,0 +1,13 @@
+clang_use_chrome_plugins = false
+is_component_build = false
+is_debug = false
+mac_deployment_target = "10.13.0"
+pdf_enable_v8 = true
+pdf_enable_xfa = true
+pdf_is_standalone = true
+pdf_use_partition_alloc = false
+target_cpu = "arm64"
+target_os = "mac"
+treat_warnings_as_errors = false
+v8_enable_i18n_support = false
+v8_use_external_startup_data = false
