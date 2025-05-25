@@ -21,19 +21,29 @@
         _dataProcessor = std::make_shared<leafra::DataProcessor>();
         _eventCallback = nil;
         
-        // Set up C++ event callback
+        // Set up C++ event callback with proper weak reference handling
         LeafraSDKBridge* __weak weakSelf = self;
-        _coreSDK->set_event_callback([=](const std::string& message) {
+        _coreSDK->set_event_callback([weakSelf](const std::string& message) {
             LeafraSDKBridge* strongSelf = weakSelf;
-            if (strongSelf && strongSelf.eventCallback) {
+            if (strongSelf && strongSelf->_eventCallback) {
                 NSString *nsMessage = [NSString stringWithUTF8String:message.c_str()];
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    strongSelf.eventCallback(nsMessage);
+                    if (strongSelf->_eventCallback) {
+                        strongSelf->_eventCallback(nsMessage);
+                    }
                 });
             }
         });
     }
     return self;
+}
+
+- (void)dealloc {
+    // Clear the callback to prevent crashes
+    if (_coreSDK) {
+        _coreSDK->set_event_callback(nullptr);
+    }
+    _eventCallback = nil;
 }
 
 #pragma mark - Helper Methods
@@ -271,7 +281,7 @@
 }
 
 - (void)setEventCallback:(void (^)(NSString *message))callback {
-    self.eventCallback = callback;
+    _eventCallback = [callback copy];
 }
 
 @end 
