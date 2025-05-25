@@ -95,16 +95,16 @@ Create the React Native bridge files:
 
 ```bash
 # iOS Objective-C++ bridge files (need to be created)
-sdk/ios/LeafraSDKModule.h
-sdk/ios/LeafraSDKModule.mm
-sdk/ios/LeafraSDKBridge.h  
-sdk/ios/LeafraSDKBridge.mm
+sdk/react-native/ios/LeafraSDKModule.h
+sdk/react-native/ios/LeafraSDKModule.mm
+sdk/react-native/ios/LeafraSDKBridge.h  
+sdk/react-native/ios/LeafraSDKBridge.mm
 ```
 
 **Example iOS bridge implementation:**
 
 ```objc
-// sdk/ios/LeafraSDKModule.h
+// sdk/react-native/ios/LeafraSDKModule.h
 #import <React/RCTBridgeModule.h>
 
 @interface LeafraSDKModule : NSObject <RCTBridgeModule>
@@ -112,7 +112,7 @@ sdk/ios/LeafraSDKBridge.mm
 ```
 
 ```objc
-// sdk/ios/LeafraSDKModule.mm
+// sdk/react-native/ios/LeafraSDKModule.mm
 #import "LeafraSDKModule.h"
 #include "leafra/leafra_core.h"
 

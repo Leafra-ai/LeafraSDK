@@ -53,7 +53,7 @@ module.exports = {
       root: path.join(__dirname, '../path/to/LeafraSDK/sdk/react-native'),
       platforms: {
         ios: {
-          sourceDir: path.join(__dirname, '../path/to/LeafraSDK/sdk/ios'),
+          sourceDir: path.join(__dirname, '../path/to/LeafraSDK/sdk/react-native/ios'),
           podspecPath: path.join(__dirname, '../path/to/LeafraSDK/sdk/LeafraSDK.podspec'),
         },
       },
@@ -395,7 +395,7 @@ LeafraCore (C++)
 The SDK uses CMake for cross-platform building. Key files:
 
 - `sdk/CMakeLists.txt`: Main build configuration
-- `sdk/ios/CMakeLists.txt`: iOS-specific settings
+- `sdk/react-native/ios/CMakeLists.txt`: iOS-specific settings
 - `sdk/corecpp/CMakeLists.txt`: Core C++ library
 
 ### CocoaPods Integration
@@ -406,105 +406,3 @@ The `LeafraSDK.podspec` file defines:
 - Dependencies (React-Core)
 - Compiler settings (C++17, libc++)
 - Platform targets (iOS 15.1+, macOS 12.0+)
-
-## 🧪 Testing
-
-### Unit Tests
-
-Run C++ unit tests:
-```bash
-cd sdk
-./build.sh --test
-```
-
-### Integration Tests
-
-Test React Native integration:
-```bash
-cd example/Leafra
-npm run test
-```
-
-### Platform Tests
-
-Test on different platforms:
-```bash
-# iOS Simulator
-npm run ios
-
-# iOS Device
-npm run ios --device
-
-# macOS (if supported)
-npm run macos
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Build Errors**
-   - Ensure Xcode is up to date
-   - Check C++17 support
-   - Verify CocoaPods installation
-
-2. **Linking Issues**
-   - Run `cd ios && pod install`
-   - Clean and rebuild project
-   - Check `react-native.config.js`
-
-3. **Runtime Errors**
-   - Check SDK initialization
-   - Verify configuration parameters
-   - Enable debug mode for detailed logs
-
-### Debug Mode
-
-Enable debug mode for detailed logging:
-
-```typescript
-const config: LeafraConfig = {
-  // ... other config
-  debugMode: true, // Enable debug logging
-};
-```
-
-## 📚 API Reference
-
-See the TypeScript definitions in `sdk/react-native/src/index.ts` for complete API documentation.
-
-### Core Methods
-
-- `initialize(config)`: Initialize the SDK
-- `shutdown()`: Shutdown the SDK
-- `isInitialized()`: Check initialization status
-- `getVersion()`: Get SDK version
-- `getPlatform()`: Get platform information
-
-### Data Processing
-
-- `processData(input)`: Process data through the SDK
-
-### Mathematical Operations
-
-- `calculateDistance2D(p1, p2)`: Calculate 2D distance
-- `calculateDistance3D(p1, p2)`: Calculate 3D distance
-- `multiplyMatrix3x3(a, b)`: Multiply 3x3 matrices
-- `matrixDeterminant(matrix)`: Calculate matrix determinant
-
-### Event Handling
-
-- `setEventCallback(callback)`: Set event callback
-- `removeEventCallback()`: Remove event callback
-
-## 🚀 Next Steps
-
-1. **Implement Core C++ Logic**: Add your specific algorithms to the C++ core
-2. **Add More Bindings**: Extend the bridge with additional functionality
-3. **Android Support**: Create similar bindings for Android
-4. **Performance Optimization**: Profile and optimize critical paths
-5. **Documentation**: Add comprehensive API documentation
-
-## 📄 License
-
-This SDK is licensed under the MIT License. See the LICENSE file for details. 

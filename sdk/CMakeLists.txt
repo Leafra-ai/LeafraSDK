@@ -45,15 +45,15 @@ add_subdirectory(corecpp)
 # Platform-specific bindings
 if(LEAFRA_BUILD_RN_BINDINGS)
     if(LEAFRA_PLATFORM_IOS OR LEAFRA_PLATFORM_MACOS)
-        add_subdirectory(ios)
+        add_subdirectory(react-native/ios)
     endif()
     
     if(LEAFRA_PLATFORM_ANDROID)
-        add_subdirectory(android)
+        add_subdirectory(react-native/android)
     endif()
     
     if(LEAFRA_PLATFORM_WINDOWS)
-        add_subdirectory(windows)
+        add_subdirectory(react-native/windows)
     endif()
 endif()
 

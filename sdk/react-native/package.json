@@ -5,13 +5,14 @@
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
   "types": "lib/typescript/index.d.ts",
-  "react-native": "src/index",
-  "source": "src/index",
+  "react-native": "common/src/index",
+  "source": "common/src/index",
   "files": [
-    "src",
+    "common/src",
     "lib",
-    "android",
     "ios",
+    "android",
+    "windows",
     "cpp",
     "*.podspec",
     "!lib/typescript/example",
@@ -147,7 +148,7 @@
     "useTabs": false
   },
   "react-native-builder-bob": {
-    "source": "src",
+    "source": "common/src",
     "output": "lib",
     "targets": [
       "commonjs",
@@ -163,6 +164,6 @@
   "codegenConfig": {
     "name": "RNLeafraSDKSpec",
     "type": "modules",
-    "jsSrcsDir": "src"
+    "jsSrcsDir": "common/src"
   }
 } 

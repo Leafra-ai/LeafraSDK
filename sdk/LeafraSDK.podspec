@@ -21,20 +21,20 @@ Pod::Spec.new do |s|
   s.source_files = [
     "corecpp/src/**/*.{cpp,mm}",
     "corecpp/include/**/*.h",
-    "ios/**/*.{h,mm}"
+    "react-native/ios/**/*.{h,mm}"
   ]
   
   # Public headers
   s.public_header_files = [
     "corecpp/include/**/*.h",
-    "ios/**/*.h"
+    "react-native/ios/**/*.h"
   ]
   
   # Header search paths
   s.header_mappings_dir = "corecpp/include"
   s.preserve_paths = [
     "corecpp/include/**/*.h",
-    "ios/**/*.h"
+    "react-native/ios/**/*.h"
   ]
   
   # Dependencies
@@ -66,7 +66,7 @@ Pod::Spec.new do |s|
     # Ensure all necessary directories exist
     mkdir -p corecpp/src
     mkdir -p corecpp/include/leafra
-    mkdir -p ios
+    mkdir -p react-native/ios
     
     # Create empty implementation files if they don't exist (for initial setup)
     touch corecpp/src/leafra_core.cpp
@@ -88,8 +88,8 @@ Pod::Spec.new do |s|
     rn.dependency 'LeafraSDK/Core'
     rn.dependency 'React-Core'
     
-    rn.source_files = "ios/**/*.{h,mm}"
-    rn.public_header_files = "ios/**/*.h"
+    rn.source_files = "react-native/ios/**/*.{h,mm}"
+    rn.public_header_files = "react-native/ios/**/*.h"
   end
   
   # Default subspecs

@@ -11,11 +11,11 @@ module.exports = {
       root: path.join(__dirname, '../../sdk/react-native'),
       platforms: {
         ios: {
-          sourceDir: path.join(__dirname, '../../sdk/ios'),
+          sourceDir: path.join(__dirname, '../../sdk/react-native/ios'),
           podspecPath: path.join(__dirname, '../../sdk/LeafraSDK.podspec'),
         },
         android: {
-          sourceDir: path.join(__dirname, '../../sdk/android'),
+          sourceDir: path.join(__dirname, '../../sdk/react-native/android'),
           packageImportPath: 'import io.leafra.sdk.LeafraSDKPackage;',
         },
       },
