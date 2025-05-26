@@ -208,6 +208,54 @@
     };
 }
 
+- (NSDictionary *)processUserFiles:(NSArray<NSString *> *)fileUrls error:(NSError **)error {
+    if (!_coreSDK) {
+        if (error) {
+            *error = [self errorFromResultCode:leafra::ResultCode::ERROR_INITIALIZATION_FAILED
+                                       message:@"SDK not initialized"];
+        }
+        return @{@"result": @((int)leafra::ResultCode::ERROR_INITIALIZATION_FAILED), @"processedFiles": @[], @"message": @"SDK not initialized"};
+    }
+    
+    // Convert NSArray of NSString to std::vector<std::string>
+    std::vector<std::string> filePaths;
+    for (NSString *urlString in fileUrls) {
+        // Convert file URL to local path
+        NSURL *url = [NSURL URLWithString:urlString];
+        if (url && url.isFileURL) {
+            std::string path = [url.path UTF8String];
+            filePaths.push_back(path);
+        } else {
+            // If it's not a file URL, try to use the string directly
+            std::string path = [urlString UTF8String];
+            filePaths.push_back(path);
+        }
+    }
+    
+    // Call the C++ SDK method
+    leafra::ResultCode result = _coreSDK->process_user_files(filePaths);
+    
+    if (result != leafra::ResultCode::SUCCESS && error) {
+        *error = [self errorFromResultCode:result message:@"Failed to process user files"];
+    }
+    
+    // Create response with processed file information
+    NSMutableArray *processedFiles = [NSMutableArray arrayWithCapacity:filePaths.size()];
+    for (const auto& path : filePaths) {
+        [processedFiles addObject:[NSString stringWithUTF8String:path.c_str()]];
+    }
+    
+    NSString *message = (result == leafra::ResultCode::SUCCESS) ? 
+        [NSString stringWithFormat:@"Successfully processed %lu files", (unsigned long)filePaths.size()] :
+        @"Failed to process some files";
+    
+    return @{
+        @"result": @((int)result),
+        @"processedFiles": processedFiles,
+        @"message": message
+    };
+}
+
 - (NSNumber *)calculateDistance2D:(NSDictionary *)p1 point2:(NSDictionary *)p2 error:(NSError **)error {
     if (!_mathUtils) {
         if (error) {

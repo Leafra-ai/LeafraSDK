@@ -71,6 +71,10 @@ const LeafraSDK = {
     return LeafraSDKNative.processData(input);
   },
   
+  async processUserFiles(fileUrls: string[]): Promise<ProcessDataResult> {
+    return LeafraSDKNative.processUserFiles(fileUrls);
+  },
+  
   async matrixDeterminant(matrix: Matrix3x3): Promise<number> {
     return LeafraSDKNative.matrixDeterminant(matrix);
   }
@@ -199,6 +203,39 @@ export default function TestInterface({ onBack }: TestInterfaceProps) {
     }
   };
 
+  const testFileProcessing = async () => {
+    try {
+      addResult('📄 Testing file processing...');
+      
+      if (!LeafraSDKNative) {
+        addResult('❌ Native module not available');
+        return;
+      }
+      
+      // Test with sample file URLs (these would normally come from file picker)
+      const testFileUrls = [
+        'file:///path/to/sample1.pdf',
+        'file:///path/to/sample2.pdf'
+      ];
+      
+      addResult(`📄 Processing ${testFileUrls.length} test files...`);
+      
+      const result = await LeafraSDK.processUserFiles(testFileUrls);
+      if (result.result === ResultCode.SUCCESS) {
+        addResult(`✅ File processing successful`);
+        addResult(`📄 Processed files: ${testFileUrls.length}`);
+        if (result.output && result.output.length > 0) {
+          addResult(`📊 Output data: [${result.output.slice(0, 5).join(', ')}...]`);
+        }
+      } else {
+        addResult(`❌ File processing failed: ${result.result}`);
+      }
+      
+    } catch (error) {
+      addResult(`💥 File processing error: ${error}`);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -212,6 +249,7 @@ export default function TestInterface({ onBack }: TestInterfaceProps) {
         <Button title="Test SDK" onPress={testSDKIntegration} />
         <Button title="Test Math" onPress={testMathOperations} />
         <Button title="Test Data" onPress={testDataProcessing} />
+        <Button title="Test File" onPress={testFileProcessing} />
       </View>
       
       <View style={styles.resultsContainer}>
@@ -264,6 +302,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginBottom: 20,
     gap: 10,
+    flexWrap: 'wrap',
   },
   resultsContainer: {
     flex: 1,

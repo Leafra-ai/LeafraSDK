@@ -8,7 +8,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
+
+import FileBrowserModal from './FileBrowserModal';
 
 interface Message {
   id: string;
@@ -22,6 +25,13 @@ interface ChatInterfaceProps {
   onSettings: () => void;
 }
 
+interface SelectedFile {
+  uri: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
 export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -32,6 +42,7 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
     },
   ]);
   const [inputText, setInputText] = useState('');
+  const [fileBrowserVisible, setFileBrowserVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const sendMessage = () => {
@@ -64,6 +75,53 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
     }, 100);
   };
 
+  const handleAddFiles = () => {
+    setFileBrowserVisible(true);
+  };
+
+  const handleFilesSelected = async (files: SelectedFile[]) => {
+    try {
+      // Add a message showing the selected files
+      const fileMessage: Message = {
+        id: Date.now().toString(),
+        text: `📎 Selected ${files.length} PDF file(s):\n${files.map(f => `• ${f.name}`).join('\n')}`,
+        timestamp: new Date(),
+        isUser: true,
+      };
+      setMessages(prev => [...prev, fileMessage]);
+
+      // Show processing message
+      setTimeout(() => {
+        const processingMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: 'Processing your files through LeafraSDK...',
+          timestamp: new Date(),
+          isUser: false,
+        };
+        setMessages(prev => [...prev, processingMessage]);
+      }, 500);
+
+      // Process files through SDK (this will be implemented in the next step)
+      setTimeout(() => {
+        const resultMessage: Message = {
+          id: (Date.now() + 2).toString(),
+          text: `✅ Successfully processed ${files.length} PDF files! The files have been analyzed and are ready for further operations. You can now ask questions about the content or use the test interface for detailed SDK operations.`,
+          timestamp: new Date(),
+          isUser: false,
+        };
+        setMessages(prev => [...prev, resultMessage]);
+      }, 2000);
+
+      // Scroll to bottom
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 2100);
+
+    } catch (error) {
+      Alert.alert('Error', 'Failed to process files: ' + error);
+    }
+  };
+
   const generateAIResponse = (userInput: string): string => {
     const input = userInput.toLowerCase();
     
@@ -75,6 +133,8 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
       return 'To test the SDK, tap the settings button (⚙️) in the top right and select "Test Interface" to access all testing features.';
     } else if (input.includes('help')) {
       return 'I can help you with:\n• SDK integration questions\n• Testing SDK features\n• Understanding SDK capabilities\n• Accessing the test interface\n\nWhat would you like to know?';
+    } else if (input.includes('file') || input.includes('pdf')) {
+      return 'You can add PDF files using the + button in the top right. I\'ll process them through LeafraSDK and help you analyze the content.';
     } else {
       return 'That\'s interesting! Feel free to ask me about LeafraSDK features, testing, or integration. You can also use the settings menu to access the test interface.';
     }
@@ -93,7 +153,7 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
       <View style={styles.header}>
         <Text style={styles.headerTitle}>LeafraSDK Chat</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.headerButton} onPress={onAddFiles}>
+          <TouchableOpacity style={styles.headerButton} onPress={handleAddFiles}>
             <Text style={styles.headerButtonText}>+</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={onSettings}>
@@ -153,6 +213,13 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
           <Text style={styles.sendButtonText}>Send</Text>
         </TouchableOpacity>
       </View>
+
+      {/* File Browser Modal */}
+      <FileBrowserModal
+        visible={fileBrowserVisible}
+        onClose={() => setFileBrowserVisible(false)}
+        onFilesSelected={handleFilesSelected}
+      />
     </KeyboardAvoidingView>
   );
 }

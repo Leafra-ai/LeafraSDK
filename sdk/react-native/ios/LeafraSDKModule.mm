@@ -115,6 +115,23 @@ RCT_EXPORT_METHOD(processData:(NSArray<NSNumber *> *)input
     });
 }
 
+RCT_EXPORT_METHOD(processUserFiles:(NSArray<NSString *> *)fileUrls
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSError *error = nil;
+        NSDictionary *result = [self.sdkBridge processUserFiles:fileUrls error:&error];
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                reject(@"PROCESS_FILES_ERROR", error.localizedDescription, error);
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
 RCT_EXPORT_METHOD(calculateDistance2D:(NSDictionary *)p1
                   point2:(NSDictionary *)p2
                   resolver:(RCTPromiseResolveBlock)resolve

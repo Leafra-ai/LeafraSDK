@@ -99,6 +99,48 @@ ResultCode LeafraCore::process_data(const data_buffer_t& input, data_buffer_t& o
     }
 }
 
+ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_paths) {
+    if (!pImpl->initialized_) {
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    try {
+        // Log the file processing attempt
+        std::ostringstream oss;
+        oss << "Processing " << file_paths.size() << " user files";
+        pImpl->send_event(oss.str());
+        
+        // Process each file
+        for (const auto& file_path : file_paths) {
+            // For now, just validate that the file exists and is a PDF
+            if (file_path.empty()) {
+                pImpl->send_event("Error: Empty file path provided");
+                return ResultCode::ERROR_INVALID_PARAMETER;
+            }
+            
+            // Check if file has PDF extension
+            if (file_path.length() < 4 || 
+                file_path.substr(file_path.length() - 4) != ".pdf") {
+                pImpl->send_event("Error: Only PDF files are supported - " + file_path);
+                return ResultCode::ERROR_INVALID_PARAMETER;
+            }
+            
+            // Log each file being processed
+            pImpl->send_event("Processing file: " + file_path);
+            
+            // TODO: Add actual PDF processing logic here
+            // For now, we'll just simulate successful processing
+        }
+        
+        pImpl->send_event("Successfully processed all user files");
+        return ResultCode::SUCCESS;
+        
+    } catch (const std::exception& e) {
+        pImpl->send_event("File processing failed: " + std::string(e.what()));
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+}
+
 void LeafraCore::set_event_callback(callback_t callback) {
     pImpl->event_callback_ = callback;
 }

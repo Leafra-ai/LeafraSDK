@@ -57,6 +57,13 @@ public:
     ResultCode process_data(const data_buffer_t& input, data_buffer_t& output);
     
     /**
+     * @brief Process user files through the SDK
+     * @param file_paths Vector of file paths to process
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode process_user_files(const std::vector<std::string>& file_paths);
+    
+    /**
      * @brief Set event callback
      * @param callback Function to be called on events
      */

@@ -52,6 +52,14 @@
 - (NSDictionary *)processData:(NSArray<NSNumber *> *)input error:(NSError **)error;
 
 /**
+ * @brief Process user files through the SDK
+ * @param fileUrls Array of file URL strings to process
+ * @param error Error pointer for error handling
+ * @return Dictionary containing result code and processing results
+ */
+- (NSDictionary *)processUserFiles:(NSArray<NSString *> *)fileUrls error:(NSError **)error;
+
+/**
  * @brief Calculate distance between two 2D points
  * @param p1 First point dictionary with x, y keys
  * @param p2 Second point dictionary with x, y keys

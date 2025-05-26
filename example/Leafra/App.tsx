@@ -12,14 +12,6 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('chat');
   const [settingsVisible, setSettingsVisible] = useState(false);
 
-  const handleAddFiles = () => {
-    Alert.alert(
-      'Add Files',
-      'File upload functionality will be implemented here.',
-      [{ text: 'OK' }]
-    );
-  };
-
   const handleSettings = () => {
     setSettingsVisible(true);
   };
@@ -41,7 +33,7 @@ export default function App() {
       case 'chat':
         return (
           <ChatInterface
-            onAddFiles={handleAddFiles}
+            onAddFiles={() => {}}
             onSettings={handleSettings}
           />
         );
@@ -50,7 +42,7 @@ export default function App() {
       default:
         return (
           <ChatInterface
-            onAddFiles={handleAddFiles}
+            onAddFiles={() => {}}
             onSettings={handleSettings}
           />
         );
