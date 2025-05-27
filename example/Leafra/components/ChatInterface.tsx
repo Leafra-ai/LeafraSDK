@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,9 +9,52 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  NativeModules,
 } from 'react-native';
 
 import FileBrowserModal from './FileBrowserModal';
+
+// SDK Integration
+const { LeafraSDK: LeafraSDKNative } = NativeModules;
+
+// SDK Types (copied from TestInterface for consistency)
+interface LeafraConfig {
+  name?: string;
+  version?: string;
+  debugMode?: boolean;
+  maxThreads?: number;
+  bufferSize?: number;
+}
+
+interface ProcessDataResult {
+  result: number;
+  output: number[];
+  message?: string;
+}
+
+enum ResultCode {
+  SUCCESS = 0,
+  ERROR_INITIALIZATION_FAILED = -1,
+  ERROR_INVALID_PARAMETER = -2,
+  ERROR_PROCESSING_FAILED = -3,
+  ERROR_NOT_IMPLEMENTED = -4,
+}
+
+// SDK Wrapper
+const LeafraSDK = {
+  async initialize(config: LeafraConfig): Promise<ResultCode> {
+    return LeafraSDKNative.initialize(config);
+  },
+  async isInitialized(): Promise<boolean> {
+    return LeafraSDKNative.isInitialized();
+  },
+  async processUserFiles(fileUrls: string[]): Promise<ProcessDataResult> {
+    return LeafraSDKNative.processUserFiles(fileUrls);
+  },
+  async getVersion(): Promise<string> {
+    return LeafraSDKNative.getVersion();
+  },
+};
 
 interface Message {
   id: string;
@@ -43,7 +86,70 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
   ]);
   const [inputText, setInputText] = useState('');
   const [fileBrowserVisible, setFileBrowserVisible] = useState(false);
+  const [sdkInitialized, setSdkInitialized] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Initialize SDK when component mounts
+  useEffect(() => {
+    initializeSDK();
+  }, []);
+
+  const initializeSDK = async () => {
+    try {
+      if (!LeafraSDKNative) {
+        console.log('❌ LeafraSDK native module not found');
+        return;
+      }
+
+      // Check if already initialized
+      const isInitialized = await LeafraSDK.isInitialized();
+      if (isInitialized) {
+        setSdkInitialized(true);
+        console.log('✅ SDK already initialized');
+        return;
+      }
+
+      // Initialize SDK
+      const config: LeafraConfig = {
+        name: 'LeafraChatApp',
+        version: '1.0.0',
+        debugMode: true,
+        maxThreads: 2,
+        bufferSize: 1024
+      };
+
+      const result = await LeafraSDK.initialize(config);
+      
+      if (result === ResultCode.SUCCESS) {
+        setSdkInitialized(true);
+        console.log('✅ SDK initialized successfully in ChatInterface');
+        
+        // Get SDK version for logging
+        const version = await LeafraSDK.getVersion();
+        console.log(`📱 LeafraSDK Version: ${version}`);
+      } else {
+        console.log(`❌ SDK initialization failed: ${result}`);
+      }
+      
+    } catch (error) {
+      console.log(`💥 SDK initialization error: ${error}`);
+    }
+  };
+
+  const addMessage = (text: string, isUser: boolean = false) => {
+    const message: Message = {
+      id: Date.now().toString() + Math.random(),
+      text,
+      timestamp: new Date(),
+      isUser,
+    };
+    setMessages(prev => [...prev, message]);
+    
+    // Scroll to bottom
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   const sendMessage = () => {
     if (inputText.trim() === '') return;
@@ -82,43 +188,57 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
   const handleFilesSelected = async (files: SelectedFile[]) => {
     try {
       // Add a message showing the selected files
-      const fileMessage: Message = {
-        id: Date.now().toString(),
-        text: `📎 Selected ${files.length} PDF file(s):\n${files.map(f => `• ${f.name}`).join('\n')}`,
-        timestamp: new Date(),
-        isUser: true,
-      };
-      setMessages(prev => [...prev, fileMessage]);
+      addMessage(`📎 Selected ${files.length} PDF file(s):\n${files.map(f => `• ${f.name}`).join('\n')}`, true);
+
+      // Check if SDK is initialized
+      if (!sdkInitialized) {
+        addMessage('⚠️ SDK not initialized. Attempting to initialize...');
+        await initializeSDK();
+        
+        if (!sdkInitialized) {
+          addMessage('❌ Failed to initialize SDK. Please try again or use the test interface.');
+          return;
+        }
+      }
 
       // Show processing message
-      setTimeout(() => {
-        const processingMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: 'Processing your files through LeafraSDK...',
-          timestamp: new Date(),
-          isUser: false,
-        };
-        setMessages(prev => [...prev, processingMessage]);
-      }, 500);
+      addMessage('🔄 Processing your files through LeafraSDK...');
 
-      // Process files through SDK (this will be implemented in the next step)
-      setTimeout(() => {
-        const resultMessage: Message = {
-          id: (Date.now() + 2).toString(),
-          text: `✅ Successfully processed ${files.length} PDF files! The files have been analyzed and are ready for further operations. You can now ask questions about the content or use the test interface for detailed SDK operations.`,
-          timestamp: new Date(),
-          isUser: false,
-        };
-        setMessages(prev => [...prev, resultMessage]);
-      }, 2000);
+      // Extract file URLs for SDK processing
+      const fileUrls = files.map(file => file.uri);
+      console.log('📄 Processing files:', fileUrls);
 
-      // Scroll to bottom
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 2100);
+      try {
+        // Actually call the SDK to process files
+        const result = await LeafraSDK.processUserFiles(fileUrls);
+        
+        if (result.result === ResultCode.SUCCESS) {
+          addMessage(`✅ Successfully processed ${files.length} PDF files through LeafraSDK!`);
+          addMessage(`📊 Processing completed. The files have been analyzed using PDFium and are ready for further operations.`);
+          
+          // Log additional details if available
+          if (result.output && result.output.length > 0) {
+            console.log('📊 SDK Output:', result.output);
+            addMessage(`📈 Generated ${result.output.length} data points from the analysis.`);
+          }
+          
+          if (result.message) {
+            console.log('📝 SDK Message:', result.message);
+          }
+          
+        } else {
+          addMessage(`❌ File processing failed with error code: ${result.result}`);
+          console.log('❌ SDK processing failed:', result);
+        }
+        
+      } catch (sdkError) {
+        console.log('💥 SDK processing error:', sdkError);
+        addMessage(`❌ SDK processing error: ${sdkError}`);
+      }
 
     } catch (error) {
-      Alert.alert('Error', 'Failed to process files: ' + error);
+      console.log('💥 File selection error:', error);
+      addMessage(`❌ Failed to process files: ${error}`);
     }
   };
 
@@ -126,17 +246,19 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
     const input = userInput.toLowerCase();
     
     if (input.includes('hello') || input.includes('hi')) {
-      return 'Hello! I\'m here to help you with LeafraSDK. You can ask me about SDK features, integration, or use the settings menu to access the test interface.';
+      return `Hello! I'm here to help you with LeafraSDK. The SDK is ${sdkInitialized ? '✅ initialized and ready' : '⚠️ not yet initialized'}. You can ask me about SDK features, upload PDF files for processing, or use the settings menu to access the test interface.`;
     } else if (input.includes('sdk') || input.includes('leafra')) {
-      return 'LeafraSDK provides powerful data processing and mathematical operations. You can test the SDK functionality through the settings menu → Test Interface.';
+      return `LeafraSDK is ${sdkInitialized ? '✅ active and ready for processing' : '⚠️ initializing'}. It provides powerful PDF processing with PDFium integration, data processing, and mathematical operations. You can upload PDF files using the + button or access advanced testing through the settings menu.`;
     } else if (input.includes('test')) {
-      return 'To test the SDK, tap the settings button (⚙️) in the top right and select "Test Interface" to access all testing features.';
+      return 'You can test the SDK in two ways:\n• Upload PDF files using the + button for real-time processing\n• Use the settings button (⚙️) → "Test Interface" for comprehensive SDK testing';
     } else if (input.includes('help')) {
-      return 'I can help you with:\n• SDK integration questions\n• Testing SDK features\n• Understanding SDK capabilities\n• Accessing the test interface\n\nWhat would you like to know?';
+      return `I can help you with:\n• ${sdkInitialized ? '✅' : '⚠️'} SDK integration and features\n• PDF file processing (use + button)\n• Understanding SDK capabilities\n• Accessing the test interface\n\nWhat would you like to know?`;
     } else if (input.includes('file') || input.includes('pdf')) {
-      return 'You can add PDF files using the + button in the top right. I\'ll process them through LeafraSDK and help you analyze the content.';
+      return `You can upload PDF files using the + button in the top right. ${sdkInitialized ? 'The SDK is ready to process them with PDFium for text extraction and analysis!' : 'I\'ll initialize the SDK and process them for you.'}`;
+    } else if (input.includes('status') || input.includes('initialized')) {
+      return `SDK Status: ${sdkInitialized ? '✅ Initialized and ready for processing' : '⚠️ Not initialized - will initialize when needed'}`;
     } else {
-      return 'That\'s interesting! Feel free to ask me about LeafraSDK features, testing, or integration. You can also use the settings menu to access the test interface.';
+      return `That's interesting! The LeafraSDK is ${sdkInitialized ? '✅ ready to help' : '⚠️ initializing'}. Feel free to ask me about SDK features, upload PDF files for processing, or use the settings menu to access the test interface.`;
     }
   };
 
