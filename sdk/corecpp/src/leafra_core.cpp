@@ -3,6 +3,7 @@
 #include "leafra/math_utils.h"
 #include "leafra/platform_utils.h"
 #include "leafra/logger.h"
+#include "leafra/leafra_parsing.h"
 #include <iostream>
 #include <sstream>
 
@@ -22,15 +23,17 @@ public:
     callback_t event_callback_;
     std::unique_ptr<DataProcessor> data_processor_;
     std::unique_ptr<MathUtils> math_utils_;
+    std::unique_ptr<FileParsingWrapper> file_parser_;
     
     Impl() : initialized_(false), event_callback_(nullptr) {
         data_processor_ = std::make_unique<DataProcessor>();
         math_utils_ = std::make_unique<MathUtils>();
+        file_parser_ = std::make_unique<FileParsingWrapper>();
     }
     
     void send_event(const std::string& message) {
         if (event_callback_) {
-            event_callback_(message);
+            event_callback_(message.c_str());
         }
     }
 };
@@ -70,6 +73,16 @@ ResultCode LeafraCore::initialize(const Config& config) {
             LEAFRA_DEBUG() << "Data processor initialized successfully";
         }
         
+        // Initialize file parser
+        if (pImpl->file_parser_) {
+            bool result = pImpl->file_parser_->initialize();
+            if (!result) {
+                LEAFRA_ERROR() << "Failed to initialize file parser";
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            LEAFRA_DEBUG() << "File parser initialized successfully";
+        }
+        
         pImpl->initialized_ = true;
         LEAFRA_INFO() << "LeafraSDK initialized successfully";
         
@@ -95,6 +108,12 @@ ResultCode LeafraCore::shutdown() {
     }
     
     try {
+        // Shutdown file parser
+        if (pImpl->file_parser_) {
+            pImpl->file_parser_->shutdown();
+            LEAFRA_DEBUG() << "File parser shutdown completed";
+        }
+        
         pImpl->initialized_ = false;
         pImpl->send_event("LeafraSDK shutdown completed");
         return ResultCode::SUCCESS;
@@ -130,86 +149,90 @@ ResultCode LeafraCore::process_data(const data_buffer_t& input, data_buffer_t& o
 }
 
 ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_paths) {
+    if (!pImpl->initialized_) {
+        LEAFRA_ERROR() << "LeafraCore not initialized";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    if (!pImpl->file_parser_) {
+        LEAFRA_ERROR() << "File parser not available";
+        return ResultCode::ERROR_NOT_IMPLEMENTED;
+    }
+    
     LEAFRA_INFO() << "Processing " << file_paths.size() << " user files";
     pImpl->send_event("Processing " + std::to_string(file_paths.size()) + " user files");
     
+    size_t processed_count = 0;
+    size_t error_count = 0;
+    
     for (const auto& file_path : file_paths) {
-        LEAFRA_DEBUG() << "Processing file: " << file_path;
+        LEAFRA_INFO() << "Processing file: " << file_path;
         pImpl->send_event("Processing file: " + file_path);
         
-        // Validate file exists and is PDF
-        if (file_path.substr(file_path.find_last_of(".") + 1) != "pdf") {
-            LEAFRA_WARNING() << "Skipping non-PDF file: " << file_path;
-            pImpl->send_event("Skipping non-PDF file: " + file_path);
+        // Check if file type is supported
+        if (!pImpl->file_parser_->isFileTypeSupported(file_path)) {
+            LEAFRA_WARNING() << "Unsupported file type: " << file_path;
+            pImpl->send_event("Unsupported file type: " + file_path);
+            error_count++;
             continue;
         }
         
-#ifdef LEAFRA_HAS_PDFIUM
-        LEAFRA_DEBUG() << "Initializing PDFium for file processing";
+        // Parse the file using the appropriate adapter
+        ParsedDocument result = pImpl->file_parser_->parseFile(file_path);
         
-        // Initialize PDFium (call once)
-        static bool pdfium_initialized = false;
-        if (!pdfium_initialized) {
-            FPDF_InitLibrary();
-            pdfium_initialized = true;
-            LEAFRA_INFO() << "PDFium library initialized";
-        }
-        
-        // Load PDF document
-        FPDF_DOCUMENT document = FPDF_LoadDocument(file_path.c_str(), nullptr);
-        if (!document) {
-            LEAFRA_ERROR() << "Failed to load PDF: " << file_path;
-            pImpl->send_event("Failed to load PDF: " + file_path);
-            continue;
-        }
-        
-        // Get page count
-        int page_count = FPDF_GetPageCount(document);
-        LEAFRA_INFO() << "PDF has " << page_count << " pages: " << file_path;
-        pImpl->send_event("PDF has " + std::to_string(page_count) + " pages");
-        
-        // Process each page
-        for (int i = 0; i < page_count; ++i) {
-            FPDF_PAGE page = FPDF_LoadPage(document, i);
-            if (!page) {
-                LEAFRA_WARNING() << "Failed to load page " << (i + 1) << " from " << file_path;
-                continue;
+        if (result.isValid) {
+            processed_count++;
+            
+            // Log parsing results
+            LEAFRA_INFO() << "Successfully parsed " << result.fileType << " file: " << file_path;
+            LEAFRA_INFO() << "  - Title: " << result.title;
+            LEAFRA_INFO() << "  - Author: " << result.author;
+            LEAFRA_INFO() << "  - Pages: " << result.getPageCount();
+            LEAFRA_INFO() << "  - Total text length: " << result.getAllText().length() << " characters";
+            
+            // Send detailed events
+            pImpl->send_event("✅ Parsed " + result.fileType + ": " + file_path);
+            pImpl->send_event("📄 Pages: " + std::to_string(result.getPageCount()));
+            pImpl->send_event("📝 Text length: " + std::to_string(result.getAllText().length()) + " chars");
+            
+            if (!result.title.empty()) {
+                pImpl->send_event("📖 Title: " + result.title);
+            }
+            if (!result.author.empty()) {
+                pImpl->send_event("👤 Author: " + result.author);
             }
             
-            // Extract text from page
-            FPDF_TEXTPAGE text_page = FPDFText_LoadPage(page);
-            if (text_page) {
-                int char_count = FPDFText_CountChars(text_page);
-                LEAFRA_DEBUG() << "Page " << (i + 1) << " has " << char_count << " characters";
-                pImpl->send_event("Page " + std::to_string(i + 1) + " has " + std::to_string(char_count) + " characters");
-                
-                // Get text content (simplified example)
-                if (char_count > 0) {
-                    std::vector<unsigned short> buffer(char_count + 1);
-                    FPDFText_GetText(text_page, 0, char_count, buffer.data());
-                    // Convert and process text as needed
-                    LEAFRA_DEBUG() << "Extracted text from page " << (i + 1);
-                    pImpl->send_event("Extracted text from page " + std::to_string(i + 1));
+            // Log metadata if available
+            for (const auto& [key, value] : result.metadata) {
+                if (!value.empty()) {
+                    LEAFRA_DEBUG() << "  - " << key << ": " << value;
                 }
-                
-                FPDFText_ClosePage(text_page);
             }
             
-            FPDF_ClosePage(page);
+        } else {
+            error_count++;
+            LEAFRA_ERROR() << "Failed to parse file: " << file_path << " - " << result.errorMessage;
+            pImpl->send_event("❌ Failed to parse: " + file_path + " - " + result.errorMessage);
         }
-        
-        FPDF_CloseDocument(document);
-        LEAFRA_INFO() << "Successfully processed PDF: " << file_path;
-        pImpl->send_event("Successfully processed PDF: " + file_path);
-#else
-        LEAFRA_WARNING() << "PDFium not available - simulating processing: " << file_path;
-        pImpl->send_event("PDFium not available - simulating processing: " + file_path);
-#endif
     }
     
-    LEAFRA_INFO() << "File processing completed successfully";
-    pImpl->send_event("File processing completed");
-    return ResultCode::SUCCESS;
+    // Summary
+    LEAFRA_INFO() << "File processing completed - Processed: " << processed_count 
+                  << ", Errors: " << error_count << ", Total: " << file_paths.size();
+    
+    pImpl->send_event("📊 Processing summary: " + std::to_string(processed_count) + 
+                     " successful, " + std::to_string(error_count) + " failed");
+    
+    if (processed_count > 0) {
+        pImpl->send_event("✅ File processing completed successfully");
+        return ResultCode::SUCCESS;
+    } else if (error_count == file_paths.size()) {
+        pImpl->send_event("❌ All files failed to process");
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    } else {
+        pImpl->send_event("⚠️ File processing completed with some errors");
+        return ResultCode::SUCCESS; // Partial success
+    }
 }
 
 void LeafraCore::set_event_callback(callback_t callback) {

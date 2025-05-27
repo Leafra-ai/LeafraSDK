@@ -76,6 +76,12 @@ Pod::Spec.new do |s|
     touch corecpp/src/math_utils.cpp
     touch corecpp/src/data_processor.cpp
     touch corecpp/src/platform_utils.cpp
+    touch corecpp/src/logger.cpp
+    touch corecpp/src/leafra_parsing.cpp
+    touch corecpp/src/leafra_parsing_adapter_pdf.cpp
+    touch corecpp/src/leafra_parsing_adapter_txt.cpp
+    touch corecpp/src/leafra_parsing_adapter_docx.cpp
+    touch corecpp/src/leafra_parsing_adapter_excel.cpp
   CMD
   
   # Subspecs for modular inclusion

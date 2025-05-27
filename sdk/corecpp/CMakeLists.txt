@@ -7,6 +7,7 @@ set(LEAFRA_CORE_SOURCES
     src/math_utils.cpp
     src/platform_utils.cpp
     src/logger.cpp
+    src/leafra_parsing.cpp
 )
 
 # Core library headers
@@ -17,6 +18,7 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/platform_utils.h
     include/leafra/types.h
     include/leafra/logger.h
+    include/leafra/leafra_parsing.h
 )
 
 # Create the core library
