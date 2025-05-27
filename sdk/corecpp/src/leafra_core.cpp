@@ -5,6 +5,12 @@
 #include <iostream>
 #include <sstream>
 
+#ifdef LEAFRA_HAS_PDFIUM
+#include "fpdfview.h"
+#include "fpdf_text.h"
+#include "fpdf_doc.h"
+#endif
+
 namespace leafra {
 
 // Private implementation class (PIMPL pattern)
@@ -100,45 +106,70 @@ ResultCode LeafraCore::process_data(const data_buffer_t& input, data_buffer_t& o
 }
 
 ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_paths) {
-    if (!pImpl->initialized_) {
-        return ResultCode::ERROR_INITIALIZATION_FAILED;
-    }
+    pImpl->send_event("Processing " + std::to_string(file_paths.size()) + " user files");
     
-    try {
-        // Log the file processing attempt
-        std::ostringstream oss;
-        oss << "Processing " << file_paths.size() << " user files";
-        pImpl->send_event(oss.str());
+    for (const auto& file_path : file_paths) {
+        pImpl->send_event("Processing file: " + file_path);
         
-        // Process each file
-        for (const auto& file_path : file_paths) {
-            // For now, just validate that the file exists and is a PDF
-            if (file_path.empty()) {
-                pImpl->send_event("Error: Empty file path provided");
-                return ResultCode::ERROR_INVALID_PARAMETER;
-            }
-            
-            // Check if file has PDF extension
-            if (file_path.length() < 4 || 
-                file_path.substr(file_path.length() - 4) != ".pdf") {
-                pImpl->send_event("Error: Only PDF files are supported - " + file_path);
-                return ResultCode::ERROR_INVALID_PARAMETER;
-            }
-            
-            // Log each file being processed
-            pImpl->send_event("Processing file: " + file_path);
-            
-            // TODO: Add actual PDF processing logic here
-            // For now, we'll just simulate successful processing
+        // Validate file exists and is PDF
+        if (file_path.substr(file_path.find_last_of(".") + 1) != "pdf") {
+            pImpl->send_event("Skipping non-PDF file: " + file_path);
+            continue;
         }
         
-        pImpl->send_event("Successfully processed all user files");
-        return ResultCode::SUCCESS;
+#ifdef LEAFRA_HAS_PDFIUM
+        // Initialize PDFium (call once)
+        static bool pdfium_initialized = false;
+        if (!pdfium_initialized) {
+            FPDF_InitLibrary();
+            pdfium_initialized = true;
+        }
         
-    } catch (const std::exception& e) {
-        pImpl->send_event("File processing failed: " + std::string(e.what()));
-        return ResultCode::ERROR_PROCESSING_FAILED;
+        // Load PDF document
+        FPDF_DOCUMENT document = FPDF_LoadDocument(file_path.c_str(), nullptr);
+        if (!document) {
+            pImpl->send_event("Failed to load PDF: " + file_path);
+            continue;
+        }
+        
+        // Get page count
+        int page_count = FPDF_GetPageCount(document);
+        pImpl->send_event("PDF has " + std::to_string(page_count) + " pages");
+        
+        // Process each page
+        for (int i = 0; i < page_count; ++i) {
+            FPDF_PAGE page = FPDF_LoadPage(document, i);
+            if (!page) continue;
+            
+            // Extract text from page
+            FPDF_TEXTPAGE text_page = FPDFText_LoadPage(page);
+            if (text_page) {
+                int char_count = FPDFText_CountChars(text_page);
+                pImpl->send_event("Page " + std::to_string(i + 1) + " has " + std::to_string(char_count) + " characters");
+                
+                // Get text content (simplified example)
+                if (char_count > 0) {
+                    std::vector<unsigned short> buffer(char_count + 1);
+                    FPDFText_GetText(text_page, 0, char_count, buffer.data());
+                    // Convert and process text as needed
+                    pImpl->send_event("Extracted text from page " + std::to_string(i + 1));
+                }
+                
+                FPDFText_ClosePage(text_page);
+            }
+            
+            FPDF_ClosePage(page);
+        }
+        
+        FPDF_CloseDocument(document);
+        pImpl->send_event("Successfully processed PDF: " + file_path);
+#else
+        pImpl->send_event("PDFium not available - simulating processing: " + file_path);
+#endif
     }
+    
+    pImpl->send_event("File processing completed");
+    return ResultCode::SUCCESS;
 }
 
 void LeafraCore::set_event_callback(callback_t callback) {

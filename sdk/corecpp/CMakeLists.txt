@@ -40,6 +40,15 @@ target_include_directories(LeafraCore
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Link PDFium if available (defined in parent CMakeLists.txt)
+if(TARGET PDFium::PDFium)
+    target_link_libraries(LeafraCore PRIVATE PDFium::PDFium)
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_PDFIUM=1)
+    message(STATUS "✅ LeafraCore linked with PDFium")
+else()
+    message(STATUS "⚠️  Building LeafraCore without PDFium")
+endif()
+
 # Compiler definitions
 target_compile_definitions(LeafraCore PRIVATE
     LEAFRA_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
