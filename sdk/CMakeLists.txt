@@ -47,7 +47,7 @@ if(APPLE)
         endif()
         
         set(PDFIUM_LIBRARY "${PDFIUM_PLATFORM_DIR}/libpdfium.a")
-        set(PDFIUM_INCLUDE_DIR "${PDFIUM_PLATFORM_DIR}/Headers")
+        set(PDFIUM_INCLUDE_DIR "${PDFIUM_ROOT_DIR}/ios/release/include")
         
     else()
         # macOS

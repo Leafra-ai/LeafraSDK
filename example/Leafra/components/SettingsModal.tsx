@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  Switch,
 } from 'react-native';
+import { SDKConfigManager, getEnvironmentInfo } from '../config/sdkConfig';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -15,6 +17,17 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ visible, onClose, onTestInterface }: SettingsModalProps) {
+  const [debugMode, setDebugMode] = React.useState(
+    SDKConfigManager.getInstance().getDebugMode()
+  );
+  
+  const envInfo = getEnvironmentInfo();
+
+  const handleDebugToggle = (value: boolean) => {
+    setDebugMode(value);
+    SDKConfigManager.getInstance().setDebugMode(value);
+  };
+
   const settingsOptions = [
     {
       id: 'test',
@@ -74,6 +87,87 @@ export default function SettingsModal({ visible, onClose, onTestInterface }: Set
           </TouchableOpacity>
         </View>
 
+        {/* Debug Configuration */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Debug Configuration</Text>
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Debug Mode</Text>
+              <Text style={styles.settingDescription}>
+                Enable detailed logging and debug output
+              </Text>
+            </View>
+            <Switch
+              value={debugMode}
+              onValueChange={handleDebugToggle}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+              thumbColor={debugMode ? '#007AFF' : '#f4f3f4'}
+            />
+          </View>
+        </View>
+
+        {/* Environment Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Environment Info</Text>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Build Type:</Text>
+            <Text style={styles.infoValue}>{envInfo.buildType}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>React Native __DEV__:</Text>
+            <Text style={styles.infoValue}>{envInfo.__DEV__ ? 'true' : 'false'}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Current Debug Mode:</Text>
+            <Text style={styles.infoValue}>{envInfo.debugMode ? 'enabled' : 'disabled'}</Text>
+          </View>
+          
+          {envInfo.forceDebug && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Force Debug:</Text>
+              <Text style={[styles.infoValue, styles.warningText]}>ENABLED</Text>
+            </View>
+          )}
+          
+          {envInfo.forceProduction && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Force Production:</Text>
+              <Text style={[styles.infoValue, styles.warningText]}>ENABLED</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Developer Tools */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Developer Tools</Text>
+          
+          <TouchableOpacity style={styles.menuItem} onPress={onTestInterface}>
+            <Text style={styles.menuItemText}>🧪 Test Interface</Text>
+            <Text style={styles.menuItemDescription}>
+              Access SDK testing and debugging tools
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* App Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App Information</Text>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>App Version:</Text>
+            <Text style={styles.infoValue}>1.0.0</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>LeafraSDK:</Text>
+            <Text style={styles.infoValue}>Integrated</Text>
+          </View>
+        </View>
+
         {/* Settings Options */}
         <ScrollView style={styles.content}>
           <View style={styles.section}>
@@ -94,15 +188,6 @@ export default function SettingsModal({ visible, onClose, onTestInterface }: Set
                 <Text style={styles.optionArrow}>›</Text>
               </TouchableOpacity>
             ))}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>App Information</Text>
-            <View style={styles.infoContainer}>
-              <Text style={styles.infoText}>LeafraSDK Demo App</Text>
-              <Text style={styles.infoSubtext}>Version 1.0.0</Text>
-              <Text style={styles.infoSubtext}>React Native Integration</Text>
-            </View>
           </View>
         </ScrollView>
       </View>
@@ -219,5 +304,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 2,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  settingInfo: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2,
+  },
+  settingDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  infoLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 10,
+  },
+  infoValue: {
+    fontSize: 16,
+    color: '#666',
+  },
+  warningText: {
+    color: '#FF0000',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 10,
+  },
+  menuItemDescription: {
+    fontSize: 14,
+    color: '#666',
   },
 }); 

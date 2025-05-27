@@ -6,6 +6,7 @@ set(LEAFRA_CORE_SOURCES
     src/data_processor.cpp
     src/math_utils.cpp
     src/platform_utils.cpp
+    src/logger.cpp
 )
 
 # Core library headers
@@ -15,6 +16,7 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/math_utils.h
     include/leafra/platform_utils.h
     include/leafra/types.h
+    include/leafra/logger.h
 )
 
 # Create the core library
@@ -47,6 +49,17 @@ if(TARGET PDFium::PDFium)
     message(STATUS "✅ LeafraCore linked with PDFium")
 else()
     message(STATUS "⚠️  Building LeafraCore without PDFium")
+endif()
+
+# Platform-specific libraries for logging
+if(APPLE)
+    # iOS/macOS - os_log is part of the system, link Foundation framework
+    target_link_libraries(LeafraCore PRIVATE "-framework Foundation")
+elseif(ANDROID)
+    # Android - link with log library
+    target_link_libraries(LeafraCore PRIVATE log)
+elseif(WIN32)
+    # Windows - no additional libraries needed for OutputDebugString
 endif()
 
 # Compiler definitions

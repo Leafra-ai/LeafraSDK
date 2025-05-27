@@ -2,6 +2,7 @@
 #include "leafra/data_processor.h"
 #include "leafra/math_utils.h"
 #include "leafra/platform_utils.h"
+#include "leafra/logger.h"
 #include <iostream>
 #include <sstream>
 
@@ -47,19 +48,42 @@ ResultCode LeafraCore::initialize(const Config& config) {
     try {
         pImpl->config_ = config;
         
+        // Initialize logging system
+        Logger& logger = Logger::getInstance();
+        if (config.debug_mode) {
+            logger.setLogLevel(LogLevel::LEAFRA_DEBUG);
+            LEAFRA_INFO() << "Debug logging enabled";
+        } else {
+            logger.setLogLevel(LogLevel::LEAFRA_INFO);
+        }
+        
+        LEAFRA_INFO() << "Initializing LeafraSDK v" << get_version();
+        LEAFRA_DEBUG() << "Config - Name: " << config.name << ", Threads: " << config.max_threads << ", Buffer: " << config.buffer_size;
+        
         // Initialize data processor
         if (pImpl->data_processor_) {
             ResultCode result = pImpl->data_processor_->initialize();
             if (result != ResultCode::SUCCESS) {
+                LEAFRA_ERROR() << "Failed to initialize data processor";
                 return result;
             }
+            LEAFRA_DEBUG() << "Data processor initialized successfully";
         }
         
         pImpl->initialized_ = true;
+        LEAFRA_INFO() << "LeafraSDK initialized successfully";
+        
+#ifdef LEAFRA_HAS_PDFIUM
+        LEAFRA_INFO() << "✅ PDFium integration: ENABLED";
+#else
+        LEAFRA_WARNING() << "⚠️  PDFium integration: DISABLED (library not found)";
+#endif
+        
         pImpl->send_event("LeafraSDK initialized successfully");
         
         return ResultCode::SUCCESS;
     } catch (const std::exception& e) {
+        LEAFRA_ERROR() << "Initialization failed: " << e.what();
         pImpl->send_event("Initialization failed: " + std::string(e.what()));
         return ResultCode::ERROR_INITIALIZATION_FAILED;
     }
@@ -106,45 +130,57 @@ ResultCode LeafraCore::process_data(const data_buffer_t& input, data_buffer_t& o
 }
 
 ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_paths) {
+    LEAFRA_INFO() << "Processing " << file_paths.size() << " user files";
     pImpl->send_event("Processing " + std::to_string(file_paths.size()) + " user files");
     
     for (const auto& file_path : file_paths) {
+        LEAFRA_DEBUG() << "Processing file: " << file_path;
         pImpl->send_event("Processing file: " + file_path);
         
         // Validate file exists and is PDF
         if (file_path.substr(file_path.find_last_of(".") + 1) != "pdf") {
+            LEAFRA_WARNING() << "Skipping non-PDF file: " << file_path;
             pImpl->send_event("Skipping non-PDF file: " + file_path);
             continue;
         }
         
 #ifdef LEAFRA_HAS_PDFIUM
+        LEAFRA_DEBUG() << "Initializing PDFium for file processing";
+        
         // Initialize PDFium (call once)
         static bool pdfium_initialized = false;
         if (!pdfium_initialized) {
             FPDF_InitLibrary();
             pdfium_initialized = true;
+            LEAFRA_INFO() << "PDFium library initialized";
         }
         
         // Load PDF document
         FPDF_DOCUMENT document = FPDF_LoadDocument(file_path.c_str(), nullptr);
         if (!document) {
+            LEAFRA_ERROR() << "Failed to load PDF: " << file_path;
             pImpl->send_event("Failed to load PDF: " + file_path);
             continue;
         }
         
         // Get page count
         int page_count = FPDF_GetPageCount(document);
+        LEAFRA_INFO() << "PDF has " << page_count << " pages: " << file_path;
         pImpl->send_event("PDF has " + std::to_string(page_count) + " pages");
         
         // Process each page
         for (int i = 0; i < page_count; ++i) {
             FPDF_PAGE page = FPDF_LoadPage(document, i);
-            if (!page) continue;
+            if (!page) {
+                LEAFRA_WARNING() << "Failed to load page " << (i + 1) << " from " << file_path;
+                continue;
+            }
             
             // Extract text from page
             FPDF_TEXTPAGE text_page = FPDFText_LoadPage(page);
             if (text_page) {
                 int char_count = FPDFText_CountChars(text_page);
+                LEAFRA_DEBUG() << "Page " << (i + 1) << " has " << char_count << " characters";
                 pImpl->send_event("Page " + std::to_string(i + 1) + " has " + std::to_string(char_count) + " characters");
                 
                 // Get text content (simplified example)
@@ -152,6 +188,7 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                     std::vector<unsigned short> buffer(char_count + 1);
                     FPDFText_GetText(text_page, 0, char_count, buffer.data());
                     // Convert and process text as needed
+                    LEAFRA_DEBUG() << "Extracted text from page " << (i + 1);
                     pImpl->send_event("Extracted text from page " + std::to_string(i + 1));
                 }
                 
@@ -162,12 +199,15 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
         }
         
         FPDF_CloseDocument(document);
+        LEAFRA_INFO() << "Successfully processed PDF: " << file_path;
         pImpl->send_event("Successfully processed PDF: " + file_path);
 #else
+        LEAFRA_WARNING() << "PDFium not available - simulating processing: " << file_path;
         pImpl->send_event("PDFium not available - simulating processing: " + file_path);
 #endif
     }
     
+    LEAFRA_INFO() << "File processing completed successfully";
     pImpl->send_event("File processing completed");
     return ResultCode::SUCCESS;
 }

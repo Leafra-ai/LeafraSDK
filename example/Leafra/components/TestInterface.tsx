@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, Button, ScrollView, NativeModules } from 'react-native';
+import { getSDKConfig } from '../config/sdkConfig';
 
 // Direct import from NativeModules instead of package
 const { LeafraSDK: LeafraSDKNative } = NativeModules;
@@ -107,13 +108,7 @@ export default function TestInterface({ onBack }: TestInterfaceProps) {
       addResult('✅ LeafraSDK native module found!');
       addResult('📋 Available methods: ' + Object.keys(LeafraSDKNative).join(', '));
       
-      const config: LeafraConfig = {
-        name: 'LeafraTestApp',
-        version: '1.0.0',
-        debugMode: true,
-        maxThreads: 2,
-        bufferSize: 512
-      };
+      const config: LeafraConfig = getSDKConfig('test');
 
       const result = await LeafraSDK.initialize(config);
       

@@ -44,19 +44,22 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'CLANG_CXX_LIBRARY' => 'libc++',
-    'GCC_PREPROCESSOR_DEFINITIONS' => 'LEAFRA_EXPORTS=1',
-    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include',
+    'GCC_PREPROCESSOR_DEFINITIONS' => 'LEAFRA_EXPORTS=1 LEAFRA_HAS_PDFIUM=1',
+    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include $(PODS_TARGET_SRCROOT)/corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/include',
     'OTHER_CPLUSPLUSFLAGS' => '-fvisibility=hidden -fvisibility-inlines-hidden'
   }
   
   # User target settings
   s.user_target_xcconfig = {
-    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include'
+    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include $(PODS_TARGET_SRCROOT)/corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/include'
   }
   
   # Framework settings
   s.frameworks = ['Foundation', 'CoreFoundation']
   s.libraries = ['c++']
+  
+  # PDFium integration
+  s.ios.vendored_frameworks = 'corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/pdfium.xcframework'
   
   # Module map for proper header exposure
   s.module_map = false

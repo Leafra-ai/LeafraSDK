@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import FileBrowserModal from './FileBrowserModal';
+import { getSDKConfig } from '../config/sdkConfig';
 
 // SDK Integration
 const { LeafraSDK: LeafraSDKNative } = NativeModules;
@@ -110,13 +111,7 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
       }
 
       // Initialize SDK
-      const config: LeafraConfig = {
-        name: 'LeafraChatApp',
-        version: '1.0.0',
-        debugMode: true,
-        maxThreads: 2,
-        bufferSize: 1024
-      };
+      const config: LeafraConfig = getSDKConfig();
 
       const result = await LeafraSDK.initialize(config);
       

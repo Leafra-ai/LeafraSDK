@@ -8,8 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		19669B267E7C9C00D440C947 /* libPods-Leafra.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7AE1F3B7D6C0521A5B5AEDE5 /* libPods-Leafra.a */; };
 		24F792D9F00738FC0524946B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */; };
-		3DE006AB28B97C0D00415A18 /* libPods-Leafra.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 25F00A9DDC5BF5424DBBA176 /* libPods-Leafra.a */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5B202CD46E9F2F48D1493AAA /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
@@ -20,16 +20,16 @@
 		13B07F961A680F5B00A75B9A /* Leafra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Leafra.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Leafra/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Leafra/Info.plist; sourceTree = "<group>"; };
-		25F00A9DDC5BF5424DBBA176 /* libPods-Leafra.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Leafra.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7AE1F3B7D6C0521A5B5AEDE5 /* libPods-Leafra.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Leafra.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Leafra/SplashScreen.storyboard; sourceTree = "<group>"; };
-		AA94DDDEE95CE14A8B40066D /* Pods-Leafra.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.release.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.release.xcconfig"; sourceTree = "<group>"; };
 		AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Leafra/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		BA8BE572B26B43639D8EBFFB /* Pods-Leafra.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.release.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Leafra/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		D72A48946E69FB2A6846288A /* Pods-Leafra.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.debug.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Leafra/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Leafra-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Leafra-Bridging-Header.h"; path = "Leafra/Leafra-Bridging-Header.h"; sourceTree = "<group>"; };
-		F5B56288C754EE096F589C6E /* Pods-Leafra.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.debug.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,13 +37,23 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3DE006AB28B97C0D00415A18 /* libPods-Leafra.a in Frameworks */,
+				19669B267E7C9C00D440C947 /* libPods-Leafra.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		02CA399627FDC64B7F867E28 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				D72A48946E69FB2A6846288A /* Pods-Leafra.debug.xcconfig */,
+				BA8BE572B26B43639D8EBFFB /* Pods-Leafra.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* Leafra */ = {
 			isa = PBXGroup;
 			children = (
@@ -62,7 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				25F00A9DDC5BF5424DBBA176 /* libPods-Leafra.a */,
+				7AE1F3B7D6C0521A5B5AEDE5 /* libPods-Leafra.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -89,8 +99,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				F5AE6A67BBEA558BA170B739 /* Pods */,
 				C76104BFA83DCF9A1DC1B361 /* ExpoModulesProviders */,
+				02CA399627FDC64B7F867E28 /* Pods */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -122,16 +132,6 @@
 			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
-		F5AE6A67BBEA558BA170B739 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				F5B56288C754EE096F589C6E /* Pods-Leafra.debug.xcconfig */,
-				AA94DDDEE95CE14A8B40066D /* Pods-Leafra.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -139,14 +139,14 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Leafra" */;
 			buildPhases = (
-				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
+				A9032F16143CD772C3587C87 /* [CP] Check Pods Manifest.lock */,
 				4B2A64ACB5F824AF6AAB2D9C /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				8D3D43F4C12C75F751A65A06 /* [CP] Embed Pods Frameworks */,
+				D8ED55D3DD31A2CB0E0DE917 /* [CP] Embed Pods Frameworks */,
+				D45CB081BE4A5B24B2C6673A /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -218,7 +218,26 @@
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
 		};
-		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
+		4B2A64ACB5F824AF6AAB2D9C /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Leafra/expo-configure-project.sh\"\n";
+		};
+		A9032F16143CD772C3587C87 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -240,26 +259,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		4B2A64ACB5F824AF6AAB2D9C /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Leafra/expo-configure-project.sh\"\n";
-		};
-		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
+		D45CB081BE4A5B24B2C6673A /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -329,7 +329,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		8D3D43F4C12C75F751A65A06 /* [CP] Embed Pods Frameworks */ = {
+		D8ED55D3DD31A2CB0E0DE917 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -364,7 +364,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = F5B56288C754EE096F589C6E /* Pods-Leafra.debug.xcconfig */;
+			baseConfigurationReference = D72A48946E69FB2A6846288A /* Pods-Leafra.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -400,7 +400,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AA94DDDEE95CE14A8B40066D /* Pods-Leafra.release.xcconfig */;
+			baseConfigurationReference = BA8BE572B26B43639D8EBFFB /* Pods-Leafra.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
