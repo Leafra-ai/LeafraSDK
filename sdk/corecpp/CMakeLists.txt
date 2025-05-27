@@ -8,6 +8,11 @@ set(LEAFRA_CORE_SOURCES
     src/platform_utils.cpp
     src/logger.cpp
     src/leafra_parsing.cpp
+    src/leafra_parsing_adapter_pdf.cpp
+    src/leafra_parsing_adapter_txt.cpp
+    src/leafra_parsing_adapter_docx.cpp
+    src/leafra_parsing_adapter_excel.cpp
+    src/leafra_sqlite.cpp
 )
 
 # Core library headers
@@ -19,6 +24,7 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/types.h
     include/leafra/logger.h
     include/leafra/leafra_parsing.h
+    include/leafra/leafra_sqlite.h
 )
 
 # Create the core library
@@ -51,6 +57,22 @@ if(TARGET PDFium::PDFium)
     message(STATUS "✅ LeafraCore linked with PDFium")
 else()
     message(STATUS "⚠️  Building LeafraCore without PDFium")
+endif()
+
+# Link SQLite if available (defined in parent CMakeLists.txt)
+if(TARGET SQLite::SQLite3)
+    target_link_libraries(LeafraCore PRIVATE SQLite::SQLite3)
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_SQLITE=1)
+    
+    # Add preprocessor definition for system headers if using system SQLite
+    if(SQLITE_USE_SYSTEM_HEADERS)
+        target_compile_definitions(LeafraCore PRIVATE LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1)
+        message(STATUS "✅ LeafraCore linked with SQLite (using system headers)")
+    else()
+        message(STATUS "✅ LeafraCore linked with SQLite (using custom headers)")
+    endif()
+else()
+    message(STATUS "⚠️  Building LeafraCore without SQLite")
 endif()
 
 # Platform-specific libraries for logging

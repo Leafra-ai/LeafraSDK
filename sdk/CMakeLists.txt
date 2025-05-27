@@ -98,6 +98,129 @@ else()
     set(PDFIUM_FOUND FALSE)
 endif()
 
+# ==============================================================================
+# SQLite Integration
+# ==============================================================================
+
+set(SQLITE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/sqlite")
+
+# Platform-specific SQLite configuration
+if(APPLE)
+    # iOS/macOS - Use system SQLite with system headers
+    find_library(SQLITE_LIBRARY sqlite3)
+    if(SQLITE_LIBRARY)
+        message(STATUS "✅ Found system SQLite library: ${SQLITE_LIBRARY}")
+        
+        # Use system headers - no custom include directory needed
+        add_library(SQLite::SQLite3 SHARED IMPORTED)
+        set_target_properties(SQLite::SQLite3 PROPERTIES
+            IMPORTED_LOCATION "${SQLITE_LIBRARY}"
+        )
+        
+        set(SQLITE_FOUND TRUE)
+        set(SQLITE_USE_SYSTEM_HEADERS TRUE)
+        message(STATUS "✅ SQLite integration enabled (system library with system headers)")
+    else()
+        message(WARNING "❌ System SQLite library not found")
+        set(SQLITE_FOUND FALSE)
+    endif()
+    
+elseif(ANDROID)
+    # Android - Use bundled AAR with our custom headers
+    set(SQLITE_AAR_PATH "${SQLITE_ROOT_DIR}/android/sqlite-android-3490200.aar")
+    set(SQLITE_INCLUDE_DIR "${SQLITE_ROOT_DIR}/include")
+    
+    if(EXISTS "${SQLITE_AAR_PATH}")
+        message(STATUS "✅ Found SQLite AAR: ${SQLITE_AAR_PATH}")
+        
+        # For Android, we'll handle the AAR in the Android-specific build files
+        # Here we just mark it as found for the C++ code
+        add_library(SQLite::SQLite3 INTERFACE IMPORTED)
+        set_target_properties(SQLite::SQLite3 PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${SQLITE_INCLUDE_DIR}"
+        )
+        
+        set(SQLITE_FOUND TRUE)
+        set(SQLITE_USE_SYSTEM_HEADERS FALSE)
+        message(STATUS "✅ SQLite integration enabled (bundled AAR with custom headers)")
+    else()
+        message(WARNING "❌ SQLite AAR not found at: ${SQLITE_AAR_PATH}")
+        set(SQLITE_FOUND FALSE)
+    endif()
+    
+elseif(WIN32)
+    # Windows - Use bundled DLL with our custom headers
+    set(SQLITE_INCLUDE_DIR "${SQLITE_ROOT_DIR}/include")
+    
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        # 64-bit
+        set(SQLITE_DLL_DIR "${SQLITE_ROOT_DIR}/windows/win-x64")
+        set(SQLITE_ARCH "x64")
+    else()
+        # 32-bit
+        set(SQLITE_DLL_DIR "${SQLITE_ROOT_DIR}/windows/win-x86")
+        set(SQLITE_ARCH "x86")
+    endif()
+    
+    set(SQLITE_DLL_PATH "${SQLITE_DLL_DIR}/sqlite3.dll")
+    set(SQLITE_DEF_PATH "${SQLITE_DLL_DIR}/sqlite3.def")
+    
+    if(EXISTS "${SQLITE_DLL_PATH}" AND EXISTS "${SQLITE_DEF_PATH}")
+        message(STATUS "✅ Found SQLite DLL (${SQLITE_ARCH}): ${SQLITE_DLL_PATH}")
+        message(STATUS "✅ Found SQLite DEF: ${SQLITE_DEF_PATH}")
+        
+        # Create import library from DLL and DEF file
+        set(SQLITE_LIB_PATH "${CMAKE_CURRENT_BINARY_DIR}/sqlite3.lib")
+        
+        # Generate import library using lib.exe
+        add_custom_command(
+            OUTPUT "${SQLITE_LIB_PATH}"
+            COMMAND lib /def:"${SQLITE_DEF_PATH}" /out:"${SQLITE_LIB_PATH}" /machine:${SQLITE_ARCH}
+            DEPENDS "${SQLITE_DEF_PATH}"
+            COMMENT "Generating SQLite import library"
+        )
+        
+        add_custom_target(sqlite_import_lib DEPENDS "${SQLITE_LIB_PATH}")
+        
+        add_library(SQLite::SQLite3 SHARED IMPORTED)
+        set_target_properties(SQLite::SQLite3 PROPERTIES
+            IMPORTED_LOCATION "${SQLITE_DLL_PATH}"
+            IMPORTED_IMPLIB "${SQLITE_LIB_PATH}"
+            INTERFACE_INCLUDE_DIRECTORIES "${SQLITE_INCLUDE_DIR}"
+        )
+        
+        # Ensure import library is built before using SQLite
+        add_dependencies(SQLite::SQLite3 sqlite_import_lib)
+        
+        set(SQLITE_FOUND TRUE)
+        set(SQLITE_USE_SYSTEM_HEADERS FALSE)
+        message(STATUS "✅ SQLite integration enabled (bundled DLL with custom headers)")
+    else()
+        message(WARNING "❌ SQLite DLL or DEF not found in: ${SQLITE_DLL_DIR}")
+        set(SQLITE_FOUND FALSE)
+    endif()
+    
+else()
+    # Linux - Use system dynamic library with system headers
+    find_library(SQLITE_LIBRARY sqlite3)
+    if(SQLITE_LIBRARY)
+        message(STATUS "✅ Found system SQLite library: ${SQLITE_LIBRARY}")
+        
+        # Use system headers - no custom include directory needed
+        add_library(SQLite::SQLite3 SHARED IMPORTED)
+        set_target_properties(SQLite::SQLite3 PROPERTIES
+            IMPORTED_LOCATION "${SQLITE_LIBRARY}"
+        )
+        
+        set(SQLITE_FOUND TRUE)
+        set(SQLITE_USE_SYSTEM_HEADERS TRUE)
+        message(STATUS "✅ SQLite integration enabled (system library with system headers)")
+    else()
+        message(WARNING "❌ System SQLite library not found. Please install libsqlite3-dev")
+        set(SQLITE_FOUND FALSE)
+    endif()
+endif()
+
 # Compiler flags
 if(APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
