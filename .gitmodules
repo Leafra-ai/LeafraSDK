@@ -1,0 +1,3 @@
+[submodule "sdk/corecpp/third_party/sentencepiece"]
+	path = sdk/corecpp/third_party/sentencepiece
+	url = https://github.com/google/sentencepiece.git
