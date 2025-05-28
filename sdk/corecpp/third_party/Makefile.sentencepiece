@@ -1,0 +1,154 @@
+# SentencePiece Build Makefile
+# Builds SentencePiece from source for multiple platforms
+
+SENTENCEPIECE_SOURCE_DIR := $(CURDIR)/sentencepiece
+SENTENCEPIECE_OUTPUT_DIR := $(CURDIR)/prebuilt/sentencepiece
+BUILD_SCRIPT := $(CURDIR)/build_sentencepiece.py
+
+# Default target
+.PHONY: all
+all: help
+
+.PHONY: help
+help:
+	@echo "SentencePiece Build System"
+	@echo "========================="
+	@echo ""
+	@echo "Available targets:"
+	@echo "  macos     - Build for macOS (universal binary)"
+	@echo "  ios       - Build for iOS (device + simulator, creates XCFramework)"
+	@echo "  linux     - Build for Linux"
+	@echo "  android   - Build for Android (all ABIs)"
+	@echo "  windows   - Build for Windows"
+	@echo "  clean     - Clean all build artifacts"
+	@echo "  deps      - Install dependencies for current platform"
+	@echo ""
+	@echo "Requirements:"
+	@echo "  - SentencePiece source code in: $(SENTENCEPIECE_SOURCE_DIR)"
+	@echo "  - Python 3.6+ with required modules"
+	@echo "  - Platform-specific build tools (see README)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make macos          # Build for macOS"
+	@echo "  make ios            # Build for iOS"
+	@echo "  make android        # Build for Android (requires ANDROID_NDK_ROOT)"
+
+.PHONY: check-source
+check-source:
+	@if [ ! -d "$(SENTENCEPIECE_SOURCE_DIR)" ]; then \
+		echo "❌ SentencePiece source not found at: $(SENTENCEPIECE_SOURCE_DIR)"; \
+		echo "Please clone SentencePiece source code to this directory"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(SENTENCEPIECE_SOURCE_DIR)/CMakeLists.txt" ]; then \
+		echo "❌ Invalid SentencePiece source directory"; \
+		exit 1; \
+	fi
+	@echo "✅ SentencePiece source found"
+
+.PHONY: check-python
+check-python:
+	@python3 --version > /dev/null 2>&1 || (echo "❌ Python 3 not found" && exit 1)
+	@echo "✅ Python 3 found"
+
+.PHONY: macos
+macos: check-source check-python
+	@echo "🍎 Building SentencePiece for macOS..."
+	python3 $(BUILD_SCRIPT) --source $(SENTENCEPIECE_SOURCE_DIR) --output $(SENTENCEPIECE_OUTPUT_DIR) --platform macos
+
+.PHONY: ios
+ios: check-source check-python
+	@echo "📱 Building SentencePiece for iOS..."
+	python3 $(BUILD_SCRIPT) --source $(SENTENCEPIECE_SOURCE_DIR) --output $(SENTENCEPIECE_OUTPUT_DIR) --platform ios
+
+.PHONY: linux
+linux: check-source check-python
+	@echo "🐧 Building SentencePiece for Linux..."
+	python3 $(BUILD_SCRIPT) --source $(SENTENCEPIECE_SOURCE_DIR) --output $(SENTENCEPIECE_OUTPUT_DIR) --platform linux
+
+.PHONY: android
+android: check-source check-python check-android-ndk
+	@echo "🤖 Building SentencePiece for Android..."
+	python3 $(BUILD_SCRIPT) --source $(SENTENCEPIECE_SOURCE_DIR) --output $(SENTENCEPIECE_OUTPUT_DIR) --platform android
+
+.PHONY: windows
+windows: check-source check-python
+	@echo "🪟 Building SentencePiece for Windows..."
+	python3 $(BUILD_SCRIPT) --source $(SENTENCEPIECE_SOURCE_DIR) --output $(SENTENCEPIECE_OUTPUT_DIR) --platform windows
+
+.PHONY: check-android-ndk
+check-android-ndk:
+	@if [ -z "$(ANDROID_NDK_ROOT)" ] && [ -z "$(NDK_ROOT)" ]; then \
+		echo "❌ Android NDK not found. Please set ANDROID_NDK_ROOT environment variable"; \
+		exit 1; \
+	fi
+	@echo "✅ Android NDK found"
+
+.PHONY: deps-macos
+deps-macos:
+	@echo "Installing macOS dependencies..."
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install cmake gperftools; \
+	else \
+		echo "❌ Homebrew not found. Please install Homebrew first"; \
+		exit 1; \
+	fi
+
+.PHONY: deps-linux
+deps-linux:
+	@echo "Installing Linux dependencies..."
+	@if command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get update && \
+		sudo apt-get install -y cmake build-essential pkg-config libgoogle-perftools-dev libtcmalloc-minimal4; \
+	elif command -v yum >/dev/null 2>&1; then \
+		sudo yum install -y cmake gcc-c++ make pkgconfig gperftools-devel; \
+	elif command -v dnf >/dev/null 2>&1; then \
+		sudo dnf install -y cmake gcc-c++ make pkgconfig gperftools-devel; \
+	else \
+		echo "❌ Package manager not found. Please install dependencies manually"; \
+		exit 1; \
+	fi
+
+.PHONY: deps
+deps:
+	@case "$$(uname -s)" in \
+		Darwin) $(MAKE) deps-macos ;; \
+		Linux) $(MAKE) deps-linux ;; \
+		*) echo "❌ Unsupported platform for automatic dependency installation" ;; \
+	esac
+
+.PHONY: clean
+clean:
+	@echo "🧹 Cleaning build artifacts..."
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/build
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/macos
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/ios-device
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/ios-simulator
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/sentencepiece.xcframework
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/linux
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/android-*
+	rm -rf $(SENTENCEPIECE_OUTPUT_DIR)/windows-*
+	@echo "✅ Clean completed"
+
+.PHONY: info
+info:
+	@echo "SentencePiece Build Configuration"
+	@echo "================================"
+	@echo "Source directory: $(SENTENCEPIECE_SOURCE_DIR)"
+	@echo "Output directory: $(SENTENCEPIECE_OUTPUT_DIR)"
+	@echo "Build script:     $(BUILD_SCRIPT)"
+	@echo "Current platform: $$(uname -s)"
+	@echo ""
+	@echo "Environment variables:"
+	@echo "  ANDROID_NDK_ROOT: $(ANDROID_NDK_ROOT)"
+	@echo "  NDK_ROOT:         $(NDK_ROOT)"
+
+# Platform-specific convenience targets
+.PHONY: apple
+apple: macos ios
+
+.PHONY: mobile
+mobile: ios android
+
+.PHONY: desktop
+desktop: macos linux windows 

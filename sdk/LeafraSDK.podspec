@@ -44,7 +44,7 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'CLANG_CXX_LIBRARY' => 'libc++',
-    'GCC_PREPROCESSOR_DEFINITIONS' => 'LEAFRA_EXPORTS=1 LEAFRA_HAS_PDFIUM=1 LEAFRA_HAS_SQLITE=1 LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1',
+    'GCC_PREPROCESSOR_DEFINITIONS' => 'LEAFRA_EXPORTS=1 LEAFRA_HAS_PDFIUM=1 LEAFRA_HAS_SQLITE=1 LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1 LEAFRA_HAS_SENTENCEPIECE=1',
     'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include $(PODS_TARGET_SRCROOT)/corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/include',
     'OTHER_CPLUSPLUSFLAGS' => '-fvisibility=hidden -fvisibility-inlines-hidden'
   }

@@ -13,6 +13,7 @@ set(LEAFRA_CORE_SOURCES
     src/leafra_parsing_adapter_docx.cpp
     src/leafra_parsing_adapter_excel.cpp
     src/leafra_sqlite.cpp
+    src/leafra_sentencepiece.cpp
 )
 
 # Core library headers
@@ -25,6 +26,7 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/logger.h
     include/leafra/leafra_parsing.h
     include/leafra/leafra_sqlite.h
+    include/leafra/leafra_sentencepiece.h
 )
 
 # Create the core library
@@ -73,6 +75,15 @@ if(TARGET SQLite::SQLite3)
     endif()
 else()
     message(STATUS "⚠️  Building LeafraCore without SQLite")
+endif()
+
+# Link SentencePiece if available (defined in parent CMakeLists.txt)
+if(TARGET SentencePiece::SentencePiece)
+    target_link_libraries(LeafraCore PRIVATE SentencePiece::SentencePiece)
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_SENTENCEPIECE=1)
+    message(STATUS "✅ LeafraCore linked with SentencePiece")
+else()
+    message(STATUS "⚠️  Building LeafraCore without SentencePiece")
 endif()
 
 # Platform-specific libraries for logging

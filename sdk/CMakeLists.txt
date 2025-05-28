@@ -248,6 +248,150 @@ if(LEAFRA_BUILD_RN_BINDINGS)
     endif()
 endif()
 
+# ==============================================================================
+# SentencePiece Integration
+# ==============================================================================
+
+set(SENTENCEPIECE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/sentencepiece")
+
+# Platform-specific SentencePiece configuration
+if(APPLE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        # iOS - Use XCFramework
+        set(SENTENCEPIECE_XCFRAMEWORK_PATH "${SENTENCEPIECE_ROOT_DIR}/sentencepiece.xcframework")
+        
+        if(EXISTS "${SENTENCEPIECE_XCFRAMEWORK_PATH}")
+            message(STATUS "✅ Found SentencePiece XCFramework: ${SENTENCEPIECE_XCFRAMEWORK_PATH}")
+            
+            # Import the XCFramework
+            add_library(SentencePiece::SentencePiece STATIC IMPORTED)
+            set_target_properties(SentencePiece::SentencePiece PROPERTIES
+                IMPORTED_LOCATION "${SENTENCEPIECE_XCFRAMEWORK_PATH}"
+                INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_ROOT_DIR}/ios-device/include"
+            )
+            
+            set(SENTENCEPIECE_FOUND TRUE)
+            message(STATUS "✅ SentencePiece integration enabled (iOS XCFramework)")
+        else()
+            message(WARNING "❌ SentencePiece XCFramework not found at: ${SENTENCEPIECE_XCFRAMEWORK_PATH}")
+            message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece ios")
+            set(SENTENCEPIECE_FOUND FALSE)
+        endif()
+        
+    else()
+        # macOS
+        set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/macos/lib/libsentencepiece.a")
+        set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_ROOT_DIR}/macos/include")
+        
+        if(EXISTS "${SENTENCEPIECE_LIBRARY}")
+            message(STATUS "✅ Found SentencePiece library: ${SENTENCEPIECE_LIBRARY}")
+            
+            add_library(SentencePiece::SentencePiece STATIC IMPORTED)
+            set_target_properties(SentencePiece::SentencePiece PROPERTIES
+                IMPORTED_LOCATION "${SENTENCEPIECE_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_INCLUDE_DIR}"
+            )
+            
+            set(SENTENCEPIECE_FOUND TRUE)
+            message(STATUS "✅ SentencePiece integration enabled (macOS)")
+        else()
+            message(WARNING "❌ SentencePiece library not found at: ${SENTENCEPIECE_LIBRARY}")
+            message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece macos")
+            set(SENTENCEPIECE_FOUND FALSE)
+        endif()
+    endif()
+    
+elseif(ANDROID)
+    # Android - Select appropriate ABI
+    if(ANDROID_ABI STREQUAL "arm64-v8a")
+        set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/android-arm64-v8a/lib/libsentencepiece.so")
+        set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_ROOT_DIR}/android-arm64-v8a/include")
+    elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+        set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/android-armeabi-v7a/lib/libsentencepiece.so")
+        set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_ROOT_DIR}/android-armeabi-v7a/include")
+    elseif(ANDROID_ABI STREQUAL "x86_64")
+        set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/android-x86_64/lib/libsentencepiece.so")
+        set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_ROOT_DIR}/android-x86_64/include")
+    elseif(ANDROID_ABI STREQUAL "x86")
+        set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/android-x86/lib/libsentencepiece.so")
+        set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_ROOT_DIR}/android-x86/include")
+    else()
+        message(WARNING "Unsupported Android ABI for SentencePiece: ${ANDROID_ABI}")
+        set(SENTENCEPIECE_FOUND FALSE)
+    endif()
+    
+    if(SENTENCEPIECE_FOUND AND EXISTS "${SENTENCEPIECE_LIBRARY}")
+        message(STATUS "✅ Found SentencePiece library (${ANDROID_ABI}): ${SENTENCEPIECE_LIBRARY}")
+        
+        add_library(SentencePiece::SentencePiece SHARED IMPORTED)
+        set_target_properties(SentencePiece::SentencePiece PROPERTIES
+            IMPORTED_LOCATION "${SENTENCEPIECE_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_INCLUDE_DIR}"
+        )
+        
+        set(SENTENCEPIECE_FOUND TRUE)
+        message(STATUS "✅ SentencePiece integration enabled (Android ${ANDROID_ABI})")
+    else()
+        message(WARNING "❌ SentencePiece library not found for Android ${ANDROID_ABI}")
+        message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece android")
+        set(SENTENCEPIECE_FOUND FALSE)
+    endif()
+    
+elseif(WIN32)
+    # Windows - Use DLL
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(SENTENCEPIECE_ARCH "x64")
+    else()
+        set(SENTENCEPIECE_ARCH "x86")
+    endif()
+    
+    set(SENTENCEPIECE_DLL_DIR "${SENTENCEPIECE_ROOT_DIR}/windows-${SENTENCEPIECE_ARCH}")
+    set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_DLL_DIR}/lib/sentencepiece.lib")
+    set(SENTENCEPIECE_DLL "${SENTENCEPIECE_DLL_DIR}/bin/sentencepiece.dll")
+    set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_DLL_DIR}/include")
+    
+    if(EXISTS "${SENTENCEPIECE_LIBRARY}" AND EXISTS "${SENTENCEPIECE_DLL}")
+        message(STATUS "✅ Found SentencePiece library (${SENTENCEPIECE_ARCH}): ${SENTENCEPIECE_LIBRARY}")
+        message(STATUS "✅ Found SentencePiece DLL: ${SENTENCEPIECE_DLL}")
+        
+        add_library(SentencePiece::SentencePiece SHARED IMPORTED)
+        set_target_properties(SentencePiece::SentencePiece PROPERTIES
+            IMPORTED_LOCATION "${SENTENCEPIECE_DLL}"
+            IMPORTED_IMPLIB "${SENTENCEPIECE_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_INCLUDE_DIR}"
+        )
+        
+        set(SENTENCEPIECE_FOUND TRUE)
+        message(STATUS "✅ SentencePiece integration enabled (Windows ${SENTENCEPIECE_ARCH})")
+    else()
+        message(WARNING "❌ SentencePiece library not found for Windows ${SENTENCEPIECE_ARCH}")
+        message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece windows")
+        set(SENTENCEPIECE_FOUND FALSE)
+    endif()
+    
+else()
+    # Linux - Use shared library
+    set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/linux/lib/libsentencepiece.so")
+    set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_ROOT_DIR}/linux/include")
+    
+    if(EXISTS "${SENTENCEPIECE_LIBRARY}")
+        message(STATUS "✅ Found SentencePiece library: ${SENTENCEPIECE_LIBRARY}")
+        
+        add_library(SentencePiece::SentencePiece SHARED IMPORTED)
+        set_target_properties(SentencePiece::SentencePiece PROPERTIES
+            IMPORTED_LOCATION "${SENTENCEPIECE_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_INCLUDE_DIR}"
+        )
+        
+        set(SENTENCEPIECE_FOUND TRUE)
+        message(STATUS "✅ SentencePiece integration enabled (Linux)")
+    else()
+        message(WARNING "❌ SentencePiece library not found at: ${SENTENCEPIECE_LIBRARY}")
+        message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece linux")
+        set(SENTENCEPIECE_FOUND FALSE)
+    endif()
+endif()
+
 # Export targets
 export(TARGETS LeafraCore FILE LeafraSDKTargets.cmake)
 
