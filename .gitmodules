@@ -1,3 +1,6 @@
 [submodule "sdk/corecpp/third_party/sentencepiece"]
 	path = sdk/corecpp/third_party/sentencepiece
 	url = https://github.com/google/sentencepiece.git
+[submodule "sdk/corecpp/third_party/models/embedding/multilingual-e5-small"]
+	path = sdk/corecpp/third_party/models/embedding/multilingual-e5-small
+	url = https://huggingface.co/intfloat/multilingual-e5-small
