@@ -4,3 +4,6 @@
 [submodule "sdk/corecpp/third_party/models/embedding/multilingual-e5-small"]
 	path = sdk/corecpp/third_party/models/embedding/multilingual-e5-small
 	url = https://huggingface.co/intfloat/multilingual-e5-small
+[submodule "sdk/corecpp/third_party/models/embedding/granite-embedding-107m-multilingual"]
+	path = sdk/corecpp/third_party/models/embedding/granite-embedding-107m-multilingual
+	url = https://huggingface.co/ibm-granite/granite-embedding-107m-multilingual
