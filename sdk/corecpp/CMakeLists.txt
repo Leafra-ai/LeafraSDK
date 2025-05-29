@@ -14,6 +14,7 @@ set(LEAFRA_CORE_SOURCES
     src/leafra_parsing_adapter_excel.cpp
     src/leafra_sqlite.cpp
     src/leafra_sentencepiece.cpp
+    src/leafra_chunker.cpp
 )
 
 # Core library headers
@@ -27,6 +28,7 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/leafra_parsing.h
     include/leafra/leafra_sqlite.h
     include/leafra/leafra_sentencepiece.h
+    include/leafra/leafra_chunker.h
 )
 
 # Create the core library
