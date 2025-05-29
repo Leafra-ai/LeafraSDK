@@ -38,6 +38,15 @@ class SentencePieceTokenizer::Impl {
 public:
     std::string last_error = "SentencePiece not available - compiled without LEAFRA_HAS_SENTENCEPIECE";
     bool loaded = false;
+    
+    void set_error(const std::string& error) {
+        last_error = error;
+        LEAFRA_ERROR() << "SentencePiece error: " << error;
+    }
+
+    void clear_error() {
+        last_error.clear();
+    }
 };
 
 #endif

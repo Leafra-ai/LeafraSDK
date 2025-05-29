@@ -77,6 +77,9 @@ void Logger::platformLog(LogLevel level, const std::string& message) {
     os_log_t log = os_log_create("com.leafra.sdk", "LeafraSDK");
     os_log_with_type(log, osLogType, "%{public}s", message.c_str());
     
+    // Also output to console for command line applications
+    std::cout << message << std::endl;
+    
 #elif defined(__ANDROID__)
     // Android - Use __android_log_print
     android_LogPriority priority;

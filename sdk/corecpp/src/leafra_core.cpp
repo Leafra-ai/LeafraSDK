@@ -4,6 +4,7 @@
 #include "leafra/platform_utils.h"
 #include "leafra/logger.h"
 #include "leafra/leafra_parsing.h"
+#include "leafra/leafra_chunker.h"
 #include <iostream>
 #include <sstream>
 
@@ -15,6 +16,19 @@
 
 namespace leafra {
 
+// Implementation of ChunkingConfig constructors
+ChunkingConfig::ChunkingConfig() {
+    // Default values are already set in the header with sensible defaults for LLM processing
+    size_unit = ChunkSizeUnit::TOKENS;
+    token_method = TokenApproximationMethod::WORD_BASED;
+}
+
+ChunkingConfig::ChunkingConfig(size_t size, double overlap, bool use_tokens) 
+    : chunk_size(size), overlap_percentage(overlap) {
+    size_unit = use_tokens ? ChunkSizeUnit::TOKENS : ChunkSizeUnit::CHARACTERS;
+    token_method = TokenApproximationMethod::WORD_BASED;
+}
+
 // Private implementation class (PIMPL pattern)
 class LeafraCore::Impl {
 public:
@@ -24,11 +38,13 @@ public:
     std::unique_ptr<DataProcessor> data_processor_;
     std::unique_ptr<MathUtils> math_utils_;
     std::unique_ptr<FileParsingWrapper> file_parser_;
+    std::unique_ptr<LeafraChunker> chunker_;
     
     Impl() : initialized_(false), event_callback_(nullptr) {
         data_processor_ = std::make_unique<DataProcessor>();
         math_utils_ = std::make_unique<MathUtils>();
         file_parser_ = std::make_unique<FileParsingWrapper>();
+        chunker_ = std::make_unique<LeafraChunker>();
     }
     
     void send_event(const std::string& message) {
@@ -83,6 +99,37 @@ ResultCode LeafraCore::initialize(const Config& config) {
             LEAFRA_DEBUG() << "File parser initialized successfully";
         }
         
+        // Initialize chunker
+        if (pImpl->chunker_) {
+            ResultCode result = pImpl->chunker_->initialize();
+            if (result != ResultCode::SUCCESS) {
+                LEAFRA_ERROR() << "Failed to initialize chunker";
+                return result;
+            }
+            LEAFRA_DEBUG() << "Chunker initialized successfully";
+            
+            // Configure chunker with config settings
+            ChunkingOptions chunking_options(
+                config.chunking.chunk_size,
+                config.chunking.overlap_percentage,
+                config.chunking.size_unit,
+                config.chunking.token_method
+            );
+            chunking_options.preserve_word_boundaries = config.chunking.preserve_word_boundaries;
+            chunking_options.include_metadata = config.chunking.include_metadata;
+            
+            pImpl->chunker_->set_default_options(chunking_options);
+            
+            // Log chunking configuration
+            LEAFRA_INFO() << "Chunking configuration:";
+            LEAFRA_INFO() << "  - Enabled: " << (config.chunking.enabled ? "Yes" : "No");
+            LEAFRA_INFO() << "  - Chunk size: " << config.chunking.chunk_size 
+                          << (config.chunking.size_unit == ChunkSizeUnit::TOKENS ? " tokens" : " characters");
+            LEAFRA_INFO() << "  - Overlap: " << (config.chunking.overlap_percentage * 100.0) << "%";
+            LEAFRA_INFO() << "  - Token method: " << (config.chunking.token_method == TokenApproximationMethod::SIMPLE ? "Simple" :
+                                                      config.chunking.token_method == TokenApproximationMethod::WORD_BASED ? "Word-based" : "Advanced");
+        }
+        
         pImpl->initialized_ = true;
         LEAFRA_INFO() << "LeafraSDK initialized successfully";
         
@@ -108,6 +155,14 @@ ResultCode LeafraCore::shutdown() {
     }
     
     try {
+        // Shutdown chunker
+        if (pImpl->chunker_) {
+            // Note: If LeafraChunker doesn't have a shutdown method, the destructor will handle cleanup
+            // But we reset statistics and clear any cached data
+            pImpl->chunker_->reset_statistics();
+            LEAFRA_DEBUG() << "Chunker shutdown completed";
+        }
+        
         // Shutdown file parser
         if (pImpl->file_parser_) {
             pImpl->file_parser_->shutdown();
@@ -207,6 +262,120 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                 if (!value.empty()) {
                     LEAFRA_DEBUG() << "  - " << key << ": " << value;
                 }
+            }
+            
+            // Perform chunking if enabled
+            if (pImpl->config_.chunking.enabled && pImpl->chunker_) {
+                LEAFRA_INFO() << "Starting chunking process for: " << file_path;
+                pImpl->send_event("🔗 Starting chunking process");
+                
+                // Prepare pages for chunking
+                std::vector<std::string> pages;
+                for (size_t i = 0; i < result.getPageCount(); ++i) {
+                    if (i < result.pages.size() && !result.pages[i].empty()) {
+                        pages.push_back(result.pages[i]);
+                    }
+                }
+                
+                if (!pages.empty()) {
+                    std::vector<TextChunk> chunks;
+                    ResultCode chunk_result = pImpl->chunker_->chunk_document_advanced(pages, pImpl->chunker_->get_default_options(), chunks);
+                    
+                    if (chunk_result == ResultCode::SUCCESS) {
+                        LEAFRA_INFO() << "✅ Successfully created " << chunks.size() << " chunks";
+                        pImpl->send_event("🧩 Created " + std::to_string(chunks.size()) + " chunks");
+                        
+                        // Log chunk statistics
+                        size_t total_chunk_chars = 0;
+                        size_t total_estimated_tokens = 0;
+                        for (const auto& chunk : chunks) {
+                            total_chunk_chars += chunk.content.length();
+                            total_estimated_tokens += chunk.estimated_tokens;
+                        }
+                        
+                        LEAFRA_INFO() << "Chunk statistics:";
+                        LEAFRA_INFO() << "  - Total chunks: " << chunks.size();
+                        LEAFRA_INFO() << "  - Total characters in chunks: " << total_chunk_chars;
+                        LEAFRA_INFO() << "  - Estimated tokens: " << total_estimated_tokens;
+                        LEAFRA_INFO() << "  - Avg chunk size: " << (chunks.size() > 0 ? total_chunk_chars / chunks.size() : 0) << " chars";
+                        LEAFRA_INFO() << "  - Avg tokens per chunk: " << (chunks.size() > 0 ? total_estimated_tokens / chunks.size() : 0);
+                        
+                        pImpl->send_event("📊 Chunks: " + std::to_string(chunks.size()) + 
+                                        ", Avg size: " + std::to_string(chunks.size() > 0 ? total_chunk_chars / chunks.size() : 0) + " chars, " +
+                                        std::to_string(chunks.size() > 0 ? total_estimated_tokens / chunks.size() : 0) + " tokens");
+                        
+                        // Print detailed chunk content if requested (development/debug feature)
+                        if (pImpl->config_.chunking.print_chunks_full || pImpl->config_.chunking.print_chunks_brief) {
+                            LEAFRA_INFO() << "";
+                            LEAFRA_INFO() << "============================================================";
+                            LEAFRA_INFO() << "  Chunk Content Analysis for: " << file_path;
+                            LEAFRA_INFO() << "============================================================";
+                            LEAFRA_INFO() << "📋 Chunk printing requested - showing chunker output:";
+                            LEAFRA_INFO() << "📊 Created " << chunks.size() << " chunks from " << file_path;
+                            
+                            for (size_t i = 0; i < chunks.size(); ++i) {
+                                const auto& chunk = chunks[i];
+                                
+                                LEAFRA_INFO() << "";
+                                LEAFRA_INFO() << "----------------------------------------";
+                                LEAFRA_INFO() << "Chunk " << (i + 1) << " of " << chunks.size() << ":";
+                                LEAFRA_INFO() << "  📐 Length: " << chunk.content.length() << " characters";
+                                LEAFRA_INFO() << "  🔤 Tokens: " << chunk.estimated_tokens << " (estimated)";
+                                LEAFRA_INFO() << "  📄 Page: " << (chunk.page_number + 1);
+                                LEAFRA_INFO() << "  📍 Position: " << chunk.start_index << "-" << chunk.end_index;
+                                LEAFRA_INFO() << "Content:";
+                                
+                                // Print content based on print mode
+                                if (pImpl->config_.chunking.print_chunks_full) {
+                                    // Print full content
+                                    LEAFRA_INFO() << chunk.content;
+                                } else if (pImpl->config_.chunking.print_chunks_brief) {
+                                    // Print first N lines
+                                    std::istringstream stream(chunk.content);
+                                    std::string line;
+                                    int line_count = 0;
+                                    int max_lines = pImpl->config_.chunking.max_lines;
+                                    
+                                    while (std::getline(stream, line) && line_count < max_lines) {
+                                        LEAFRA_INFO() << line;
+                                        line_count++;
+                                    }
+                                    
+                                    // Check if there are more lines
+                                    if (std::getline(stream, line)) {
+                                        LEAFRA_INFO() << "... (content truncated, " << max_lines << " lines shown)";
+                                    }
+                                }
+                                
+                                if (i < chunks.size() - 1) {
+                                    LEAFRA_INFO() << "";
+                                }
+                            }
+                            
+                            LEAFRA_INFO() << "============================================================";
+                        }
+                        
+                        // Optional: Log first few chunks for debugging (only in debug mode)
+                        if (pImpl->config_.debug_mode && chunks.size() > 0) {
+                            size_t chunks_to_log = std::min(size_t(3), chunks.size());
+                            for (size_t i = 0; i < chunks_to_log; ++i) {
+                                LEAFRA_DEBUG() << "Chunk " << (i + 1) << " (page " << chunks[i].page_number + 1 
+                                             << ", " << chunks[i].content.length() << " chars, " 
+                                             << chunks[i].estimated_tokens << " tokens): "
+                                             << chunks[i].content.substr(0, 100) << "...";
+                            }
+                        }
+                        
+                    } else {
+                        LEAFRA_ERROR() << "Failed to chunk document: " << file_path;
+                        pImpl->send_event("❌ Chunking failed for: " + file_path);
+                    }
+                } else {
+                    LEAFRA_WARNING() << "No text content found for chunking in: " << file_path;
+                    pImpl->send_event("⚠️ No text content for chunking");
+                }
+            } else if (!pImpl->config_.chunking.enabled) {
+                LEAFRA_DEBUG() << "Chunking disabled in configuration, skipping chunk creation";
             }
             
         } else {

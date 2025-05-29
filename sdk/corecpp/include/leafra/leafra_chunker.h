@@ -1,5 +1,6 @@
 #pragma once
 
+#include "types.h"
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -23,18 +24,18 @@
 
 namespace leafra {
 
-// Result types
-enum class ResultCode : int32_t {
-    SUCCESS = 0,
-    ERROR_INVALID_PARAMETER = -1,
-    ERROR_INITIALIZATION_FAILED = -2,
-    ERROR_PROCESSING_FAILED = -3,
-    ERROR_NOT_IMPLEMENTED = -4,
-    ERROR_OUT_OF_MEMORY = -5
-};
+/**
+ * @brief Forward declarations
+ */
+class LeafraChunker;
 
 /**
- * @brief Enum to specify chunk size unit
+ * @brief Result code enum
+ * Note: This enum is defined in types.h
+ */
+
+/**
+ * @brief Enum for chunk size units
  */
 enum class ChunkSizeUnit : int32_t {
     CHARACTERS = 0,  // Default: chunk size in characters

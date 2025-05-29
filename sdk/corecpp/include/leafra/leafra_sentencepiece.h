@@ -27,35 +27,48 @@ public:
      * @brief Tokenization options
      */
     struct TokenizeOptions {
-        bool enable_sampling = false;      ///< Enable subword regularization
-        float alpha = 0.1f;               ///< Sampling parameter (0.0 = deterministic)
-        int nbest_size = -1;              ///< Number of best segmentations (-1 = all)
-        bool add_bos = false;             ///< Add beginning-of-sentence token
-        bool add_eos = false;             ///< Add end-of-sentence token
-        bool reverse = false;             ///< Reverse the input sequence
+        bool enable_sampling;      ///< Enable subword regularization
+        float alpha;               ///< Sampling parameter (0.0 = deterministic)
+        int nbest_size;            ///< Number of best segmentations (-1 = all)
+        bool add_bos;              ///< Add beginning-of-sentence token
+        bool add_eos;              ///< Add end-of-sentence token
+        bool reverse;              ///< Reverse the input sequence
+        
+        // Default constructor
+        TokenizeOptions() : enable_sampling(false), alpha(0.1f), nbest_size(-1), 
+                           add_bos(false), add_eos(false), reverse(false) {}
     };
 
     /**
      * @brief Training options for creating new models
      */
     struct TrainOptions {
-        std::string model_type = "unigram";  ///< Model type: unigram, bpe, char, word
-        int vocab_size = 8000;               ///< Vocabulary size
-        float character_coverage = 0.9995f;  ///< Character coverage (0.9995 for CJK, 1.0 for others)
-        std::string input_sentence_size = ""; ///< Max input sentence size
-        bool shuffle_input_sentence = true;   ///< Shuffle input sentences
-        int seed_sentencepiece_size = 1000000; ///< Seed sentence piece size
-        bool shrinking_factor = true;         ///< Enable shrinking factor
-        int num_threads = 16;                ///< Number of threads for training
-        int num_sub_iterations = 2;          ///< Number of EM sub-iterations
-        int max_sentence_length = 4192;     ///< Maximum sentence length
-        bool split_by_unicode_script = true; ///< Split by Unicode script
-        bool split_by_number = true;         ///< Split numbers
-        bool split_by_whitespace = true;     ///< Split by whitespace
-        std::string control_symbols = "";    ///< Control symbols
-        std::string user_defined_symbols = ""; ///< User-defined symbols
-        bool byte_fallback = false;          ///< Enable byte fallback
-        std::string unk_surface = " \u2047 "; ///< Unknown surface form
+        std::string model_type;              ///< Model type: unigram, bpe, char, word
+        int vocab_size;                      ///< Vocabulary size
+        float character_coverage;            ///< Character coverage (0.9995 for CJK, 1.0 for others)
+        std::string input_sentence_size;     ///< Max input sentence size
+        bool shuffle_input_sentence;         ///< Shuffle input sentences
+        int seed_sentencepiece_size;         ///< Seed sentence piece size
+        bool shrinking_factor;               ///< Enable shrinking factor
+        int num_threads;                     ///< Number of threads for training
+        int num_sub_iterations;              ///< Number of EM sub-iterations
+        int max_sentence_length;             ///< Maximum sentence length
+        bool split_by_unicode_script;        ///< Split by Unicode script
+        bool split_by_number;                ///< Split numbers
+        bool split_by_whitespace;            ///< Split by whitespace
+        std::string control_symbols;         ///< Control symbols
+        std::string user_defined_symbols;    ///< User-defined symbols
+        bool byte_fallback;                  ///< Enable byte fallback
+        std::string unk_surface;             ///< Unknown surface form
+        
+        // Default constructor
+        TrainOptions() : model_type("unigram"), vocab_size(8000), character_coverage(0.9995f),
+                        input_sentence_size(""), shuffle_input_sentence(true),
+                        seed_sentencepiece_size(1000000), shrinking_factor(true),
+                        num_threads(16), num_sub_iterations(2), max_sentence_length(4192),
+                        split_by_unicode_script(true), split_by_number(true), 
+                        split_by_whitespace(true), control_symbols(""), 
+                        user_defined_symbols(""), byte_fallback(false), unk_surface(" \u2047 ") {}
     };
 
     SentencePieceTokenizer();
@@ -99,7 +112,7 @@ public:
      * @param options Tokenization options
      * @return Vector of token strings
      */
-    std::vector<std::string> encode(const std::string& text, const TokenizeOptions& options = {}) const;
+    std::vector<std::string> encode(const std::string& text, const TokenizeOptions& options = TokenizeOptions()) const;
 
     /**
      * @brief Tokenize text into IDs
@@ -107,7 +120,7 @@ public:
      * @param options Tokenization options
      * @return Vector of token IDs
      */
-    std::vector<int> encode_as_ids(const std::string& text, const TokenizeOptions& options = {}) const;
+    std::vector<int> encode_as_ids(const std::string& text, const TokenizeOptions& options = TokenizeOptions()) const;
 
     /**
      * @brief Detokenize pieces back to text
@@ -170,7 +183,7 @@ public:
      */
     static bool train_model(const std::vector<std::string>& input_files,
                            const std::string& model_prefix,
-                           const TrainOptions& options = {});
+                           const TrainOptions& options = TrainOptions());
 
     /**
      * @brief Get model information as string

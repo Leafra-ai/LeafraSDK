@@ -34,6 +34,10 @@ namespace leafra {
 class DataProcessor;
 class MathUtils;
 
+// Forward declaration for chunking types
+enum class ChunkSizeUnit : int32_t;
+enum class TokenApproximationMethod : int32_t;
+
 // Basic types
 using byte_t = uint8_t;
 using data_buffer_t = std::vector<byte_t>;
@@ -49,6 +53,30 @@ enum class ResultCode : int32_t {
     ERROR_OUT_OF_MEMORY = -5
 };
 
+/**
+ * @brief Chunking configuration for the SDK
+ */
+struct ChunkingConfig {
+    bool enabled = true;                    // Whether to enable chunking during file processing
+    size_t chunk_size = 500;               // Size of each chunk (in tokens by default)
+    double overlap_percentage = 0.15;       // Overlap percentage (0.0 to 1.0)
+    bool preserve_word_boundaries = true;   // Whether to avoid breaking words
+    bool include_metadata = true;           // Whether to include chunk metadata
+    ChunkSizeUnit size_unit;                // Unit for chunk_size (CHARACTERS or TOKENS)
+    TokenApproximationMethod token_method;  // Token approximation method
+    
+    // Debug/Development options for chunk content printing
+    bool print_chunks_full = false;         // Print full content of all chunks
+    bool print_chunks_brief = false;        // Print first N lines of each chunk
+    int max_lines = 3;                      // Maximum lines to show when print_chunks_brief is true
+    
+    // Default constructor with sensible defaults for LLM processing
+    ChunkingConfig();
+    
+    // Constructor with custom parameters
+    ChunkingConfig(size_t size, double overlap, bool use_tokens = true);
+};
+
 // Configuration structure
 struct Config {
     std::string name;
@@ -56,6 +84,7 @@ struct Config {
     bool debug_mode = false;
     int32_t max_threads = 4;
     size_t buffer_size = 1024;
+    ChunkingConfig chunking;               // Chunking configuration
 };
 
 // Data structures
