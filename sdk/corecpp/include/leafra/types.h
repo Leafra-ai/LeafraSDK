@@ -56,7 +56,7 @@ enum class ResultCode : int32_t {
 /**
  * @brief Chunking configuration for the SDK
  */
-struct ChunkingConfig {
+struct LEAFRA_API ChunkingConfig {
     bool enabled = true;                    // Whether to enable chunking during file processing
     size_t chunk_size = 500;               // Size of each chunk (in tokens by default)
     double overlap_percentage = 0.15;       // Overlap percentage (0.0 to 1.0)
@@ -78,7 +78,7 @@ struct ChunkingConfig {
 };
 
 // Configuration structure
-struct Config {
+struct LEAFRA_API Config {
     std::string name;
     std::string version;
     bool debug_mode = false;

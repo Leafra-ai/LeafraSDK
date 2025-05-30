@@ -21,20 +21,14 @@ void test_token_estimation() {
     std::cout << "Length: " << test_text.length() << " characters" << std::endl;
     
     // Test all estimation methods
-    size_t simple = LeafraChunker::estimate_token_count(test_text, TokenApproximationMethod::SIMPLE);
-    size_t word_based = LeafraChunker::estimate_token_count(test_text, TokenApproximationMethod::WORD_BASED);
-    size_t advanced = LeafraChunker::estimate_token_count(test_text, TokenApproximationMethod::ADVANCED);
+    size_t estimated = LeafraChunker::estimate_token_count(test_text, TokenApproximationMethod::SIMPLE);
     
     std::cout << "\nToken estimates:" << std::endl;
-    std::cout << "  Simple (char/4):    " << simple << " tokens" << std::endl;
-    std::cout << "  Word-based (×1.33): " << word_based << " tokens" << std::endl;
-    std::cout << "  Advanced heuristic: " << advanced << " tokens" << std::endl;
+    std::cout << "  Simple (char/4):    " << estimated << " tokens" << std::endl;
     
     // Test character conversion back
     std::cout << "\nCharacter estimates (for 50 tokens):" << std::endl;
     std::cout << "  Simple:    " << LeafraChunker::tokens_to_characters(50, TokenApproximationMethod::SIMPLE) << " chars" << std::endl;
-    std::cout << "  Word-based: " << LeafraChunker::tokens_to_characters(50, TokenApproximationMethod::WORD_BASED) << " chars" << std::endl;
-    std::cout << "  Advanced:  " << LeafraChunker::tokens_to_characters(50, TokenApproximationMethod::ADVANCED) << " chars" << std::endl;
 }
 
 void test_token_chunking() {
@@ -56,13 +50,9 @@ void test_token_chunking() {
     
     std::vector<TokenApproximationMethod> methods;
     methods.push_back(TokenApproximationMethod::SIMPLE);
-    methods.push_back(TokenApproximationMethod::WORD_BASED);
-    methods.push_back(TokenApproximationMethod::ADVANCED);
     
     std::vector<std::string> method_names;
-    method_names.push_back("Simple");
-    method_names.push_back("Word-based");
-    method_names.push_back("Advanced");
+    method_names.push_back("Simple (Unified)");
     
     LeafraChunker chunker;
     if (chunker.initialize() != ResultCode::SUCCESS) {
@@ -115,7 +105,7 @@ void test_multi_page_token_chunking() {
     }
     
     std::vector<TextChunk> chunks;
-    ResultCode result = chunker.chunk_document_tokens(pages, 15, 0.2, TokenApproximationMethod::WORD_BASED, chunks);
+    ResultCode result = chunker.chunk_document_tokens(pages, 15, 0.2, TokenApproximationMethod::SIMPLE, chunks);
     
     if (result == ResultCode::SUCCESS) {
         std::cout << "Successfully created " << chunks.size() << " chunks" << std::endl;

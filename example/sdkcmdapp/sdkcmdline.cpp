@@ -155,10 +155,10 @@ int main(int argc, char* argv[]) {
         
         // Configure chunking settings for testing
         config.chunking.enabled = true;
-        config.chunking.chunk_size = 50;  // 50 tokens per chunk
+        config.chunking.chunk_size = 500;  // 500 tokens per chunk
         config.chunking.overlap_percentage = 0.2;  // 20% overlap
         config.chunking.size_unit = ChunkSizeUnit::TOKENS;
-        config.chunking.token_method = TokenApproximationMethod::WORD_BASED;
+        config.chunking.token_method = TokenApproximationMethod::SIMPLE;
         config.chunking.preserve_word_boundaries = true;
         config.chunking.include_metadata = true;
         
@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Chunking Enabled: " << (config.chunking.enabled ? "Yes" : "No") << std::endl;
         std::cout << "Chunk Size: " << config.chunking.chunk_size << " tokens" << std::endl;
         std::cout << "Overlap: " << (config.chunking.overlap_percentage * 100) << "%" << std::endl;
-        std::cout << "Token Method: Word-based approximation" << std::endl;
+        std::cout << "Token Method: Simple approximation" << std::endl;
         std::cout << "Preserve Word Boundaries: " << (config.chunking.preserve_word_boundaries ? "Yes" : "No") << std::endl;
         
         // Set up event callback to monitor SDK operations

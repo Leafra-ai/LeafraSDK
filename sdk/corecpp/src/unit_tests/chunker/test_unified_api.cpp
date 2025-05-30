@@ -19,7 +19,7 @@ void test_unified_api() {
     
     // Test 1: Character-based chunking using advanced method
     std::cout << "\n1. Character-based chunking (using chunk_text_advanced):" << std::endl;
-    ChunkingOptions char_options(100, 0.1, ChunkSizeUnit::CHARACTERS, TokenApproximationMethod::WORD_BASED);
+    ChunkingOptions char_options(100, 0.1, ChunkSizeUnit::CHARACTERS, TokenApproximationMethod::SIMPLE);
     
     ResultCode result = chunker.chunk_text_advanced(text, char_options, chunks);
     if (result == ResultCode::SUCCESS) {
@@ -34,7 +34,7 @@ void test_unified_api() {
     
     // Test 2: Token-based chunking using the SAME advanced method
     std::cout << "\n2. Token-based chunking (using chunk_text_advanced):" << std::endl;
-    ChunkingOptions token_options(20, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::WORD_BASED);
+    ChunkingOptions token_options(20, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
     
     result = chunker.chunk_text_advanced(text, token_options, chunks);
     if (result == ResultCode::SUCCESS) {
@@ -53,7 +53,7 @@ void test_unified_api() {
     pages.push_back("Page 1: Introduction with sufficient content for testing purposes.");
     pages.push_back("Page 2: Analysis section containing detailed information and data.");
     
-    ChunkingOptions multipage_options(15, 0.2, ChunkSizeUnit::TOKENS, TokenApproximationMethod::ADVANCED);
+    ChunkingOptions multipage_options(15, 0.2, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
     
     result = chunker.chunk_document_advanced(pages, multipage_options, chunks);
     if (result == ResultCode::SUCCESS) {

@@ -1,0 +1,7 @@
+This is a test document with multiple paragraphs to demonstrate chunking functionality. 
+
+The LeafraSDK chunking system intelligently splits documents into smaller pieces while preserving context and meaning. Each chunk maintains optimal sizes for language model processing.
+
+This third paragraph adds more content to test the overlap feature. The chunking algorithm ensures that adjacent chunks have some overlap to maintain context continuity between segments.
+
+Finally, this last paragraph completes our test document. The system will create multiple chunks from this content, showing how the chunking algorithm handles different text structures and maintains readability. 

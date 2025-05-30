@@ -230,24 +230,6 @@ endif()
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/corecpp/include)
 
-# Add subdirectories
-add_subdirectory(corecpp)
-
-# Platform-specific bindings
-if(LEAFRA_BUILD_RN_BINDINGS)
-    if(LEAFRA_PLATFORM_IOS OR LEAFRA_PLATFORM_MACOS)
-        add_subdirectory(react-native/ios)
-    endif()
-    
-    if(LEAFRA_PLATFORM_ANDROID)
-        add_subdirectory(react-native/android)
-    endif()
-    
-    if(LEAFRA_PLATFORM_WINDOWS)
-        add_subdirectory(react-native/windows)
-    endif()
-endif()
-
 # ==============================================================================
 # SentencePiece Integration
 # ==============================================================================
@@ -281,19 +263,23 @@ if(APPLE)
     else()
         # macOS
         set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/macos/lib/libsentencepiece.a")
+        set(SENTENCEPIECE_TRAIN_LIBRARY "${SENTENCEPIECE_ROOT_DIR}/macos/lib/libsentencepiece_train.a")
         set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_ROOT_DIR}/macos/include")
         
-        if(EXISTS "${SENTENCEPIECE_LIBRARY}")
+        if(EXISTS "${SENTENCEPIECE_LIBRARY}" AND EXISTS "${SENTENCEPIECE_TRAIN_LIBRARY}")
             message(STATUS "✅ Found SentencePiece library: ${SENTENCEPIECE_LIBRARY}")
+            message(STATUS "✅ Found SentencePiece training library: ${SENTENCEPIECE_TRAIN_LIBRARY}")
             
+            # Create a combined target that includes both libraries
             add_library(SentencePiece::SentencePiece STATIC IMPORTED)
             set_target_properties(SentencePiece::SentencePiece PROPERTIES
                 IMPORTED_LOCATION "${SENTENCEPIECE_LIBRARY}"
                 INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES "${SENTENCEPIECE_TRAIN_LIBRARY}"
             )
             
             set(SENTENCEPIECE_FOUND TRUE)
-            message(STATUS "✅ SentencePiece integration enabled (macOS)")
+            message(STATUS "✅ SentencePiece integration enabled (macOS with training)")
         else()
             message(WARNING "❌ SentencePiece library not found at: ${SENTENCEPIECE_LIBRARY}")
             message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece macos")
@@ -389,6 +375,24 @@ else()
         message(WARNING "❌ SentencePiece library not found at: ${SENTENCEPIECE_LIBRARY}")
         message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece linux")
         set(SENTENCEPIECE_FOUND FALSE)
+    endif()
+endif()
+
+# Add subdirectories
+add_subdirectory(corecpp)
+
+# Platform-specific bindings
+if(LEAFRA_BUILD_RN_BINDINGS)
+    if(LEAFRA_PLATFORM_IOS OR LEAFRA_PLATFORM_MACOS)
+        add_subdirectory(react-native/ios)
+    endif()
+    
+    if(LEAFRA_PLATFORM_ANDROID)
+        add_subdirectory(react-native/android)
+    endif()
+    
+    if(LEAFRA_PLATFORM_WINDOWS)
+        add_subdirectory(react-native/windows)
     endif()
 endif()
 

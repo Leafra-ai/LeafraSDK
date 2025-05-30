@@ -7,15 +7,15 @@
 
 using namespace leafra;
 
-// Helper function to convert ResultCode to string for printing
-std::string result_code_to_string(ResultCode code) {
-    switch (static_cast<int>(code)) {
-        case static_cast<int>(ResultCode::SUCCESS): return "SUCCESS";
-        case static_cast<int>(ResultCode::ERROR_INVALID_PARAMETER): return "ERROR_INVALID_PARAMETER";
-        case static_cast<int>(ResultCode::ERROR_INITIALIZATION_FAILED): return "ERROR_INITIALIZATION_FAILED";
-        case static_cast<int>(ResultCode::ERROR_PROCESSING_FAILED): return "ERROR_PROCESSING_FAILED";
-        case static_cast<int>(ResultCode::ERROR_NOT_IMPLEMENTED): return "ERROR_NOT_IMPLEMENTED";
-        case static_cast<int>(ResultCode::ERROR_OUT_OF_MEMORY): return "ERROR_OUT_OF_MEMORY";
+// Temporary implementation for testing
+const char* test_result_code_to_string(ResultCode code) {
+    switch (code) {
+        case ResultCode::SUCCESS: return "SUCCESS";
+        case ResultCode::ERROR_INVALID_PARAMETER: return "ERROR_INVALID_PARAMETER";
+        case ResultCode::ERROR_INITIALIZATION_FAILED: return "ERROR_INITIALIZATION_FAILED";
+        case ResultCode::ERROR_PROCESSING_FAILED: return "ERROR_PROCESSING_FAILED";
+        case ResultCode::ERROR_NOT_IMPLEMENTED: return "ERROR_NOT_IMPLEMENTED";
+        case ResultCode::ERROR_OUT_OF_MEMORY: return "ERROR_OUT_OF_MEMORY";
         default: return "UNKNOWN";
     }
 }
@@ -42,8 +42,8 @@ std::string result_code_to_string(ResultCode code) {
 #define TEST_ASSERT_RESULT_CODE(expected, actual, message) \
     do { \
         if ((expected) != (actual)) { \
-            std::cerr << "FAIL: " << message << " - Expected: " << result_code_to_string(expected) \
-                      << ", Actual: " << result_code_to_string(actual) << " at line " << __LINE__ << std::endl; \
+            std::cerr << "FAIL: " << message << " - Expected: " << test_result_code_to_string(expected) \
+                      << ", Actual: " << test_result_code_to_string(actual) << " at line " << __LINE__ << std::endl; \
             return false; \
         } \
     } while(0)
@@ -472,24 +472,15 @@ bool test_token_estimation() {
     
     std::string text = "Hello world! This is a test.";
     
-    // Test all three methods
-    size_t simple = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::SIMPLE);
-    size_t word_based = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::WORD_BASED);
-    size_t advanced = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::ADVANCED);
+    // Test the unified simple method
+    size_t estimated = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::SIMPLE);
     
-    // Verify estimates are reasonable (between 4-10 tokens)
-    TEST_ASSERT(simple >= 4 && simple <= 10, "Simple method should estimate 4-10 tokens");
-    TEST_ASSERT(word_based >= 4 && word_based <= 10, "Word-based method should estimate 4-10 tokens");
-    TEST_ASSERT(advanced >= 4 && advanced <= 10, "Advanced method should estimate 4-10 tokens");
+    // Verify estimate is reasonable (between 4-10 tokens for this text)
+    TEST_ASSERT(estimated >= 4 && estimated <= 10, "Simple method should estimate 4-10 tokens");
     
-    // Test character conversion
-    size_t chars_simple = LeafraChunker::tokens_to_characters(10, TokenApproximationMethod::SIMPLE);
-    size_t chars_word = LeafraChunker::tokens_to_characters(10, TokenApproximationMethod::WORD_BASED);
-    size_t chars_advanced = LeafraChunker::tokens_to_characters(10, TokenApproximationMethod::ADVANCED);
-    
-    TEST_ASSERT_EQUAL(static_cast<size_t>(40), chars_simple, "Simple method: 10 tokens should be 40 characters");
-    TEST_ASSERT(chars_word > 40, "Word-based method should estimate more characters");
-    TEST_ASSERT(chars_advanced > 30, "Advanced method should estimate reasonable characters");
+    // Test character conversion - should use ~4 chars/token
+    size_t chars_expected = LeafraChunker::tokens_to_characters(10, TokenApproximationMethod::SIMPLE);
+    TEST_ASSERT_EQUAL(static_cast<size_t>(40), chars_expected, "Simple method: 10 tokens should be 40 characters");
     
     return true;
 }
@@ -502,7 +493,7 @@ bool test_basic_token_chunking() {
     std::string text = "The quick brown fox jumps over the lazy dog. This is a test sentence.";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text_tokens(text, 10, 0.1, TokenApproximationMethod::WORD_BASED, chunks);
+    ResultCode result = chunker.chunk_text_tokens(text, 10, 0.1, TokenApproximationMethod::SIMPLE, chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Token chunking failed");
     TEST_ASSERT(!chunks.empty(), "No chunks created");
     
@@ -527,7 +518,7 @@ bool test_token_multipage_chunking() {
     
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_document_tokens(pages, 8, 0.15, TokenApproximationMethod::ADVANCED, chunks);
+    ResultCode result = chunker.chunk_document_tokens(pages, 8, 0.15, TokenApproximationMethod::SIMPLE, chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Token document chunking failed");
     TEST_ASSERT(!chunks.empty(), "No chunks created");
     
@@ -570,41 +561,34 @@ bool test_token_chunking_error_handling() {
     return true;
 }
 
-// Test 21: Different approximation methods comparison
+// Test 21: Unified approximation method test
 bool test_approximation_methods_comparison() {
     LeafraChunker chunker;
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, chunker.initialize(), "Chunker initialization failed");
     
-    std::string text = "This is a comprehensive test of the different token approximation methods. "
-                      "We want to verify that all three methods produce reasonable results.";
+    std::string text = "This is a comprehensive test of the unified token approximation method. "
+                      "All methods now use the same 4 chars/token approach for consistency.";
     
-    std::vector<TextChunk> simple_chunks, word_chunks, advanced_chunks;
+    std::vector<TextChunk> chunks;
     
-    // Test all three methods with same parameters
-    ResultCode r1 = chunker.chunk_text_tokens(text, 15, 0.1, TokenApproximationMethod::SIMPLE, simple_chunks);
-    ResultCode r2 = chunker.chunk_text_tokens(text, 15, 0.1, TokenApproximationMethod::WORD_BASED, word_chunks);
-    ResultCode r3 = chunker.chunk_text_tokens(text, 15, 0.1, TokenApproximationMethod::ADVANCED, advanced_chunks);
+    // Test the unified method
+    ResultCode result = chunker.chunk_text_tokens(text, 15, 0.1, TokenApproximationMethod::SIMPLE, chunks);
     
-    TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, r1, "Simple method should succeed");
-    TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, r2, "Word-based method should succeed");
-    TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, r3, "Advanced method should succeed");
+    TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Simple method should succeed");
+    TEST_ASSERT(!chunks.empty(), "Simple method should create chunks");
     
-    TEST_ASSERT(!simple_chunks.empty(), "Simple method should create chunks");
-    TEST_ASSERT(!word_chunks.empty(), "Word-based method should create chunks");
-    TEST_ASSERT(!advanced_chunks.empty(), "Advanced method should create chunks");
-    
-    // All methods should produce reasonable token estimates
-    for (const auto& chunk : simple_chunks) {
-        TEST_ASSERT(chunk.estimated_tokens > 0, "Simple chunk should have token estimate");
-    }
-    for (const auto& chunk : word_chunks) {
-        TEST_ASSERT(chunk.estimated_tokens > 0, "Word-based chunk should have token estimate");
-    }
-    for (const auto& chunk : advanced_chunks) {
-        TEST_ASSERT(chunk.estimated_tokens > 0, "Advanced chunk should have token estimate");
+    // Verify chunks have reasonable token estimates
+    for (const auto& chunk : chunks) {
+        TEST_ASSERT(chunk.estimated_tokens > 0, "Chunk should have token estimate");
     }
     
     return true;
+}
+
+// Helper function to check if a word is split across chunk boundaries
+bool is_word_split(const std::vector<TextChunk>& chunks) {
+    // Implementation of is_word_split function
+    return false; // Placeholder return, actual implementation needed
 }
 
 int main() {

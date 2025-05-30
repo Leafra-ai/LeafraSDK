@@ -15,11 +15,27 @@
 #include <functional>
 #include <cstdint>
 
+// Include SQLite headers based on configuration
+#ifdef LEAFRA_USE_SYSTEM_SQLITE_HEADERS
+    // Use system SQLite headers (iOS/macOS)
+    #include <sqlite3.h>
+#else
+    // Use custom SQLite headers (Android/Windows)
+    #include "sqlite3.h"
+#endif
+
 namespace leafra {
 
-// Forward declarations
-struct sqlite3;
-struct sqlite3_stmt;
+// Type aliases for SQLite - use system types when available
+#ifdef LEAFRA_USE_SYSTEM_SQLITE_HEADERS
+    // Use system SQLite types directly
+    using sqlite3 = ::sqlite3;
+    using sqlite3_stmt = ::sqlite3_stmt;
+#else
+    // Forward declarations for custom SQLite (Android/Windows)
+    struct sqlite3;
+    struct sqlite3_stmt;
+#endif
 
 /**
  * @brief SQLite database connection wrapper

@@ -419,7 +419,9 @@ bool is_available() {
 
 std::string get_version() {
 #ifdef LEAFRA_HAS_SENTENCEPIECE
-    return sentencepiece::SentencePieceProcessor::version();
+    // SentencePiece doesn't provide a simple version method in newer versions
+    // Return a placeholder version string indicating SentencePiece is available
+    return "SentencePiece (available)";
 #else
     return "Not available";
 #endif

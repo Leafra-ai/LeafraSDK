@@ -44,11 +44,10 @@ enum class ChunkSizeUnit : int32_t {
 
 /**
  * @brief Enum for token approximation methods
+ * NOTE: Simplified to use single unified approach of ~4 chars/token for consistency.
  */
 enum class TokenApproximationMethod : int32_t {
-    SIMPLE = 0,     // 1 token ≈ 4 characters (fastest)
-    WORD_BASED = 1, // 1 token ≈ 0.75 words (balanced)
-    ADVANCED = 2    // Heuristic based on word length (most accurate)
+    SIMPLE = 0     // 1 token ≈ 4 characters (unified approach)
 };
 
 /**
@@ -75,14 +74,14 @@ struct ChunkingOptions {
     bool preserve_word_boundaries = true; // Whether to avoid breaking words
     bool include_metadata = true;       // Whether to include chunk metadata
     ChunkSizeUnit size_unit = ChunkSizeUnit::CHARACTERS;  // Unit for chunk_size
-    TokenApproximationMethod token_method = TokenApproximationMethod::WORD_BASED;  // Token approximation method
+    TokenApproximationMethod token_method = TokenApproximationMethod::SIMPLE;  // Token approximation method
     
     ChunkingOptions() = default;
     ChunkingOptions(size_t size, double overlap)
         : chunk_size(size), overlap_percentage(overlap) {}
     
     // New constructor for token-based chunking
-    ChunkingOptions(size_t size, double overlap, ChunkSizeUnit unit, TokenApproximationMethod method = TokenApproximationMethod::WORD_BASED)
+    ChunkingOptions(size_t size, double overlap, ChunkSizeUnit unit, TokenApproximationMethod method = TokenApproximationMethod::SIMPLE)
         : chunk_size(size), overlap_percentage(overlap), size_unit(unit), token_method(method) {}
 };
 
@@ -263,19 +262,67 @@ private:
                           size_t global_start) const;
     
     /**
-     * @brief Simple token approximation: 1 token ≈ 4 characters
-     */
-    static size_t estimate_tokens_simple(const std::string& text);
-    
-    /**
-     * @brief Word-based token approximation: 1 token ≈ 0.75 words
-     */
-    static size_t estimate_tokens_word_based(const std::string& text);
-    
-    /**
      * @brief Advanced token approximation with heuristics
      */
     static size_t estimate_tokens_advanced(const std::string& text);
+
+    // ========== IMPROVED TOKEN CHUNKING METHODS (PRIVATE) ==========
+    
+    /**
+     * @brief Improved token-based chunking for single text
+     * @param text Input text to chunk
+     * @param options Chunking options
+     * @param chunks Output vector of text chunks
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode chunk_text_tokens_improved(const std::string& text,
+                                         const ChunkingOptions& options,
+                                         std::vector<TextChunk>& chunks);
+    
+    /**
+     * @brief Improved token-based chunking for multi-page documents
+     * @param pages Vector of text pages
+     * @param options Chunking options
+     * @param chunks Output vector of text chunks
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode chunk_document_tokens_improved(const std::vector<std::string>& pages,
+                                             const ChunkingOptions& options,
+                                             std::vector<TextChunk>& chunks);
+    
+    /**
+     * @brief Find optimal chunk end position based on target token count
+     * @param text Source text
+     * @param start_pos Starting position
+     * @param target_tokens Target number of tokens
+     * @param options Chunking options
+     * @return Optimal end position
+     */
+    size_t find_optimal_chunk_end(const std::string& text,
+                                 size_t start_pos,
+                                 size_t target_tokens,
+                                 const ChunkingOptions& options) const;
+    
+    /**
+     * @brief Estimate character count needed for target tokens
+     * @param text Source text for context
+     * @param start_pos Starting position
+     * @param target_tokens Target number of tokens
+     * @param method Token approximation method
+     * @return Estimated character count
+     */
+    size_t estimate_characters_for_tokens(const std::string& text,
+                                         size_t start_pos,
+                                         size_t target_tokens,
+                                         TokenApproximationMethod method) const;
+    
+    /**
+     * @brief Find the start of the next word from given position
+     * @param text Source text
+     * @param pos Current position
+     * @return Position of next word start
+     */
+    size_t find_next_word_start(const std::string& text, size_t pos) const;
 
 private:
     ChunkingOptions default_options_;

@@ -1,0 +1,20 @@
+@PACKAGE_INIT@
+
+# LeafraSDK Package Configuration
+
+set(LEAFRA_VERSION "@PROJECT_VERSION@")
+
+# Check required components
+include(CMakeFindDependencyMacro)
+
+# Include the targets file
+include("${CMAKE_CURRENT_LIST_DIR}/LeafraSDKTargets.cmake")
+
+# Set the LeafraCore target as found
+set(LeafraSDK_FOUND TRUE)
+set(LeafraCore_FOUND TRUE)
+
+# Provide information about found components
+message(STATUS "LeafraSDK v${LEAFRA_VERSION} found")
+
+check_required_components(LeafraSDK) 

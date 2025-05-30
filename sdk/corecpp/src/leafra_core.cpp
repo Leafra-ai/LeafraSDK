@@ -20,13 +20,13 @@ namespace leafra {
 ChunkingConfig::ChunkingConfig() {
     // Default values are already set in the header with sensible defaults for LLM processing
     size_unit = ChunkSizeUnit::TOKENS;
-    token_method = TokenApproximationMethod::WORD_BASED;
+    token_method = TokenApproximationMethod::SIMPLE;
 }
 
 ChunkingConfig::ChunkingConfig(size_t size, double overlap, bool use_tokens) 
     : chunk_size(size), overlap_percentage(overlap) {
     size_unit = use_tokens ? ChunkSizeUnit::TOKENS : ChunkSizeUnit::CHARACTERS;
-    token_method = TokenApproximationMethod::WORD_BASED;
+    token_method = TokenApproximationMethod::SIMPLE;
 }
 
 // Private implementation class (PIMPL pattern)
@@ -126,8 +126,7 @@ ResultCode LeafraCore::initialize(const Config& config) {
             LEAFRA_INFO() << "  - Chunk size: " << config.chunking.chunk_size 
                           << (config.chunking.size_unit == ChunkSizeUnit::TOKENS ? " tokens" : " characters");
             LEAFRA_INFO() << "  - Overlap: " << (config.chunking.overlap_percentage * 100.0) << "%";
-            LEAFRA_INFO() << "  - Token method: " << (config.chunking.token_method == TokenApproximationMethod::SIMPLE ? "Simple" :
-                                                      config.chunking.token_method == TokenApproximationMethod::WORD_BASED ? "Word-based" : "Advanced");
+            LEAFRA_INFO() << "  - Token method: Simple";
         }
         
         pImpl->initialized_ = true;

@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Project name
 project(LeafraSDKCmdLineExample)
 
+# Disable React Native bindings for command line build
+set(LEAFRA_BUILD_RN_BINDINGS OFF)
+
 # Find the LeafraCore library
 # This assumes the SDK is built and installed, or we're building from the parent directory
 if(NOT TARGET LeafraCore)
@@ -19,17 +22,18 @@ if(NOT TARGET LeafraCore)
     
     if(LEAFRA_SDK_ROOT)
         message(STATUS "Found LeafraSDK at: ${LEAFRA_SDK_ROOT}")
-        add_subdirectory(${LEAFRA_SDK_ROOT}/sdk/corecpp LeafraCore)
+        # Include the full SDK directory to get PDFium configuration
+        add_subdirectory(${LEAFRA_SDK_ROOT}/sdk leafra-sdk)
     else()
-        message(FATAL_ERROR "LeafraCore library not found. Please build the SDK first or ensure it's in the parent directory.")
+        message(FATAL_ERROR "Could not find LeafraSDK. Please ensure this example is in the correct directory structure.")
     endif()
 endif()
 
-# SDK Command Line Application (Example)
+# Create the executable
 add_executable(sdkcmdline sdkcmdline.cpp)
 
-# Link with LeafraCore
-target_link_libraries(sdkcmdline LeafraCore)
+# Link against LeafraCore
+target_link_libraries(sdkcmdline PRIVATE LeafraCore)
 
 # Include directories - point to the SDK headers
 if(LEAFRA_SDK_ROOT)
@@ -53,5 +57,6 @@ set_target_properties(sdkcmdline PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
+# Configuration summary
 message(STATUS "✅ LeafraSDK Command Line Example configured successfully")
 message(STATUS "📱 Supported platforms: macOS, Linux, Windows (Desktop only)") 

@@ -96,6 +96,16 @@ endif()
 if(APPLE)
     # iOS/macOS - os_log is part of the system, link Foundation framework
     target_link_libraries(LeafraCore PRIVATE "-framework Foundation")
+    
+    # Add Core Graphics and other frameworks required by PDFium
+    if(TARGET PDFium::PDFium)
+        target_link_libraries(LeafraCore PRIVATE 
+            "-framework CoreGraphics"
+            "-framework CoreFoundation"
+            "-framework CoreText"
+        )
+        message(STATUS "✅ Linked Apple frameworks for PDFium")
+    endif()
 elseif(ANDROID)
     # Android - link with log library
     target_link_libraries(LeafraCore PRIVATE log)
