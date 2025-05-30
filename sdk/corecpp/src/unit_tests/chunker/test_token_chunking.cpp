@@ -65,7 +65,7 @@ void test_token_chunking() {
         
         for (size_t i = 0; i < methods.size(); ++i) {
             std::vector<TextChunk> chunks;
-            ResultCode result = chunker.chunk_text_tokens(sample_text, token_size, 0.1, methods[i], chunks);
+            ResultCode result = chunker.chunk_text(sample_text, ChunkingOptions(token_size, 0.1, ChunkSizeUnit::TOKENS, methods[i]), chunks);
             
             std::cout << "\n" << method_names[i] << " method:" << std::endl;
             if (result == ResultCode::SUCCESS) {
@@ -105,7 +105,7 @@ void test_multi_page_token_chunking() {
     }
     
     std::vector<TextChunk> chunks;
-    ResultCode result = chunker.chunk_document_tokens(pages, 15, 0.2, TokenApproximationMethod::SIMPLE, chunks);
+    ResultCode result = chunker.chunk_document(pages, ChunkingOptions(15, 0.2, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
     
     if (result == ResultCode::SUCCESS) {
         std::cout << "Successfully created " << chunks.size() << " chunks" << std::endl;

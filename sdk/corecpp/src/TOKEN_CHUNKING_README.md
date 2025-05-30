@@ -11,10 +11,10 @@ The LeafraChunker now supports **token-based chunking** in addition to the origi
 - Default behavior remains character-based chunking
 - Existing code requires no modifications
 
-### 🎯 **Three Approximation Methods**
-1. **Simple**: 1 token ≈ 4 characters (fastest)
-2. **Word-based**: 1 token ≈ 0.75 words (balanced accuracy/speed)  
-3. **Advanced**: Heuristic based on word length (most accurate ~90%)
+### 🎯 **Unified Token Approximation**
+- **Simple Method**: 1 token ≈ 4 characters (fast and consistent)
+- Simplified approach for better consistency across different content types
+- All methods now use the same approximation for predictable behavior
 
 ### 📊 **Enhanced Metadata**
 - Chunks now include `estimated_tokens` field
@@ -32,9 +32,7 @@ enum class ChunkSizeUnit : int32_t {
 };
 
 enum class TokenApproximationMethod : int32_t {
-    SIMPLE = 0,     // 1 token ≈ 4 characters (fastest)
-    WORD_BASED = 1, // 1 token ≈ 0.75 words (balanced)
-    ADVANCED = 2    // Heuristic based on word length (most accurate)
+    SIMPLE = 0     // 1 token ≈ 4 characters (unified approach)
 };
 ```
 
@@ -55,27 +53,13 @@ struct ChunkingOptions {
     bool preserve_word_boundaries = true;
     bool include_metadata = true;
     ChunkSizeUnit size_unit = ChunkSizeUnit::CHARACTERS;  // 🆕 New field
-    TokenApproximationMethod token_method = TokenApproximationMethod::WORD_BASED;  // 🆕 New field
+    TokenApproximationMethod token_method = TokenApproximationMethod::SIMPLE;  // 🆕 New field
 };
 ```
 
-### New Methods
+### Static Utility Methods
 
 ```cpp
-// Token-based text chunking
-ResultCode chunk_text_tokens(const std::string& text,
-                             size_t chunk_size_tokens,
-                             double overlap_percentage,
-                             TokenApproximationMethod method,
-                             std::vector<TextChunk>& chunks);
-
-// Token-based document chunking
-ResultCode chunk_document_tokens(const std::vector<std::string>& pages,
-                                size_t chunk_size_tokens,
-                                double overlap_percentage,
-                                TokenApproximationMethod method,
-                                std::vector<TextChunk>& chunks);
-
 // Static utility methods
 static size_t estimate_token_count(const std::string& text, 
                                   TokenApproximationMethod method);
@@ -98,14 +82,9 @@ chunker.initialize();
 std::string text = "Your document text here...";
 std::vector<TextChunk> chunks;
 
-// Chunk into ~100-token pieces with 10% overlap
-ResultCode result = chunker.chunk_text_tokens(
-    text, 
-    100,  // tokens per chunk
-    0.1,  // 10% overlap
-    TokenApproximationMethod::WORD_BASED,
-    chunks
-);
+// Chunk into ~100-token pieces with 10% overlap using the advanced API
+ChunkingOptions options(100, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
+ResultCode result = chunker.chunk_text(text, options, chunks);
 
 if (result == ResultCode::SUCCESS) {
     for (const auto& chunk : chunks) {
@@ -125,13 +104,8 @@ std::vector<std::string> pages = {
 };
 
 std::vector<TextChunk> chunks;
-ResultCode result = chunker.chunk_document_tokens(
-    pages,
-    50,   // 50 tokens per chunk
-    0.15, // 15% overlap
-    TokenApproximationMethod::ADVANCED,
-    chunks
-);
+ChunkingOptions options(50, 0.15, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
+ResultCode result = chunker.chunk_document(pages, options, chunks);
 
 // Each chunk will have page_number and estimated_tokens populated
 ```
@@ -141,13 +115,11 @@ ResultCode result = chunker.chunk_document_tokens(
 ```cpp
 std::string text = "Sample text for token estimation";
 
-// Get token estimates using different methods
-size_t simple_tokens = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::SIMPLE);
-size_t word_tokens = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::WORD_BASED);
-size_t advanced_tokens = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::ADVANCED);
+// Get token estimates using the unified simple method
+size_t estimated_tokens = LeafraChunker::estimate_token_count(text, TokenApproximationMethod::SIMPLE);
 
 // Convert tokens back to estimated character count
-size_t estimated_chars = LeafraChunker::tokens_to_characters(100, TokenApproximationMethod::WORD_BASED);
+size_t estimated_chars = LeafraChunker::tokens_to_characters(100, TokenApproximationMethod::SIMPLE);
 ```
 
 ### Using Enhanced ChunkingOptions
@@ -155,29 +127,27 @@ size_t estimated_chars = LeafraChunker::tokens_to_characters(100, TokenApproxima
 ```cpp
 // Create options for token-based chunking
 ChunkingOptions options(
-    80,  // chunk size
+    80,  // chunk size in tokens
     0.2, // overlap
     ChunkSizeUnit::TOKENS,
-    TokenApproximationMethod::ADVANCED
+    TokenApproximationMethod::SIMPLE
 );
 
 std::vector<TextChunk> chunks;
-ResultCode result = chunker.chunk_document_advanced(pages, options, chunks);
+ResultCode result = chunker.chunk_document(pages, options, chunks);
 ```
 
-## Approximation Method Comparison
+## Approximation Method Details
 
-| Method | Speed | Accuracy | Best For |
-|--------|-------|----------|----------|
-| **Simple** | ⚡ Fastest | ~75% | Quick prototyping, performance-critical |
-| **Word-based** | 🔄 Balanced | ~85% | General purpose, recommended default |
-| **Advanced** | 🐢 Slower | ~90% | High accuracy requirements, final production |
+| Method | Speed | Accuracy | Description |
+|--------|-------|----------|-------------|
+| **Simple** | ⚡ Fastest | ~80% | Unified approach: 1 token ≈ 4 characters |
 
 ### Performance Characteristics
 
 - **Simple**: `O(1)` - just divides character count by 4
-- **Word-based**: `O(n)` - counts words, applies ratio
-- **Advanced**: `O(n)` - analyzes word lengths and punctuation
+- Consistent behavior across all content types
+- Fast and predictable for all use cases
 
 ## Migration Guide
 
@@ -186,8 +156,8 @@ ResultCode result = chunker.chunk_document_advanced(pages, options, chunks);
 
 ```cpp
 // This continues to work exactly as before
-chunker.chunk_text(text, 1000, 0.1, chunks);
-chunker.chunk_document(pages, 500, 0.2, chunks);
+chunker.chunk_text(text, ChunkingOptions(1000, 0.1), chunks);
+chunker.chunk_document(pages, ChunkingOptions(500, 0.2), chunks);
 ```
 
 ### To Add Token Support
@@ -195,41 +165,32 @@ Simply replace your existing calls:
 
 ```cpp
 // Before (character-based)
-chunker.chunk_text(text, 1000, 0.1, chunks);
+chunker.chunk_text(text, ChunkingOptions(1000, 0.1), chunks);
 
 // After (token-based)
-chunker.chunk_text_tokens(text, 250, 0.1, TokenApproximationMethod::WORD_BASED, chunks);
+chunker.chunk_text(text, ChunkingOptions(250, 0.1, ChunkSizeUnit::TOKENS), chunks);
 ```
 
 ## Implementation Details
 
-### Token Approximation Algorithms
+### Token Approximation Algorithm
 
-#### Simple Method
+#### Simple Method (Unified Approach)
 ```
-tokens = (characters + 3) / 4  // Round up division
-```
-
-#### Word-Based Method
-```
-word_count = count_words(text)
-tokens = word_count / 0.75  // 1 token ≈ 0.75 words
+tokens = round(characters / 4.0)  // ~4 characters per token
 ```
 
-#### Advanced Method
-- Short words (≤3 chars): 1 token
-- Medium words (4-6 chars): 1 token  
-- Long words (7-10 chars): 2 tokens
-- Very long words (>10 chars): ~1 token per 5 characters
-- Punctuation: 1 token each
+This unified approach provides:
+- **Consistency**: Same approximation across all content types
+- **Simplicity**: Easy to understand and predict
+- **Performance**: O(1) time complexity
+- **Reliability**: Works well for most English text content
 
 ### Character-to-Token Conversion
 
 | Method | Formula |
 |--------|---------|
 | Simple | `chars = tokens × 4` |
-| Word-based | `chars = tokens ÷ 0.75 × 5` |
-| Advanced | `chars = tokens × 3.8` |
 
 ## Testing
 
@@ -239,7 +200,7 @@ The implementation includes comprehensive unit tests:
 - ✅ Basic token-based chunking (Test 18)  
 - ✅ Token-based multi-page chunking (Test 19)
 - ✅ Token chunking error handling (Test 20)
-- ✅ Approximation methods comparison (Test 21)
+- ✅ Unified approximation method testing (Test 21)
 
 **Total test coverage**: 21 tests with 100% pass rate
 
@@ -248,29 +209,31 @@ The implementation includes comprehensive unit tests:
 ### 1. LLM Context Window Management
 ```cpp
 // For OpenAI GPT-4 (8K context)
-chunker.chunk_text_tokens(document, 6000, 0.1, TokenApproximationMethod::WORD_BASED, chunks);
+ChunkingOptions options(6000, 0.1, ChunkSizeUnit::TOKENS);
+chunker.chunk_text(document, options, chunks);
 ```
 
 ### 2. Embedding Model Optimization
 ```cpp
 // For typical embedding models (~500 token limit)
-chunker.chunk_text_tokens(text, 400, 0.15, TokenApproximationMethod::ADVANCED, chunks);
+ChunkingOptions options(400, 0.15, ChunkSizeUnit::TOKENS);
+chunker.chunk_text(text, options, chunks);
 ```
 
 ### 3. RAG (Retrieval-Augmented Generation)
 ```cpp
 // Balance between context and retrieval precision
-chunker.chunk_document_tokens(pages, 200, 0.2, TokenApproximationMethod::WORD_BASED, chunks);
+ChunkingOptions options(200, 0.2, ChunkSizeUnit::TOKENS);
+chunker.chunk_document(pages, options, chunks);
 ```
 
 ## Best Practices
 
-1. **Start with Word-based**: Good balance of speed and accuracy
-2. **Use Advanced for production**: When accuracy is critical
-3. **Simple for prototyping**: Fast iteration and testing
-4. **Consider overlap**: 10-20% overlap helps maintain context
-5. **Preserve word boundaries**: Keep enabled for better readability
-6. **Monitor token estimates**: Use `chunk.estimated_tokens` for validation
+1. **Use the unified simple method**: Consistent and reliable for all use cases
+2. **Consider overlap**: 10-20% overlap helps maintain context
+3. **Preserve word boundaries**: Keep enabled for better readability
+4. **Monitor token estimates**: Use `chunk.estimated_tokens` for validation
+5. **Test with your content**: Validate approximation accuracy with your specific text types
 
 ## Limitations
 

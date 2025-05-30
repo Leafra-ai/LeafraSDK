@@ -104,7 +104,7 @@ bool test_single_text_chunking_basic() {
     std::string text = "This is a test text that should be chunked into smaller pieces for testing purposes.";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(text, 30, 0.2, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(30, 0.2), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Basic text chunking should succeed");
     
     TEST_ASSERT(chunks.size() > 1, "Text should be split into multiple chunks");
@@ -127,7 +127,7 @@ bool test_single_text_chunking_small_text() {
     std::string text = "Short text";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(text, 100, 0.1, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(100, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Small text chunking should succeed");
     
     TEST_ASSERT_EQUAL(static_cast<size_t>(1), chunks.size(), "Small text should create single chunk");
@@ -143,7 +143,7 @@ bool test_single_text_chunking_overlap() {
     std::string text = create_long_text(50); // Creates text with 50 words
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(text, 100, 0.3, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(100, 0.3), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Overlap chunking should succeed");
     
     if (chunks.size() > 1) {
@@ -177,7 +177,7 @@ bool test_multi_page_document_chunking() {
     
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_document(pages, 80, 0.1, chunks);
+    ResultCode result = chunker.chunk_document(pages, ChunkingOptions(80, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Multi-page document chunking should succeed");
     
     TEST_ASSERT(chunks.size() >= pages.size(), "Should have at least as many chunks as pages");
@@ -203,7 +203,7 @@ bool test_multi_page_single_page() {
     
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_document(pages, 50, 0.2, chunks);
+    ResultCode result = chunker.chunk_document(pages, ChunkingOptions(50, 0.2), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Single page in vector should succeed");
     
     for (const auto& chunk : chunks) {
@@ -227,7 +227,7 @@ bool test_advanced_chunking_options() {
     
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_document_advanced(pages, options, chunks);
+    ResultCode result = chunker.chunk_document(pages, options, chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Advanced chunking should succeed");
     
     // Check that word boundaries are preserved
@@ -255,7 +255,7 @@ bool test_word_boundary_preservation() {
     std::vector<TextChunk> chunks;
     
     // Use small chunk size to force word boundary decisions
-    ResultCode result = chunker.chunk_text(text, 25, 0.1, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(25, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Word boundary test should succeed");
     
     // Check that chunks don't break words inappropriately
@@ -289,7 +289,7 @@ bool test_statistics_tracking() {
     TEST_ASSERT_EQUAL(static_cast<size_t>(0), chunker.get_chunk_count(), "Initial chunk count should be 0");
     TEST_ASSERT_EQUAL(static_cast<size_t>(0), chunker.get_total_characters(), "Initial character count should be 0");
     
-    ResultCode result = chunker.chunk_text(text, 50, 0.2, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(50, 0.2), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Statistics test chunking should succeed");
     
     // After chunking
@@ -338,23 +338,24 @@ bool test_error_handling_invalid_parameters() {
     std::vector<TextChunk> chunks;
     
     // Test empty text
-    ResultCode result = chunker.chunk_text("", 100, 0.1, chunks);
-    TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Empty text should return error");
+    ResultCode result = chunker.chunk_text("", ChunkingOptions(100, 0.1), chunks);
+    TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Empty text should be handled gracefully");
+    TEST_ASSERT(chunks.empty(), "Empty text should result in no chunks");
     
     // Test zero chunk size
-    result = chunker.chunk_text("Some text", 0, 0.1, chunks);
+    result = chunker.chunk_text("Some text", ChunkingOptions(0, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Zero chunk size should return error");
     
     // Test invalid overlap percentage
-    result = chunker.chunk_text("Some text", 100, -0.1, chunks);
+    result = chunker.chunk_text("Some text", ChunkingOptions(100, -0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Negative overlap should return error");
     
-    result = chunker.chunk_text("Some text", 100, 1.0, chunks);
+    result = chunker.chunk_text("Some text", ChunkingOptions(100, 1.0), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "100% overlap should return error");
     
     // Test empty pages vector
     std::vector<std::string> empty_pages;
-    result = chunker.chunk_document(empty_pages, 100, 0.1, chunks);
+    result = chunker.chunk_document(empty_pages, ChunkingOptions(100, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Empty pages should return error");
     
     return true;
@@ -369,7 +370,7 @@ bool test_edge_case_very_long_words() {
     std::string text = "Short " + long_word + " words.";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(text, 50, 0.1, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(50, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Very long words should be handled");
     
     // Should still create chunks even with long words
@@ -385,7 +386,7 @@ bool test_edge_case_only_whitespace() {
     std::string text = "   \t\n   \r   ";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(text, 50, 0.1, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(50, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Whitespace-only text should be handled");
     
     if (chunks.size() > 0) {
@@ -406,7 +407,7 @@ bool test_edge_case_unicode_text() {
     std::string text = "Hello café résumé naïve Zürich München. This has accented characters.";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(text, 30, 0.1, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(30, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Unicode text should be handled");
     
     TEST_ASSERT(chunks.size() > 0, "Should create chunks from Unicode text");
@@ -425,7 +426,7 @@ bool test_chunk_metadata_consistency() {
     
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_document(pages, 40, 0.1, chunks);
+    ResultCode result = chunker.chunk_document(pages, ChunkingOptions(40, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Metadata test should succeed");
     
     // Verify metadata consistency
@@ -457,7 +458,7 @@ bool test_performance_large_document() {
     std::string large_text = create_long_text(1000); // 1000 words
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(large_text, 200, 0.1, chunks);
+    ResultCode result = chunker.chunk_text(large_text, ChunkingOptions(200, 0.1), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Large document should be processed");
     
     TEST_ASSERT(chunks.size() > 1, "Large document should create multiple chunks");
@@ -493,7 +494,7 @@ bool test_basic_token_chunking() {
     std::string text = "The quick brown fox jumps over the lazy dog. This is a test sentence.";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text_tokens(text, 10, 0.1, TokenApproximationMethod::SIMPLE, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(10, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Token chunking failed");
     TEST_ASSERT(!chunks.empty(), "No chunks created");
     
@@ -518,7 +519,7 @@ bool test_token_multipage_chunking() {
     
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_document_tokens(pages, 8, 0.15, TokenApproximationMethod::SIMPLE, chunks);
+    ResultCode result = chunker.chunk_document(pages, ChunkingOptions(8, 0.15, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Token document chunking failed");
     TEST_ASSERT(!chunks.empty(), "No chunks created");
     
@@ -542,20 +543,21 @@ bool test_token_chunking_error_handling() {
     std::vector<TextChunk> chunks;
     
     // Test empty text
-    ResultCode result = chunker.chunk_text_tokens("", 10, 0.1, TokenApproximationMethod::SIMPLE, chunks);
-    TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Should reject empty text");
+    ResultCode result = chunker.chunk_text("", ChunkingOptions(10, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
+    TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Empty text should be handled gracefully");
+    TEST_ASSERT(chunks.empty(), "Empty text should result in no chunks");
     
     // Test zero token size
-    result = chunker.chunk_text_tokens("Valid text", 0, 0.1, TokenApproximationMethod::SIMPLE, chunks);
+    result = chunker.chunk_text("Valid text", ChunkingOptions(0, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Should reject zero token size");
     
     // Test invalid overlap
-    result = chunker.chunk_text_tokens("Valid text", 10, 1.5, TokenApproximationMethod::SIMPLE, chunks);
+    result = chunker.chunk_text("Valid text", ChunkingOptions(10, 1.5, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Should reject invalid overlap");
     
     // Test empty pages vector
     std::vector<std::string> empty_pages;
-    result = chunker.chunk_document_tokens(empty_pages, 10, 0.1, TokenApproximationMethod::SIMPLE, chunks);
+    result = chunker.chunk_document(empty_pages, ChunkingOptions(10, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::ERROR_INVALID_PARAMETER, result, "Should reject empty pages");
     
     return true;
@@ -572,7 +574,7 @@ bool test_approximation_methods_comparison() {
     std::vector<TextChunk> chunks;
     
     // Test the unified method
-    ResultCode result = chunker.chunk_text_tokens(text, 15, 0.1, TokenApproximationMethod::SIMPLE, chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(15, 0.1, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE), chunks);
     
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Simple method should succeed");
     TEST_ASSERT(!chunks.empty(), "Simple method should create chunks");

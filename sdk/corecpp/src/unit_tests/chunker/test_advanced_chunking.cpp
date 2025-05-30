@@ -217,7 +217,7 @@ bool test_word_boundary_preservation_alice_txt() {
             ChunkingOptions options(chunk_size, overlap, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
             options.preserve_word_boundaries = true;
             
-            ResultCode result = chunker.chunk_text_advanced(text, options, chunks);
+            ResultCode result = chunker.chunk_text(text, options, chunks);
             TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Text chunking failed");
             
             // Test word boundary preservation
@@ -307,7 +307,7 @@ bool test_word_boundary_preservation_pdfs() {
                 ChunkingOptions options(chunk_size, overlap, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
                 options.preserve_word_boundaries = true;
                 
-                ResultCode result = chunker.chunk_document_advanced(pages, options, chunks);
+                ResultCode result = chunker.chunk_document(pages, options, chunks);
                 TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "PDF chunking failed");
                 
                 // Test word boundary preservation
@@ -399,7 +399,7 @@ bool test_token_size_accuracy_unified() {
             ChunkingOptions options(chunk_size, overlap, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
             options.preserve_word_boundaries = true;
             
-            ResultCode result = chunker.chunk_text_advanced(text, options, chunks);
+            ResultCode result = chunker.chunk_text(text, options, chunks);
             TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Text chunking failed");
             
             // Test token size accuracy
@@ -529,7 +529,7 @@ bool test_word_boundary_edge_cases() {
                 ChunkingOptions options(chunk_size, overlap, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
                 options.preserve_word_boundaries = true;
                 
-                ResultCode result = chunker.chunk_text_advanced(text, options, chunks);
+                ResultCode result = chunker.chunk_text(text, options, chunks);
                 TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, 
                     "Chunking failed for " + description + " text");
                 
@@ -581,7 +581,7 @@ bool test_overlap_with_word_boundaries() {
     ChunkingOptions options(30, 0.3, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
     options.preserve_word_boundaries = true;
     
-    ResultCode result = chunker.chunk_text_advanced(text, options, chunks);
+    ResultCode result = chunker.chunk_text(text, options, chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Overlap text chunking failed");
     
     TEST_ASSERT(check_word_boundary_preservation_robust(chunks, text), 
@@ -701,14 +701,14 @@ bool test_comprehensive_file_processing() {
                     if (is_pdf) {
                         std::vector<std::string> pages = parse_document(filepath);
                         if (!pages.empty()) {
-                            result = chunker.chunk_document_advanced(pages, options, chunks);
+                            result = chunker.chunk_document(pages, options, chunks);
                         } else {
                             result = ResultCode::ERROR_PROCESSING_FAILED;
                         }
                     } else {
                         std::string text = load_text_file(filepath);
                         if (!text.empty()) {
-                            result = chunker.chunk_text_advanced(text, options, chunks);
+                            result = chunker.chunk_text(text, options, chunks);
                         } else {
                             result = ResultCode::ERROR_PROCESSING_FAILED;
                         }

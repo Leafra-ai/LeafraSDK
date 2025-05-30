@@ -20,41 +20,116 @@ ResultCode LeafraChunker::initialize() {
     return ResultCode::SUCCESS;
 }
 
-// TEXT CHUNKING
+// TEXT CHUNKING WRAPPER API
 ResultCode LeafraChunker::chunk_text(const std::string& text,
-                                    size_t chunk_size,
-                                    double overlap_percentage,
+                                    const ChunkingOptions& options,
                                     std::vector<TextChunk>& chunks) {
     // Simple wrapper: Convert single text to single-page document
     std::vector<std::string> pages;
     pages.push_back(text);
-    return chunk_document(pages, chunk_size, overlap_percentage, chunks);
+    return chunk_document(pages, options, chunks);
 }
 
-ResultCode LeafraChunker::chunk_text_advanced(const std::string& text,
-                                             const ChunkingOptions& options,
-                                             std::vector<TextChunk>& chunks) {
-    // Simple wrapper: Convert single text to single-page document
-    std::vector<std::string> pages;
-    pages.push_back(text);
-    return chunk_document_advanced(pages, options, chunks);
+
+
+
+// DOCUMENT CHUNKING API
+
+ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
+                                                 const ChunkingOptions& options,
+                                                 std::vector<TextChunk>& chunks) {
+    if (pages.empty()) {
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    if (options.chunk_size == 0) {
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    if (options.overlap_percentage < 0.0 || options.overlap_percentage >= 1.0) {
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    try {
+        chunks.clear();
+        
+        // Calculate total document length
+        size_t total_length = 0;
+        for (const auto& page : pages) {
+            total_length += page.length();
+        }
+        last_total_characters_ = total_length;
+        
+        // Store current default options and set new ones temporarily
+        ChunkingOptions old_options = default_options_;
+        default_options_ = options;
+        
+        // Determine effective options for chunking
+        ChunkingOptions effective_options = options;
+        if (options.size_unit == ChunkSizeUnit::CHARACTERS) {
+            // Convert character size to approximate token size for the unified method
+            size_t approx_tokens = static_cast<size_t>(options.chunk_size / SIMPLE_CHARS_PER_TOKEN); // ~4 chars per token
+            if (approx_tokens < 1) approx_tokens = 1;
+            effective_options.chunk_size = approx_tokens;
+            effective_options.size_unit = ChunkSizeUnit::TOKENS;
+        }
+        
+        // Combine all pages into a single text with page separators
+        std::string combined_text;
+        std::vector<size_t> page_starts;
+        page_starts.push_back(0);
+        
+        for (size_t i = 0; i < pages.size(); ++i) {
+            combined_text += pages[i];
+            if (i < pages.size() - 1) {
+                combined_text += "\n\n"; // Page separator
+                page_starts.push_back(combined_text.length());
+            }
+        }
+        
+        // Use core chunking method
+        std::vector<TextChunk> temp_chunks;
+        ResultCode result = actual_chunker(combined_text, effective_options, temp_chunks);
+        
+        if (result != ResultCode::SUCCESS) {
+            // Restore old options before returning
+            default_options_ = old_options;
+            return result;
+        }
+        
+        // Update chunk metadata with correct page numbers
+        for (auto& chunk : temp_chunks) {
+            size_t page_number = 0;
+            for (size_t i = 0; i < page_starts.size(); ++i) {
+                if (chunk.start_index >= page_starts[i]) {
+                    page_number = i;
+                } else {
+                    break;
+                }
+            }
+            chunk.page_number = page_number;
+        }
+        
+        chunks = std::move(temp_chunks);
+        
+        // Restore old options
+        default_options_ = old_options;
+        
+        // Update statistics
+        last_chunk_count_ = chunks.size();
+        
+        return ResultCode::SUCCESS;
+        
+    } catch (const std::exception&) {
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
 }
 
-ResultCode LeafraChunker::chunk_text_tokens(const std::string& text,
-                                           size_t chunk_size_tokens,
-                                           double overlap_percentage,
-                                           TokenApproximationMethod method,
-                                           std::vector<TextChunk>& chunks) {
-    // Simple wrapper: Convert single text to single-page document
-    std::vector<std::string> pages;
-    pages.push_back(text);
-    return chunk_document_tokens(pages, chunk_size_tokens, overlap_percentage, method, chunks);
-}
 
-// New improved token-based chunking methods
-ResultCode LeafraChunker::chunk_text_tokens_improved(const std::string& text,
-                                                    const ChunkingOptions& options,
-                                                    std::vector<TextChunk>& chunks) {
+//Actual Chunker - Core chunking method
+ResultCode LeafraChunker::actual_chunker(const std::string& text,
+                                         const ChunkingOptions& options,
+                                         std::vector<TextChunk>& chunks) {
     if (text.empty()) {
         chunks.clear();
         return ResultCode::SUCCESS;
@@ -115,297 +190,6 @@ ResultCode LeafraChunker::chunk_text_tokens_improved(const std::string& text,
     } catch (const std::exception&) {
         return ResultCode::ERROR_PROCESSING_FAILED;
     }
-}
-
-
-// DOCUMENT CHUNKING
-
-ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
-                                        size_t chunk_size,
-                                        double overlap_percentage,
-                                        std::vector<TextChunk>& chunks) {
-    if (pages.empty()) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
-    }
-    
-    if (chunk_size == 0) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
-    }
-    
-    if (overlap_percentage < 0.0 || overlap_percentage >= 1.0) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
-    }
-    
-    // Additional validation for empty text in single-page case
-    if (pages.size() == 1 && pages[0].empty()) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
-    }
-    
-    try {
-        chunks.clear();
-        
-        // Calculate total document length
-        size_t total_length = 0;
-        for (const auto& page : pages) {
-            total_length += page.length();
-        }
-        last_total_characters_ = total_length;
-        
-        // Handle single page as special case (no page separators needed)
-        if (pages.size() == 1) {
-            const std::string& text = pages[0];
-            
-            // If text is smaller than chunk size, return as single chunk
-            if (text.length() <= chunk_size) {
-                chunks.emplace_back(text, 0, text.length(), 0);
-                last_chunk_count_ = 1;
-                return ResultCode::SUCCESS;
-            }
-            
-            // Calculate sizes accounting for overlap properly
-            // Goal: Each chunk should be close to chunk_size total (including overlap)
-            // If overlap is 20%, then effective new content per chunk should be ~80% of chunk_size
-            // But the total chunk size should still be close to chunk_size
-            
-            // Calculate effective content size (non-overlapping part)
-            size_t effective_content_size = static_cast<size_t>(chunk_size * (1.0 - overlap_percentage));
-            
-            // Ensure minimum effective content size
-            if (effective_content_size < 1) {
-                effective_content_size = 1;
-            }
-            
-            size_t current_pos = 0;
-            
-            while (current_pos < text.length()) {
-                // Calculate chunk end position
-                size_t target_chunk_end = current_pos + chunk_size;
-                size_t chunk_end = std::min(target_chunk_end, text.length());
-                
-                // Adjust for word boundaries if enabled in default options
-                if (default_options_.preserve_word_boundaries && chunk_end < text.length()) {
-                    // Use a proportional search window (15% of chunk size, min 50, max 300)
-                    size_t search_window = std::max(50UL, std::min(300UL, chunk_size / 7));
-                    
-                    size_t word_boundary = find_word_boundary(text, chunk_end, search_window);
-                    
-                    // Apply hard limit: don't exceed 150% of target chunk size to prevent extreme overshoots
-                    size_t max_chunk_end = current_pos + (chunk_size * 3 / 2); // 150% of chunk size
-                    
-                    if (word_boundary <= max_chunk_end) {
-                        // Word boundary is within acceptable limit
-                        chunk_end = word_boundary;
-                    } else {
-                        // Word boundary exceeds limit, find a closer boundary
-                        // Search backwards from max_chunk_end for a word boundary
-                        size_t fallback_boundary = find_word_boundary(text, max_chunk_end, search_window);
-                        
-                        // If fallback is too far back, use original word boundary anyway
-                        // (better to have a slightly large chunk than split words)
-                        if (fallback_boundary >= current_pos + (chunk_size * 2 / 3)) { // At least 67% of target size
-                            chunk_end = fallback_boundary;
-                        } else {
-                            // Original word boundary is best option even if large
-                            chunk_end = word_boundary;
-                        }
-                    }
-                    
-                    // Final safety check against text length
-                    chunk_end = std::min(chunk_end, text.length());
-                }
-                
-                // Create chunk
-                TextChunk chunk = create_chunk(text, current_pos, chunk_end, 0, current_pos);
-                chunks.push_back(chunk);
-                
-                // Move to next position by effective content size (this creates the overlap)
-                current_pos += effective_content_size;
-                
-                // Also adjust the start position to a word boundary if needed
-                if (default_options_.preserve_word_boundaries && current_pos < text.length()) {
-                    // Check if we're starting in the middle of a word (space-only approach)
-                    if (current_pos > 0 && !std::isspace(text[current_pos]) && !std::isspace(text[current_pos - 1])) {
-                        // We're in the middle of a word, find the next space
-                        while (current_pos < text.length() && !std::isspace(text[current_pos])) {
-                            current_pos++;
-                        }
-                        // Skip any following whitespace to start of next word
-                        while (current_pos < text.length() && std::isspace(text[current_pos])) {
-                            current_pos++;
-                        }
-                    }
-                }
-                
-                // If we've reached the end, break
-                if (chunk_end == text.length()) {
-                    break;
-                }
-            }
-            
-            last_chunk_count_ = chunks.size();
-            return ResultCode::SUCCESS;
-        }
-        
-        // For multi-page documents, concatenate with page separators
-        std::string combined_text;
-        std::vector<size_t> page_starts;
-        page_starts.push_back(0);
-        
-        for (size_t i = 0; i < pages.size(); ++i) {
-            combined_text += pages[i];
-            if (i < pages.size() - 1) {
-                combined_text += "\n\n"; // Page separator
-                page_starts.push_back(combined_text.length());
-            }
-        }
-        
-        // Use the single-page logic on the combined text
-        std::vector<std::string> combined_pages;
-        combined_pages.push_back(combined_text);
-        std::vector<TextChunk> temp_chunks;
-        ResultCode result = chunk_document(combined_pages, chunk_size, overlap_percentage, temp_chunks);
-        
-        if (result != ResultCode::SUCCESS) {
-            return result;
-        }
-        
-        // Update chunk metadata with correct page numbers
-        for (auto& chunk : temp_chunks) {
-            // Find which page this chunk belongs to
-            size_t page_number = 0;
-            for (size_t i = 0; i < page_starts.size(); ++i) {
-                if (chunk.start_index >= page_starts[i]) {
-                    page_number = i;
-                } else {
-                    break;
-                }
-            }
-            chunk.page_number = page_number;
-        }
-        
-        chunks = std::move(temp_chunks);
-        last_chunk_count_ = chunks.size();
-        return ResultCode::SUCCESS;
-        
-    } catch (const std::exception&) {
-        return ResultCode::ERROR_PROCESSING_FAILED;
-    }
-}
-
-ResultCode LeafraChunker::chunk_document_advanced(const std::vector<std::string>& pages,
-                                                 const ChunkingOptions& options,
-                                                 std::vector<TextChunk>& chunks) {
-    if (pages.empty()) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
-    }
-    
-    if (options.chunk_size == 0) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
-    }
-    
-    if (options.overlap_percentage < 0.0 || options.overlap_percentage >= 1.0) {
-        return ResultCode::ERROR_INVALID_PARAMETER;
-    }
-    
-    try {
-        chunks.clear();
-        
-        // Calculate total document length
-        size_t total_length = 0;
-        for (const auto& page : pages) {
-            total_length += page.length();
-        }
-        last_total_characters_ = total_length;
-        
-        // Store current default options and set new ones temporarily
-        ChunkingOptions old_options = default_options_;
-        default_options_ = options;
-        
-        ResultCode result;
-        
-        // For token-based chunking, we need more sophisticated handling
-        if (options.size_unit == ChunkSizeUnit::TOKENS) {
-            // Use a more accurate initial size estimate that accounts for word boundaries
-            size_t chunk_size_chars = tokens_to_characters(options.chunk_size, options.token_method);
-            
-            // Add buffer for word boundary adjustments (20% extra to account for boundary shifts)
-            chunk_size_chars = static_cast<size_t>(chunk_size_chars * 1.2);
-            
-            if (pages.size() == 1) {
-                result = chunk_text_tokens_improved(pages[0], options, chunks);
-            } else {
-                result = chunk_document_tokens_improved(pages, options, chunks);
-            }
-        } else {
-            // Use character-based chunking (default)
-            if (pages.size() == 1) {
-                result = chunk_text(pages[0], options.chunk_size, options.overlap_percentage, chunks);
-            } else {
-                result = chunk_document(pages, options.chunk_size, options.overlap_percentage, chunks);
-            }
-        }
-        
-        // Restore old options
-        default_options_ = old_options;
-        
-        return result;
-        
-    } catch (const std::exception&) {
-        return ResultCode::ERROR_PROCESSING_FAILED;
-    }
-}
-
-
-
-ResultCode LeafraChunker::chunk_document_tokens(const std::vector<std::string>& pages,
-                                               size_t chunk_size_tokens,
-                                               double overlap_percentage,
-                                               TokenApproximationMethod method,
-                                               std::vector<TextChunk>& chunks) {
-    // Legacy wrapper: Create options and delegate to advanced method
-    ChunkingOptions options(chunk_size_tokens, overlap_percentage, ChunkSizeUnit::TOKENS, method);
-    return chunk_document_advanced(pages, options, chunks);
-}
-
-ResultCode LeafraChunker::chunk_document_tokens_improved(const std::vector<std::string>& pages,
-                                                        const ChunkingOptions& options,
-                                                        std::vector<TextChunk>& chunks) {
-    // For multi-page documents, use the same approach as before but with improved chunking
-    std::string combined_text;
-    std::vector<size_t> page_starts;
-    page_starts.push_back(0);
-    
-    for (size_t i = 0; i < pages.size(); ++i) {
-        combined_text += pages[i];
-        if (i < pages.size() - 1) {
-            combined_text += "\n\n"; // Page separator
-            page_starts.push_back(combined_text.length());
-        }
-    }
-    
-    // Use improved single-text chunking
-    std::vector<TextChunk> temp_chunks;
-    ResultCode result = chunk_text_tokens_improved(combined_text, options, temp_chunks);
-    
-    if (result != ResultCode::SUCCESS) {
-        return result;
-    }
-    
-    // Update chunk metadata with correct page numbers
-    for (auto& chunk : temp_chunks) {
-        size_t page_number = 0;
-        for (size_t i = 0; i < page_starts.size(); ++i) {
-            if (chunk.start_index >= page_starts[i]) {
-                page_number = i;
-            } else {
-                break;
-            }
-        }
-        chunk.page_number = page_number;
-    }
-    
-    chunks = std::move(temp_chunks);
-    return ResultCode::SUCCESS;
 }
 
 size_t LeafraChunker::get_chunk_count() const {

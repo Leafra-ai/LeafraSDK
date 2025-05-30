@@ -106,59 +106,19 @@ public:
     // ========== TEXT CHUNKING METHODS ==========
     
     /**
-     * @brief Chunk a single text document
+     * @brief Advanced chunking with options
      * @param text Input text to chunk
-     * @param chunk_size Size of each chunk in characters
-     * @param overlap_percentage Overlap percentage (0.0 to 1.0)
+     * @param options Chunking options
      * @param chunks Output vector of text chunks
      * @return ResultCode indicating success or failure
      */
     ResultCode chunk_text(const std::string& text,
-                         size_t chunk_size,
-                         double overlap_percentage,
+                         const ChunkingOptions& options,
                          std::vector<TextChunk>& chunks);
 
-    /**
-     * @brief Advanced chunking with options (single text)
-     * @param text Input text to chunk
-     * @param options Chunking options (supports both character and token chunking)
-     * @param chunks Output vector of text chunks
-     * @return ResultCode indicating success or failure
-     */
-    ResultCode chunk_text_advanced(const std::string& text,
-                                  const ChunkingOptions& options,
-                                  std::vector<TextChunk>& chunks);
-
-    /**
-     * @brief Chunk a single text document (token-based) [LEGACY - use chunk_text_advanced instead]
-     * @param text Input text to chunk
-     * @param chunk_size_tokens Size of each chunk in tokens
-     * @param overlap_percentage Overlap percentage (0.0 to 1.0)
-     * @param method Token approximation method
-     * @param chunks Output vector of text chunks
-     * @return ResultCode indicating success or failure
-     */
-    ResultCode chunk_text_tokens(const std::string& text,
-                                size_t chunk_size_tokens,
-                                double overlap_percentage,
-                                TokenApproximationMethod method,
-                                std::vector<TextChunk>& chunks);
     
     // ========== DOCUMENT CHUNKING METHODS ==========
     
-    /**
-     * @brief Chunk a multi-page document
-     * @param pages Vector of text pages
-     * @param chunk_size Size of each chunk in characters
-     * @param overlap_percentage Overlap percentage (0.0 to 1.0)
-     * @param chunks Output vector of text chunks
-     * @return ResultCode indicating success or failure
-     */
-    ResultCode chunk_document(const std::vector<std::string>& pages,
-                             size_t chunk_size,
-                             double overlap_percentage,
-                             std::vector<TextChunk>& chunks);
-
     /**
      * @brief Advanced chunking with options
      * @param pages Vector of text pages
@@ -166,24 +126,10 @@ public:
      * @param chunks Output vector of text chunks
      * @return ResultCode indicating success or failure
      */
-    ResultCode chunk_document_advanced(const std::vector<std::string>& pages,
-                                      const ChunkingOptions& options,
-                                      std::vector<TextChunk>& chunks);
+    ResultCode chunk_document(const std::vector<std::string>& pages,
+                             const ChunkingOptions& options,
+                             std::vector<TextChunk>& chunks);
     
-    /**
-     * @brief Chunk a multi-page document (token-based) [LEGACY - use chunk_document_advanced instead]
-     * @param pages Vector of text pages
-     * @param chunk_size_tokens Size of each chunk in tokens
-     * @param overlap_percentage Overlap percentage (0.0 to 1.0)
-     * @param method Token approximation method
-     * @param chunks Output vector of text chunks
-     * @return ResultCode indicating success or failure
-     */
-    ResultCode chunk_document_tokens(const std::vector<std::string>& pages,
-                                    size_t chunk_size_tokens,
-                                    double overlap_percentage,
-                                    TokenApproximationMethod method,
-                                    std::vector<TextChunk>& chunks);
 
     // ========== STATISTICS AND CONFIGURATION ==========
     
@@ -275,20 +221,9 @@ private:
      * @param chunks Output vector of text chunks
      * @return ResultCode indicating success or failure
      */
-    ResultCode chunk_text_tokens_improved(const std::string& text,
-                                         const ChunkingOptions& options,
-                                         std::vector<TextChunk>& chunks);
-    
-    /**
-     * @brief Improved token-based chunking for multi-page documents
-     * @param pages Vector of text pages
-     * @param options Chunking options
-     * @param chunks Output vector of text chunks
-     * @return ResultCode indicating success or failure
-     */
-    ResultCode chunk_document_tokens_improved(const std::vector<std::string>& pages,
-                                             const ChunkingOptions& options,
-                                             std::vector<TextChunk>& chunks);
+    ResultCode actual_chunker(const std::string& text,
+                             const ChunkingOptions& options,
+                             std::vector<TextChunk>& chunks);
     
     /**
      * @brief Find optimal chunk end position based on target token count

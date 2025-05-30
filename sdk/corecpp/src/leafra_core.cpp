@@ -278,7 +278,7 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                 
                 if (!pages.empty()) {
                     std::vector<TextChunk> chunks;
-                    ResultCode chunk_result = pImpl->chunker_->chunk_document_advanced(pages, pImpl->chunker_->get_default_options(), chunks);
+                    ResultCode chunk_result = pImpl->chunker_->chunk_document(pages, pImpl->chunker_->get_default_options(), chunks);
                     
                     if (chunk_result == ResultCode::SUCCESS) {
                         LEAFRA_INFO() << "✅ Successfully created " << chunks.size() << " chunks";

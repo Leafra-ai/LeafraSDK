@@ -16,7 +16,7 @@ Interactive demonstration of token-based chunking features including:
 ### 🔧 **chunker/test_unified_api.cpp** - Unified API Demonstration
 Shows the clean, non-redundant API design:
 - Character vs token chunking using same methods
-- Unified `chunk_text_advanced()` and `chunk_document_advanced()` methods
+- Unified `chunk_text()` and `chunk_document()` methods
 - Legacy method compatibility
 
 ### 📚 **../TOKEN_CHUNKING_README.md** - Token Implementation Documentation
@@ -186,12 +186,12 @@ Sample output demonstrating the unified API:
 ```
 === Testing Unified API (No Redundancy) ===
 
-1. Character-based chunking (using chunk_text_advanced):
+1. Character-based chunking (using chunk_text):
    ✅ Success! Created 2 chunks
    Chunk 1: 87 chars, 0 tokens
    Chunk 2: 78 chars, 0 tokens
 
-2. Token-based chunking (using chunk_text_advanced):
+2. Token-based chunking (using chunk_text):
    ✅ Success! Created 2 chunks
    Chunk 1: 133 chars, 31 tokens
    Chunk 2: 48 chars, 11 tokens
