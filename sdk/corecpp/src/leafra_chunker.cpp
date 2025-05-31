@@ -1,4 +1,5 @@
 #include "leafra/leafra_chunker.h"
+#include "leafra/leafra_unicode.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -8,6 +9,16 @@ namespace leafra {
 // Token-to-character conversion constant
 // Based on empirical analysis: ~4 characters per token works well across different content types
 constexpr double SIMPLE_CHARS_PER_TOKEN = 4.0;
+
+// Conservative estimate factor for initial chunk sizing to avoid overshooting
+constexpr double CONSERVATIVE_ESTIMATE_FACTOR = 0.8;
+
+// Token count tolerance thresholds for iterative chunk sizing
+constexpr double TOKEN_COUNT_TOLERANCE_MIN = 0.92;  // 92% of target
+constexpr double TOKEN_COUNT_TOLERANCE_MAX = 1.08;  // 108% of target
+
+// Conservative factor for chunk size adjustments during iteration
+constexpr double CONSERVATIVE_ADJUSTMENT_FACTOR = 0.7;
 
 LeafraChunker::LeafraChunker() = default;
 
@@ -213,6 +224,13 @@ const ChunkingOptions& LeafraChunker::get_default_options() const {
     return default_options_;
 }
 
+/**
+ * Find the nearest word boundary for text chunking
+ * @param text UTF-8 text to search
+ * @param target_position Starting byte position
+ * @param search_window Max bytes to search in each direction
+ * @return Byte position of word boundary, or target_position if none found
+ */
 size_t LeafraChunker::find_word_boundary(const std::string& text, 
                                         size_t target_position, 
                                         size_t search_window) const {
@@ -220,65 +238,94 @@ size_t LeafraChunker::find_word_boundary(const std::string& text,
         return text.length();
     }
     
-    // If we're already at a space or text boundary, return it
-    if (target_position == 0 || target_position == text.length() || 
-        std::isspace(text[target_position])) {
+    // If we're at text boundaries, return them
+    if (target_position == 0) {
+        return 0;
+    }
+    if (target_position == text.length()) {
+        return text.length();
+    }
+    
+    // Check if we're already at a word boundary using Unicode-aware detection
+    size_t next_pos;
+    UChar32 c = get_unicode_char_at(text, target_position, next_pos);
+    if (c != U_SENTINEL && is_unicode_whitespace(c)) {
         return target_position;
     }
     
-    // We're in the middle of a word, find the next space
-    
-    // First, try searching backwards for a space
+    // Try searching backwards for a word boundary
     size_t search_start = (target_position > search_window) ? 
                           target_position - search_window : 0;
     
-    for (size_t i = target_position; i > search_start; --i) {
-        if (i == 0 || std::isspace(text[i])) {
-            // Found space - return position after the space (or 0)
-            if (i == 0) return 0;
-            
-            // Skip past whitespace to find actual word start
-            size_t word_start = i + 1;
-            while (word_start < text.length() && std::isspace(text[word_start])) {
-                word_start++;
+    size_t byte_pos = target_position;
+    while (byte_pos > search_start) {
+        // Find previous character position
+        size_t prev_pos = 0;
+        size_t temp_pos = 0;
+        
+        while (temp_pos < byte_pos && temp_pos < text.length()) {
+            prev_pos = temp_pos;
+            UChar32 temp_c = get_unicode_char_at(text, temp_pos, temp_pos);
+            if (temp_c == U_SENTINEL || temp_pos >= byte_pos) break;
+        }
+        
+        if (prev_pos == 0) break;
+        
+        UChar32 prev_c = get_unicode_char_at(text, prev_pos, next_pos);
+        if (prev_c != U_SENTINEL && is_unicode_whitespace(prev_c)) {
+            // Found whitespace - find the start of the next word
+            size_t word_start = next_pos;
+            while (word_start < text.length()) {
+                UChar32 word_c = get_unicode_char_at(text, word_start, next_pos);
+                if (word_c == U_SENTINEL || !is_unicode_whitespace(word_c)) {
+                    break;
+                }
+                word_start = next_pos;
             }
             return word_start;
         }
+        
+        byte_pos = prev_pos;
     }
     
-    // If backward search failed, try forward search
+    // If backward search failed, try forward search within window
     size_t search_end = std::min(target_position + search_window, text.length());
+    byte_pos = target_position;
     
-    for (size_t i = target_position; i < search_end; ++i) {
-        if (i == text.length() - 1 || std::isspace(text[i + 1])) {
-            // Move to end of current word (after the last non-space character)
-            return i + 1;
+    while (byte_pos < search_end) {
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        if (c == U_SENTINEL) {
+            byte_pos = next_pos;
+            continue;
         }
+        
+        if (is_unicode_whitespace(c)) {
+            // Move to end of current word (before the whitespace)
+            return byte_pos;
+        }
+        
+        byte_pos = next_pos;
     }
     
-    // If limited search failed, do an exhaustive backward search to avoid word splitting
-    for (size_t i = target_position; i > 0; --i) {
-        if (std::isspace(text[i])) {
-            // Skip past whitespace to find actual word start
-            size_t word_start = i + 1;
-            while (word_start < text.length() && std::isspace(text[word_start])) {
-                word_start++;
-            }
-            return word_start;
-        }
+    // If limited search failed, use the Unicode word boundary function with backward search
+    size_t word_boundary = find_word_boundary_helper_for_unicode(text, target_position, false);
+    if (word_boundary != target_position) {
+        return word_boundary;
     }
     
-    // If all else fails, search forward without limit
-    for (size_t i = target_position; i < text.length(); ++i) {
-        if (std::isspace(text[i])) {
-            return i;
-        }
-    }
-    
-    // Absolute last resort: end of text
-    return text.length();
+    // Last resort: search forward without limit using Unicode word boundary
+    return find_word_boundary_helper_for_unicode(text, target_position, true);
 }
 
+/**
+ * Create a text chunk with proper Unicode trimming
+ * @param text Source UTF-8 text
+ * @param start Start byte position
+ * @param end End byte position  
+ * @param page_number Page number for metadata
+ * @param global_start Absolute byte position in the full document
+ * @return TextChunk object with content and metadata
+ */
 TextChunk LeafraChunker::create_chunk(const std::string& text,
                                      size_t start,
                                      size_t end,
@@ -292,21 +339,40 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
     
     // Trim leading and trailing whitespace if preserve_word_boundaries is enabled
     if (default_options_.preserve_word_boundaries) {
-        size_t content_start = 0;
-        size_t content_end = chunk_content.length();
-        
-        // Trim leading whitespace
-        while (content_start < content_end && std::isspace(chunk_content[content_start])) {
-            ++content_start;
+        // Find content start by skipping leading Unicode whitespace
+        size_t content_start_byte = 0;
+        while (content_start_byte < chunk_content.length()) {
+            size_t next_pos;
+            UChar32 c = get_unicode_char_at(chunk_content, content_start_byte, next_pos);
+            if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
+                break;
+            }
+            content_start_byte = next_pos;
         }
         
-        // Trim trailing whitespace
-        while (content_end > content_start && std::isspace(chunk_content[content_end - 1])) {
-            --content_end;
+        // Find content end by working backwards from end, skipping trailing Unicode whitespace
+        size_t content_end_byte = chunk_content.length();
+        while (content_end_byte > content_start_byte) {
+            // Find the start of the last character
+            size_t last_char_start = 0;
+            size_t temp_pos = 0;
+            
+            while (temp_pos < content_end_byte) {
+                last_char_start = temp_pos;
+                UChar32 temp_c = get_unicode_char_at(chunk_content, temp_pos, temp_pos);
+                if (temp_c == U_SENTINEL || temp_pos >= content_end_byte) break;
+            }
+            
+            UChar32 c = get_unicode_char_at(chunk_content, last_char_start, temp_pos);
+            if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
+                break;
+            }
+            
+            content_end_byte = last_char_start;
         }
         
-        if (content_start < content_end) {
-            chunk_content = chunk_content.substr(content_start, content_end - content_start);
+        if (content_start_byte < content_end_byte) {
+            chunk_content = chunk_content.substr(content_start_byte, content_end_byte - content_start_byte);
         } else {
             chunk_content.clear();
         }
@@ -334,6 +400,15 @@ size_t LeafraChunker::estimate_token_count(const std::string& text, TokenApproxi
 
 
 // Helper methods for improved token-based chunking
+/**
+ * Find where to end a chunk to match target token count
+ * Works in UTF-8 character space internally, converts to/from byte positions
+ * @param text UTF-8 text to chunk
+ * @param start_pos Starting byte position
+ * @param target_tokens Desired number of tokens in chunk
+ * @param options Chunking configuration options
+ * @return End byte position that produces target token count
+ */
 size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
                                             size_t start_pos,
                                             size_t target_tokens,
@@ -342,63 +417,89 @@ size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
         return text.length();
     }
     
-    // Start with a more conservative character estimate
-    size_t estimated_chars = tokens_to_characters(target_tokens, options.token_method);
-    // Reduce initial estimate to avoid overshooting
-    estimated_chars = static_cast<size_t>(estimated_chars * 0.8);
-    size_t initial_end = std::min(start_pos + estimated_chars, text.length());
+    // Convert start byte position to character position for Unicode-aware processing
+    size_t text_unicode_length = get_unicode_length(text);  // Total UTF-8 characters in text
+    size_t start_char_pos = 0;  // UTF-8 character position (not bytes)
+    size_t byte_pos = 0;        // Byte position for conversion
     
-    // If we're at the end, return it
-    if (initial_end == text.length()) {
-        return text.length();
+    // Find character position corresponding to start_pos byte position
+    while (byte_pos < start_pos && byte_pos < text.length()) {
+        size_t next_pos;
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        if (c != U_SENTINEL) {
+            start_char_pos++;  // Count UTF-8 characters
+        }
+        byte_pos = next_pos;
+        
+        if (next_pos <= byte_pos) byte_pos++; // Safety check
     }
     
-    // Iteratively adjust to get closer to target token count
-    size_t current_end = initial_end;
+    // Start with a conservative character estimate
+    size_t estimated_chars = tokens_to_characters(target_tokens, options.token_method);
+    estimated_chars = static_cast<size_t>(estimated_chars * CONSERVATIVE_ESTIMATE_FACTOR); // Conservative estimate
+    
+    size_t target_end_char_pos = std::min(start_char_pos + estimated_chars, text_unicode_length);  // Character boundary check
+    
+    // Iteratively adjust to get closer to target token count (work in character space)
+    size_t current_end_char_pos = target_end_char_pos;  // UTF-8 character position
     size_t iterations = 0;
-    const size_t max_iterations = 8; // More iterations for better accuracy
+    const size_t max_iterations = 8;
     
     while (iterations < max_iterations) {
-        // Extract current chunk content
-        std::string chunk_content = text.substr(start_pos, current_end - start_pos);
+        // Extract chunk content using character positions
+        size_t chunk_char_count = current_end_char_pos - start_char_pos;  // Character count, not bytes
+        if (chunk_char_count == 0) break;
+        
+        std::string chunk_content = get_utf8_substring(text, start_char_pos, chunk_char_count);  // Use character positions
         size_t actual_tokens = estimate_token_count(chunk_content, options.token_method);
         
-        // Check if we're close enough (within 8% of target for better accuracy)
+        // Check if we're close enough
         double token_ratio = static_cast<double>(actual_tokens) / target_tokens;
-        if (token_ratio >= 0.92 && token_ratio <= 1.08) {
-            break; // Good enough
+        if (token_ratio >= TOKEN_COUNT_TOLERANCE_MIN && token_ratio <= TOKEN_COUNT_TOLERANCE_MAX) {
+            break;
         }
         
-        // Adjust position more carefully
-        if (actual_tokens < target_tokens * 0.92) {
-            // Too few tokens, extend chunk more conservatively
+        // Adjust position (character space)
+        if (actual_tokens < target_tokens * TOKEN_COUNT_TOLERANCE_MIN) {
+            // Too few tokens, extend chunk
             size_t deficit_tokens = target_tokens - actual_tokens;
             size_t chars_needed = tokens_to_characters(deficit_tokens, options.token_method);
-            // Be more conservative in extension
-            chars_needed = static_cast<size_t>(chars_needed * 0.7);
-            current_end = std::min(current_end + chars_needed, text.length());
-        } else if (actual_tokens > target_tokens * 1.08) {
+            chars_needed = static_cast<size_t>(chars_needed * CONSERVATIVE_ADJUSTMENT_FACTOR); // Conservative
+            current_end_char_pos = std::min(current_end_char_pos + chars_needed, text_unicode_length);  // Character boundary check
+        } else if (actual_tokens > target_tokens * TOKEN_COUNT_TOLERANCE_MAX) {
             // Too many tokens, shrink chunk
             size_t excess_tokens = actual_tokens - target_tokens;
             size_t chars_to_remove = tokens_to_characters(excess_tokens, options.token_method);
-            current_end = (current_end > chars_to_remove) ? current_end - chars_to_remove : start_pos + 1;
+            current_end_char_pos = (current_end_char_pos > chars_to_remove) ? 
+                                   current_end_char_pos - chars_to_remove : start_char_pos + 1;
         }
         
-        // Ensure we don't go past the end or before start
-        current_end = std::max(start_pos + 1, std::min(current_end, text.length()));
-        
+        // Ensure we don't go past bounds (character space)
+        current_end_char_pos = std::max(start_char_pos + 1, std::min(current_end_char_pos, text_unicode_length));
         iterations++;
     }
     
-    // Don't let chunks get extremely large (safety limit)
+    // Convert final character position back to byte position
+    size_t final_byte_pos = get_byte_pos_for_char_index(text, current_end_char_pos);
+    
+    // Safety limit check
     size_t max_chars = tokens_to_characters(target_tokens, options.token_method) * 2;
-    if (current_end - start_pos > max_chars) {
-        current_end = start_pos + max_chars;
+    if (current_end_char_pos - start_char_pos > max_chars) {
+        size_t limited_end_char_pos = start_char_pos + max_chars;  // Character position
+        final_byte_pos = get_byte_pos_for_char_index(text, limited_end_char_pos);  // Convert to bytes
     }
     
-    return std::min(current_end, text.length());
+    return std::min(final_byte_pos, text.length());  // Return byte position
 }
 
+/**
+ * Estimate how many characters needed to produce target token count
+ * @param text UTF-8 text to sample from
+ * @param start_pos Starting byte position for sampling
+ * @param target_tokens Desired number of tokens
+ * @param method Token approximation method to use
+ * @return Estimated character count that produces target tokens
+ */
 size_t LeafraChunker::estimate_characters_for_tokens(const std::string& text,
                                                     size_t start_pos,
                                                     size_t target_tokens,
@@ -407,15 +508,32 @@ size_t LeafraChunker::estimate_characters_for_tokens(const std::string& text,
         return 0;
     }
     
+    // Convert start byte position to character position
+    size_t start_char_pos = 0;
+    size_t byte_pos = 0;
+    
+    while (byte_pos < start_pos && byte_pos < text.length()) {
+        size_t next_pos;
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        if (c != U_SENTINEL) {
+            start_char_pos++;
+        }
+        byte_pos = next_pos;
+        if (next_pos <= byte_pos) byte_pos++; // Safety check
+    }
+    
     // Use local token density if we have enough context
-    size_t sample_size = std::min(500UL, text.length() - start_pos);
-    if (sample_size > 50) {
-        std::string sample = text.substr(start_pos, sample_size);
+    size_t text_unicode_length = get_unicode_length(text);
+    size_t remaining_chars = text_unicode_length - start_char_pos;
+    size_t sample_chars = std::min(static_cast<size_t>(100), remaining_chars); // Sample in characters, not bytes
+    
+    if (sample_chars > 10) {
+        std::string sample = get_utf8_substring(text, start_char_pos, sample_chars);
         size_t sample_tokens = estimate_token_count(sample, method);
         
         if (sample_tokens > 0) {
             // Calculate local density and use it
-            double chars_per_token = static_cast<double>(sample_size) / sample_tokens;
+            double chars_per_token = static_cast<double>(sample_chars) / sample_tokens;
             return static_cast<size_t>(target_tokens * chars_per_token);
         }
     }
@@ -424,6 +542,12 @@ size_t LeafraChunker::estimate_characters_for_tokens(const std::string& text,
     return tokens_to_characters(target_tokens, method);
 }
 
+/**
+ * Find the start of the next word using Unicode-aware detection
+ * @param text UTF-8 text to search
+ * @param pos Starting byte position
+ * @return Byte position of next word start, or text length if none found
+ */
 size_t LeafraChunker::find_next_word_start(const std::string& text, size_t pos) const {
     if (pos >= text.length()) {
         return text.length();
@@ -434,22 +558,67 @@ size_t LeafraChunker::find_next_word_start(const std::string& text, size_t pos) 
         return 0;
     }
     
-    // If we're already at the start of a word (after a space), return current position
-    if (!std::isspace(text[pos]) && (pos == 0 || std::isspace(text[pos - 1]))) {
-        return pos;
+    // Check if we're already at the start of a word using Unicode-aware detection
+    size_t next_pos;
+    UChar32 current_c = get_unicode_char_at(text, pos, next_pos);
+    
+    if (current_c != U_SENTINEL && !is_unicode_whitespace(current_c)) {
+        // Check if previous character is whitespace
+        if (pos > 0) {
+            // Find previous character position
+            size_t prev_pos = 0;
+            size_t temp_pos = 0;
+            
+            while (temp_pos < pos && temp_pos < text.length()) {
+                prev_pos = temp_pos;
+                UChar32 temp_c = get_unicode_char_at(text, temp_pos, temp_pos);
+                if (temp_c == U_SENTINEL || temp_pos >= pos) break;
+            }
+            
+            UChar32 prev_c = get_unicode_char_at(text, prev_pos, temp_pos);
+            if (prev_c != U_SENTINEL && is_unicode_whitespace(prev_c)) {
+                // We're at the start of a word
+                return pos;
+            }
+        }
     }
     
-    // If we're in the middle of a word, advance to the next space
-    while (pos < text.length() && !std::isspace(text[pos])) {
-        pos++;
+    // Advance to the next word boundary
+    size_t byte_pos = pos;
+    bool in_word = (current_c != U_SENTINEL && !is_unicode_whitespace(current_c));
+    
+    while (byte_pos < text.length()) {
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        if (c == U_SENTINEL) {
+            byte_pos = next_pos;
+            continue;
+        }
+        
+        bool is_whitespace = is_unicode_whitespace(c);
+        
+        if (in_word && is_whitespace) {
+            // We've reached the end of current word, now skip whitespace
+            byte_pos = next_pos;
+            break;
+        } else if (!in_word && !is_whitespace) {
+            // We've found the start of the next word
+            return byte_pos;
+        }
+        
+        in_word = !is_whitespace;
+        byte_pos = next_pos;
     }
     
-    // Skip whitespace to find the start of the next word
-    while (pos < text.length() && std::isspace(text[pos])) {
-        pos++;
+    // Skip remaining whitespace to find the start of the next word
+    while (byte_pos < text.length()) {
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
+            break;
+        }
+        byte_pos = next_pos;
     }
     
-    return pos;
+    return byte_pos;
 }
 
 /**

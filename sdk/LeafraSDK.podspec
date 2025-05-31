@@ -83,6 +83,11 @@ Pod::Spec.new do |s|
     touch corecpp/src/leafra_parsing_adapter_docx.cpp
     touch corecpp/src/leafra_parsing_adapter_excel.cpp
     touch corecpp/src/leafra_sqlite.cpp
+    touch corecpp/src/leafra_chunker.cpp
+    touch corecpp/src/leafra_unicode.cpp
+    
+    # Ensure Unicode module header exists
+    touch corecpp/include/leafra/leafra_unicode.h
   CMD
   
   # Subspecs for modular inclusion
