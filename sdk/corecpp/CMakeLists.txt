@@ -92,6 +92,21 @@ else()
     message(STATUS "⚠️  Building LeafraCore without SentencePiece")
 endif()
 
+# Link ICU if available (defined in parent CMakeLists.txt)
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(LeafraCore PRIVATE ICU::i18n ICU::uc)
+    
+    # Also link ICU data library if available
+    if(TARGET ICU::data)
+        target_link_libraries(LeafraCore PRIVATE ICU::data)
+    endif()
+    
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_ICU=1)
+    message(STATUS "✅ LeafraCore linked with ICU")
+else()
+    message(STATUS "⚠️  Building LeafraCore without ICU")
+endif()
+
 # Platform-specific libraries for logging
 if(APPLE)
     # iOS/macOS - os_log is part of the system, link Foundation framework

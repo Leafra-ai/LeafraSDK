@@ -69,11 +69,11 @@ struct TextChunk {
  * @brief Chunking options structure
  */
 struct ChunkingOptions {
-    size_t chunk_size = 1000;          // Size of each chunk (characters or tokens)
+    size_t chunk_size = 500;          // Size of each chunk (characters or tokens)
     double overlap_percentage = 0.1;    // Overlap percentage (0.0 to 1.0)
     bool preserve_word_boundaries = true; // Whether to avoid breaking words
     bool include_metadata = true;       // Whether to include chunk metadata
-    ChunkSizeUnit size_unit = ChunkSizeUnit::CHARACTERS;  // Unit for chunk_size
+    ChunkSizeUnit size_unit = ChunkSizeUnit::TOKENS;  // Unit for chunk_size
     TokenApproximationMethod token_method = TokenApproximationMethod::SIMPLE;  // Token approximation method
     
     ChunkingOptions() = default;

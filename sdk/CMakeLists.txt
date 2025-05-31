@@ -378,6 +378,308 @@ else()
     endif()
 endif()
 
+# ==============================================================================
+# ICU Integration
+# ==============================================================================
+
+set(ICU_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/icu")
+
+# Platform-specific ICU configuration
+if(APPLE)
+    # iOS/macOS - Use system ICU from platform SDK
+    # macOS has libicucore (Apple's bundled ICU) in /usr/lib
+    # iOS has ICU in the platform SDK
+    
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        # iOS - ICU is available in the iOS SDK
+        find_library(ICU_UC_LIBRARY icuuc HINTS ${CMAKE_OSX_SYSROOT}/usr/lib)
+        find_library(ICU_I18N_LIBRARY icui18n HINTS ${CMAKE_OSX_SYSROOT}/usr/lib)
+        find_library(ICU_DATA_LIBRARY icudata HINTS ${CMAKE_OSX_SYSROOT}/usr/lib)
+        find_path(ICU_INCLUDE_DIR unicode/unistr.h HINTS ${CMAKE_OSX_SYSROOT}/usr/include)
+        
+        if(ICU_UC_LIBRARY AND ICU_I18N_LIBRARY AND ICU_DATA_LIBRARY AND ICU_INCLUDE_DIR)
+            message(STATUS "✅ Found iOS ICU libraries:")
+            message(STATUS "  - UC: ${ICU_UC_LIBRARY}")
+            message(STATUS "  - I18N: ${ICU_I18N_LIBRARY}")
+            message(STATUS "  - Data: ${ICU_DATA_LIBRARY}")
+            message(STATUS "  - Include: ${ICU_INCLUDE_DIR}")
+            
+            # Create ICU targets
+            add_library(ICU::uc SHARED IMPORTED)
+            set_target_properties(ICU::uc PROPERTIES
+                IMPORTED_LOCATION "${ICU_UC_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            add_library(ICU::i18n SHARED IMPORTED)
+            set_target_properties(ICU::i18n PROPERTIES
+                IMPORTED_LOCATION "${ICU_I18N_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES ICU::uc
+            )
+            
+            add_library(ICU::data SHARED IMPORTED)
+            set_target_properties(ICU::data PROPERTIES
+                IMPORTED_LOCATION "${ICU_DATA_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            set(ICU_FOUND TRUE)
+            set(ICU_TYPE "iOS SDK")
+        else()
+            message(WARNING "❌ iOS ICU libraries not found")
+            set(ICU_FOUND FALSE)
+        endif()
+    else()
+        # macOS - Use libicucore (Apple's bundled ICU)
+        find_library(ICU_CORE_LIBRARY icucore HINTS /usr/lib ${CMAKE_OSX_SYSROOT}/usr/lib)
+        find_path(ICU_INCLUDE_DIR unicode/ptypes.h HINTS /usr/include ${CMAKE_OSX_SYSROOT}/usr/include)
+        
+        if(ICU_CORE_LIBRARY AND ICU_INCLUDE_DIR)
+            message(STATUS "✅ Found macOS ICU library:")
+            message(STATUS "  - ICU Core: ${ICU_CORE_LIBRARY}")
+            message(STATUS "  - Include: ${ICU_INCLUDE_DIR}")
+            
+            # Create a unified ICU target for macOS
+            add_library(ICU::core SHARED IMPORTED)
+            set_target_properties(ICU::core PROPERTIES
+                IMPORTED_LOCATION "${ICU_CORE_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            # Create aliases to match the expected interface
+            add_library(ICU::uc ALIAS ICU::core)
+            add_library(ICU::i18n ALIAS ICU::core)
+            
+            set(ICU_FOUND TRUE)
+            set(ICU_TYPE "macOS ICU Core")
+        else()
+            message(WARNING "❌ macOS ICU library (libicucore) not found")
+            set(ICU_FOUND FALSE)
+        endif()
+    endif()
+    
+    if(ICU_FOUND)
+        message(STATUS "✅ ICU integration enabled (${ICU_TYPE})")
+    endif()
+    
+elseif(ANDROID)
+    # Android - Use ICU from NDK
+    # ICU is available in the Android NDK starting from API level 31
+    # For older API levels, we'd need to bundle ICU
+    
+    if(ANDROID_PLATFORM_LEVEL GREATER_EQUAL 31)
+        find_library(ICU_UC_LIBRARY icuuc)
+        find_library(ICU_I18N_LIBRARY icui18n)
+        find_library(ICU_DATA_LIBRARY icudata)
+        find_path(ICU_INCLUDE_DIR unicode/unistr.h)
+        
+        if(ICU_UC_LIBRARY AND ICU_I18N_LIBRARY AND ICU_DATA_LIBRARY AND ICU_INCLUDE_DIR)
+            message(STATUS "✅ Found NDK ICU libraries:")
+            message(STATUS "  - UC: ${ICU_UC_LIBRARY}")
+            message(STATUS "  - I18N: ${ICU_I18N_LIBRARY}")
+            message(STATUS "  - Data: ${ICU_DATA_LIBRARY}")
+            message(STATUS "  - Include: ${ICU_INCLUDE_DIR}")
+            
+            # Create ICU targets
+            add_library(ICU::uc SHARED IMPORTED)
+            set_target_properties(ICU::uc PROPERTIES
+                IMPORTED_LOCATION "${ICU_UC_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            add_library(ICU::i18n SHARED IMPORTED)
+            set_target_properties(ICU::i18n PROPERTIES
+                IMPORTED_LOCATION "${ICU_I18N_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES ICU::uc
+            )
+            
+            add_library(ICU::data SHARED IMPORTED)
+            set_target_properties(ICU::data PROPERTIES
+                IMPORTED_LOCATION "${ICU_DATA_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            set(ICU_FOUND TRUE)
+            message(STATUS "✅ ICU integration enabled (NDK libraries)")
+        else()
+            message(WARNING "❌ NDK ICU libraries not found")
+            set(ICU_FOUND FALSE)
+        endif()
+    else()
+        message(WARNING "❌ ICU requires Android API level 31+, current level: ${ANDROID_PLATFORM_LEVEL}")
+        message(STATUS "Consider bundling ICU for older Android versions")
+        set(ICU_FOUND FALSE)
+    endif()
+    
+elseif(WIN32)
+    # Windows - Use bundled libraries
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        # 64-bit
+        set(ICU_PLATFORM_DIR "${ICU_ROOT_DIR}/windows/win-x64")
+        set(ICU_LIB_DIR "${ICU_PLATFORM_DIR}/lib64")
+        set(ICU_BIN_DIR "${ICU_PLATFORM_DIR}/bin64")
+        set(ICU_ARCH "x64")
+    elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
+        # ARM64
+        set(ICU_PLATFORM_DIR "${ICU_ROOT_DIR}/windows/win-arm64")
+        set(ICU_LIB_DIR "${ICU_PLATFORM_DIR}/lib64")
+        set(ICU_BIN_DIR "${ICU_PLATFORM_DIR}/bin64")
+        set(ICU_ARCH "arm64")
+    else()
+        # 32-bit
+        set(ICU_PLATFORM_DIR "${ICU_ROOT_DIR}/windows/win-x32")
+        set(ICU_LIB_DIR "${ICU_PLATFORM_DIR}/lib")
+        set(ICU_BIN_DIR "${ICU_PLATFORM_DIR}/bin")
+        set(ICU_ARCH "x32")
+    endif()
+    
+    set(ICU_INCLUDE_DIR "${ICU_PLATFORM_DIR}/include")
+    
+    # ICU library files
+    set(ICU_UC_LIBRARY "${ICU_LIB_DIR}/icuuc.lib")
+    set(ICU_I18N_LIBRARY "${ICU_LIB_DIR}/icuin.lib")
+    set(ICU_DATA_LIBRARY "${ICU_LIB_DIR}/icudt.lib")
+    
+    # ICU DLL files (use glob pattern to handle version numbers)
+    file(GLOB ICU_UC_DLL "${ICU_BIN_DIR}/icuuc*.dll")
+    file(GLOB ICU_I18N_DLL "${ICU_BIN_DIR}/icuin*.dll")
+    file(GLOB ICU_DATA_DLL "${ICU_BIN_DIR}/icudt*.dll")
+    
+    if(EXISTS "${ICU_UC_LIBRARY}" AND EXISTS "${ICU_I18N_LIBRARY}" AND EXISTS "${ICU_DATA_LIBRARY}")
+        message(STATUS "✅ Found ICU libraries (${ICU_ARCH}):")
+        message(STATUS "  - UC: ${ICU_UC_LIBRARY}")
+        message(STATUS "  - I18N: ${ICU_I18N_LIBRARY}")
+        message(STATUS "  - Data: ${ICU_DATA_LIBRARY}")
+        message(STATUS "  - Include: ${ICU_INCLUDE_DIR}")
+        
+        # Validate DLL files exist
+        if(ICU_UC_DLL AND ICU_I18N_DLL AND ICU_DATA_DLL)
+            list(GET ICU_UC_DLL 0 ICU_UC_DLL_PATH)
+            list(GET ICU_I18N_DLL 0 ICU_I18N_DLL_PATH)
+            list(GET ICU_DATA_DLL 0 ICU_DATA_DLL_PATH)
+            
+            message(STATUS "  - UC DLL: ${ICU_UC_DLL_PATH}")
+            message(STATUS "  - I18N DLL: ${ICU_I18N_DLL_PATH}")
+            message(STATUS "  - Data DLL: ${ICU_DATA_DLL_PATH}")
+            
+            # Create ICU targets
+            add_library(ICU::uc SHARED IMPORTED)
+            set_target_properties(ICU::uc PROPERTIES
+                IMPORTED_LOCATION "${ICU_UC_DLL_PATH}"
+                IMPORTED_IMPLIB "${ICU_UC_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            add_library(ICU::i18n SHARED IMPORTED)
+            set_target_properties(ICU::i18n PROPERTIES
+                IMPORTED_LOCATION "${ICU_I18N_DLL_PATH}"
+                IMPORTED_IMPLIB "${ICU_I18N_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES ICU::uc
+            )
+            
+            add_library(ICU::data SHARED IMPORTED)
+            set_target_properties(ICU::data PROPERTIES
+                IMPORTED_LOCATION "${ICU_DATA_DLL_PATH}"
+                IMPORTED_IMPLIB "${ICU_DATA_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            set(ICU_FOUND TRUE)
+            message(STATUS "✅ ICU integration enabled (Windows ${ICU_ARCH})")
+        else()
+            message(WARNING "❌ ICU DLL files not found in: ${ICU_BIN_DIR}")
+            set(ICU_FOUND FALSE)
+        endif()
+    else()
+        message(WARNING "❌ ICU libraries not found for Windows ${ICU_ARCH}")
+        message(STATUS "Expected libraries in: ${ICU_LIB_DIR}")
+        set(ICU_FOUND FALSE)
+    endif()
+    
+else()
+    # Linux - Use system libraries
+    # Try to find ICU using pkg-config first, then fallback to find_library
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(ICU_UC QUIET icu-uc)
+        pkg_check_modules(ICU_I18N QUIET icu-i18n)
+    endif()
+    
+    if(ICU_UC_FOUND AND ICU_I18N_FOUND)
+        message(STATUS "✅ Found ICU via pkg-config:")
+        message(STATUS "  - UC version: ${ICU_UC_VERSION}")
+        message(STATUS "  - I18N version: ${ICU_I18N_VERSION}")
+        
+        # Create ICU targets
+        add_library(ICU::uc SHARED IMPORTED)
+        set_target_properties(ICU::uc PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${ICU_UC_INCLUDE_DIRS}"
+            INTERFACE_LINK_LIBRARIES "${ICU_UC_LIBRARIES}"
+            INTERFACE_COMPILE_OPTIONS "${ICU_UC_CFLAGS_OTHER}"
+        )
+        
+        add_library(ICU::i18n SHARED IMPORTED)
+        set_target_properties(ICU::i18n PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${ICU_I18N_INCLUDE_DIRS}"
+            INTERFACE_LINK_LIBRARIES "${ICU_I18N_LIBRARIES};ICU::uc"
+            INTERFACE_COMPILE_OPTIONS "${ICU_I18N_CFLAGS_OTHER}"
+        )
+        
+        set(ICU_FOUND TRUE)
+        message(STATUS "✅ ICU integration enabled (system libraries via pkg-config)")
+    else()
+        # Fallback to find_library
+        find_library(ICU_UC_LIBRARY icuuc)
+        find_library(ICU_I18N_LIBRARY icui18n)
+        find_library(ICU_DATA_LIBRARY icudata)
+        find_path(ICU_INCLUDE_DIR unicode/unistr.h)
+        
+        if(ICU_UC_LIBRARY AND ICU_I18N_LIBRARY AND ICU_INCLUDE_DIR)
+            message(STATUS "✅ Found ICU libraries:")
+            message(STATUS "  - UC: ${ICU_UC_LIBRARY}")
+            message(STATUS "  - I18N: ${ICU_I18N_LIBRARY}")
+            if(ICU_DATA_LIBRARY)
+                message(STATUS "  - Data: ${ICU_DATA_LIBRARY}")
+            endif()
+            message(STATUS "  - Include: ${ICU_INCLUDE_DIR}")
+            
+            # Create ICU targets
+            add_library(ICU::uc SHARED IMPORTED)
+            set_target_properties(ICU::uc PROPERTIES
+                IMPORTED_LOCATION "${ICU_UC_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            
+            add_library(ICU::i18n SHARED IMPORTED)
+            set_target_properties(ICU::i18n PROPERTIES
+                IMPORTED_LOCATION "${ICU_I18N_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES ICU::uc
+            )
+            
+            if(ICU_DATA_LIBRARY)
+                add_library(ICU::data SHARED IMPORTED)
+                set_target_properties(ICU::data PROPERTIES
+                    IMPORTED_LOCATION "${ICU_DATA_LIBRARY}"
+                    INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+                )
+            endif()
+            
+            set(ICU_FOUND TRUE)
+            message(STATUS "✅ ICU integration enabled (system libraries)")
+        else()
+            message(WARNING "❌ ICU libraries not found. Please install libicu-dev")
+            message(STATUS "Ubuntu/Debian: sudo apt-get install libicu-dev")
+            message(STATUS "CentOS/RHEL: sudo yum install libicu-devel")
+            message(STATUS "Fedora: sudo dnf install libicu-devel")
+            set(ICU_FOUND FALSE)
+        endif()
+    endif()
+endif()
+
 # Add subdirectories
 add_subdirectory(corecpp)
 
