@@ -1,9 +1,11 @@
 #pragma once
 
 #include "types.h"
+#include "../../src/leafra/leafra_unicode.h"
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 // Platform-specific macros
 #ifdef _WIN32
@@ -205,7 +207,7 @@ private:
                           size_t start,
                           size_t end,
                           size_t page_number,
-                          size_t global_start) const;
+                          size_t global_start);
     
     /**
      * @brief Advanced token approximation with heuristics
@@ -267,6 +269,10 @@ private:
     ChunkingOptions default_options_;
     size_t last_chunk_count_ = 0;
     size_t last_total_characters_ = 0;
+    
+    // Unicode caching for performance optimization
+    UnicodeCacher documentCacher;
+    UnicodeCacher chunkCacher;
 };
 
 } // namespace leafra 

@@ -98,6 +98,7 @@ endif()
 set(COMMON_SOURCES
     ../../../src/leafra_chunker.cpp
     ../../../src/leafra_unicode.cpp
+    ../../../src/leafra_unicode_cacher.cpp
     ../../../src/leafra_parsing.cpp
     ../../../src/leafra_parsing_adapter_pdf.cpp
     ../../../src/leafra_parsing_adapter_txt.cpp

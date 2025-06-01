@@ -2,6 +2,8 @@
 
 #include <string>
 #include <cstddef>
+#include <vector>
+#include <mutex>
 
 #ifdef LEAFRA_HAS_ICU
 #include <unicode/uchar.h>
@@ -25,6 +27,28 @@ typedef int32_t UChar32;
 namespace leafra {
 
 /**
+ * Unicode caching class for performance optimization
+ * Caches Unicode character data for a single string to avoid repeated UTF-8 parsing
+ */
+class UnicodeCacher {
+private:
+    std::string cached_text;
+    std::vector<UChar32> codepoints_by_byte;  // maps byte_pos -> codepoint
+    std::vector<size_t> next_byte_pos_by_byte; // maps byte_pos -> next_byte_pos
+
+    void initialize_cache(const std::string& text);
+
+public:
+    UnicodeCacher();
+    UnicodeCacher(const std::string& text);
+
+    /*regenerate the cache for a new text*/
+    void reinitialize(const std::string& text);
+
+    UChar32 get_unicode_char_at_cached(size_t byte_pos, size_t& next_byte_pos) const;
+};
+
+/**
  * Safely get the Unicode code point at a given byte position in a UTF-8 string
  * @param text UTF-8 encoded string
  * @param byte_pos Byte position in the string
@@ -33,19 +57,6 @@ namespace leafra {
  * 
  */
 UChar32 get_unicode_char_at(const std::string& text, size_t byte_pos, size_t& next_byte_pos);
-
-/**
- * Safely get the Unicode code point at a given byte position in a UTF-8 string
- * This version uses cached values for performance with memory trade-off - note that cached values are only valid for the same text string
- * and are invalidated when the text string changes.
- * @param text UTF-8 encoded string
- * @param byte_pos Byte position in the string
- * @param next_byte_pos Output: byte position of the next character
- * @return Unicode code point, or U_SENTINEL if invalid
- * 
- */
-UChar32 get_unicode_char_at_cached(const std::string& text, size_t byte_pos, size_t& next_byte_pos);
-UChar32 get_unicode_char_at_cached_chunk(const std::string& text, size_t byte_pos, size_t& next_byte_pos);
 
 
 

@@ -15,6 +15,10 @@ namespace leafra {
 #define LEAFRA_HAS_ICU 1 // AD TEMP
 
 #ifdef LEAFRA_HAS_ICU
+#include <unicode/uchar.h>
+#include <unicode/utypes.h>
+#include <unicode/utf8.h>
+
 // UTF-8 Helper Functions with ICU support
 
 bool is_unicode_whitespace(UChar32 c) {
@@ -54,109 +58,6 @@ UChar32 get_unicode_char_at(const std::string& text, size_t byte_pos, size_t& ne
     return static_cast<UChar32>(static_cast<unsigned char>(text[byte_pos]));
 #endif
 }
-//  UChar32 get_unicode_char_at_cached(const std::string& text, size_t byte_pos, size_t& next_byte_pos) {
-//      return get_unicode_char_at(text, byte_pos, next_byte_pos);
-//  }
-
-// size_t hash_string(const std::string& s) {
-//     return std::hash<std::string>{}(s);
-// }
-
-UChar32 get_unicode_char_at_cached(const std::string& text, size_t byte_pos, size_t& next_byte_pos) {
-    struct Cache {
-        std::string cached_text;
-        std::vector<UChar32> codepoints_by_byte;  // maps byte_pos -> codepoint
-        std::vector<size_t> next_byte_pos_by_byte; // maps byte_pos -> next_byte_pos
-        int cache_initialized; 
-        Cache() : cached_text(""), codepoints_by_byte(0), next_byte_pos_by_byte(0), cache_initialized(0) {}
-        
-    };
-    static Cache cache;
-    //static std::mutex cache_mutex;
-    
-    {
-        //std::lock_guard<std::mutex> lock(cache_mutex);
-        if (cache.cache_initialized == 1 && cache.cached_text != text) {
-            LEAFRA_DEBUG_LOG("CACHE", "Invalid usage with different text THIS IS A BUG!");
-        }
-        if (cache.cache_initialized == 0 ) {
-            LEAFRA_DEBUG_LOG("CACHE", "Creating new cache entry");
-            //std::string preview = text.substr(0, std::min(text.size(), size_t(50)));
-            //LEAFRA_DEBUG_LOG("CACHE", "Chunk preview: " + preview);
-            cache.cache_initialized = 1;
-            cache.cached_text = text;
-            cache.codepoints_by_byte.assign(text.size() + 1, U_SENTINEL);
-            cache.next_byte_pos_by_byte.assign(text.size() + 1, text.size());
-            
-            const uint8_t* s = reinterpret_cast<const uint8_t*>(text.data());
-            int32_t len = static_cast<int32_t>(text.length());
-            int32_t i = 0;
-            while (i < len) {
-                int32_t start = i;
-                UChar32 c = 0;
-                U8_NEXT(s, i, len, c);
-                if (c >= 0) {
-                    // Valid UTF-8 sequence
-                    cache.codepoints_by_byte[start] = c;
-                    cache.next_byte_pos_by_byte[start] = static_cast<size_t>(i);
-
-                    // For continuation bytes, mark them invalid
-                    for (int32_t j = start + 1; j < i; ++j) {
-                        cache.codepoints_by_byte[j] = U_SENTINEL;
-                        cache.next_byte_pos_by_byte[j] = j + 1;  // advance 1 byte like uncached version
-                    }
-                } else {
-                    // Invalid sequence; mark single byte as invalid
-                    cache.codepoints_by_byte[start] = U_SENTINEL;
-                    cache.next_byte_pos_by_byte[start] = start + 1;
-                    i = start + 1;
-                }
-                // If we didn't advance, force advance to prevent infinite loop
-                if (i == start) {
-                    i++;
-                }
-            } 
-        }
-    }
-    
-    size_t control_next_byte_pos = next_byte_pos; 
-    UChar32 control_c = get_unicode_char_at(text, byte_pos, control_next_byte_pos);
-
-    if (byte_pos >= text.size()) {
-        next_byte_pos = text.size();
-
-#ifdef DEBUG_MISMATCHES
-        if (control_c != U_SENTINEL || control_next_byte_pos != next_byte_pos) {
-            LEAFRA_DEBUG_LOG("CACHE", "MISMATCH byte_pos=" + std::to_string(byte_pos) + 
-            ", text.size()=" + std::to_string(text.size()) +
-            ", control_c=" + std::to_string(control_c) + 
-            ", c=" + "-1" + 
-            ", control_next_byte_pos=" + std::to_string(control_next_byte_pos) + 
-            ", next_byte_pos=" + std::to_string(next_byte_pos));
-        }
-#endif
-        return U_SENTINEL;
-    }
-    
-    
-
-    next_byte_pos = cache.next_byte_pos_by_byte[byte_pos];
-
-#ifdef DEBUG_MISMATCHES
-    if( control_c != cache.codepoints_by_byte[byte_pos] || control_next_byte_pos != next_byte_pos) {
-        LEAFRA_DEBUG_LOG("CACHE", "MISMATCH byte_pos=" + std::to_string(byte_pos) + 
-        ", text.size()=" + std::to_string(text.size()) +
-        ", control_c=" + std::to_string(control_c) + 
-        ", c=" + std::to_string(cache.codepoints_by_byte[byte_pos]) + 
-        ", control_next_byte_pos=" + std::to_string(control_next_byte_pos) + 
-        ", next_byte_pos=" + std::to_string(next_byte_pos));
-    }
-#endif
-    return cache.codepoints_by_byte[byte_pos];
-}
-
-
-
 
 size_t get_byte_pos_for_char_index(const std::string& text, size_t char_index) {
     if (char_index == 0) return 0;
@@ -166,7 +67,7 @@ size_t get_byte_pos_for_char_index(const std::string& text, size_t char_index) {
     size_t byte_pos = 0;
     while (byte_pos < text.length() && current_char < char_index) {
         size_t next_pos;
-        UChar32 c = get_unicode_char_at_cached(text, byte_pos, next_pos);
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
 
         if (c != U_SENTINEL) {
             current_char++;
@@ -204,7 +105,7 @@ size_t get_unicode_length(const std::string& text) {
     
     while (byte_pos < text.length()) {
         size_t next_pos;
-        UChar32 c = get_unicode_char_at_cached(text, byte_pos, next_pos);
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
         if (c != U_SENTINEL) {
             char_count++;
         }
@@ -231,7 +132,7 @@ size_t find_word_boundary_helper_for_unicode(const std::string& text, size_t sta
         
         while (byte_pos < text.length()) {
             size_t next_pos;
-            UChar32 c = get_unicode_char_at_cached(text, byte_pos, next_pos);
+            UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
             
             if (c == U_SENTINEL) {
                 byte_pos = next_pos;
@@ -259,7 +160,7 @@ size_t find_word_boundary_helper_for_unicode(const std::string& text, size_t sta
         
         // Check current position first
         size_t next_pos;
-        UChar32 c = get_unicode_char_at_cached(text, byte_pos, next_pos);
+        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
         if (c != U_SENTINEL) {
             was_in_word = is_word_char_optimized(c);
         }
@@ -272,11 +173,11 @@ size_t find_word_boundary_helper_for_unicode(const std::string& text, size_t sta
             
             while (temp_pos < byte_pos && temp_pos < text.length()) {
                 prev_pos = temp_pos;
-                UChar32 temp_c = get_unicode_char_at_cached(text, temp_pos, temp_pos);
+                UChar32 temp_c = get_unicode_char_at(text, temp_pos, temp_pos);
                 if (temp_c == U_SENTINEL) break;
             }
             
-            UChar32 prev_c = get_unicode_char_at_cached(text, prev_pos, next_pos);
+            UChar32 prev_c = get_unicode_char_at(text, prev_pos, next_pos);
             if (prev_c == U_SENTINEL) {
                 byte_pos = prev_pos;
                 continue;

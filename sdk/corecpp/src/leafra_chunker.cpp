@@ -125,6 +125,7 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
         // Use core chunking method
         auto chunk_start = debug::timer::now();
         std::vector<TextChunk> temp_chunks;
+        documentCacher.reinitialize(combined_text);
         ResultCode result = actual_chunker(combined_text, effective_options, temp_chunks);
         
         auto chunk_end = debug::timer::now();
@@ -386,20 +387,24 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
                                      size_t start,
                                      size_t end,
                                      size_t page_number,
-                                     size_t global_start) const {
+                                     size_t global_start) {
     if (start >= text.length() || end > text.length() || start >= end) {
         return TextChunk("", start, end, page_number);
     }
     
     std::string chunk_content = text.substr(start, end - start);
     
+    //AD TODO: we shouldn't need to use a separate cacher for this - there's a single document cacher!!
+    //TEMPORARY FIX 
+    chunkCacher.reinitialize(chunk_content);
+
     // Trim leading and trailing whitespace if preserve_word_boundaries is enabled
     if (default_options_.preserve_word_boundaries) {
         // Find content start by skipping leading Unicode whitespace
         size_t content_start_byte = 0;
         while (content_start_byte < chunk_content.length()) {
             size_t next_pos;
-            UChar32 c = get_unicode_char_at(chunk_content, content_start_byte, next_pos);
+            UChar32 c = chunkCacher.get_unicode_char_at_cached(content_start_byte, next_pos);
             if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
                 break;
             }
@@ -415,11 +420,11 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
             
             while (temp_pos < content_end_byte) {
                 last_char_start = temp_pos;
-                UChar32 temp_c = get_unicode_char_at(chunk_content, temp_pos, temp_pos);
+                UChar32 temp_c = chunkCacher.get_unicode_char_at_cached(temp_pos, temp_pos);
                 if (temp_c == U_SENTINEL || temp_pos >= content_end_byte) break;
             }
             
-            UChar32 c = get_unicode_char_at(chunk_content, last_char_start, temp_pos);
+            UChar32 c = chunkCacher.get_unicode_char_at_cached(last_char_start, temp_pos);
             if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
                 break;
             }
