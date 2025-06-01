@@ -240,13 +240,15 @@ private:
      * @param target_tokens Target number of tokens
      * @param options Chunking options
      * @param text_unicode_length Pre-calculated Unicode length of the text
+     * @param chars_per_token Sampled characters per token ratio for this text
      * @return Optimal end position
      */
     size_t find_optimal_chunk_end(const std::string& text,
                                  size_t start_pos,
                                  size_t target_tokens,
                                  const ChunkingOptions& options,
-                                 size_t text_unicode_length) const;
+                                 size_t text_unicode_length,
+                                 double chars_per_token) const;
     
     /**
      * @brief Estimate character count needed for target tokens
@@ -270,6 +272,14 @@ private:
      * @return Position of next word start
      */
     size_t find_next_word_start(const std::string& text, size_t pos) const;
+    
+    /**
+     * @brief Sample text density to learn actual characters per token ratio
+     * @param text The text to sample from
+     * @param options Chunking options
+     * @return Actual characters per token ratio for this text
+     */
+    double sample_text_density(const std::string& text, const ChunkingOptions& options) const;
 
 private:
     ChunkingOptions default_options_;

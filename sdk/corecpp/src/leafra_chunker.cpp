@@ -208,6 +208,9 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
         // since the text doesn't change throughout the chunking process
         size_t text_unicode_length = documentCacher.get_unicode_length_cached();
         
+        // DENSITY SAMPLING: Learn actual text density once at the beginning
+        double chars_per_token = sample_text_density(text, options);
+        
         while (current_pos < text.length()) {
             // Ensure we start at a word boundary
             if (options.preserve_word_boundaries && current_pos > 0) {
@@ -218,7 +221,7 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
             }
             
             // Find the best chunk end that respects word boundaries and target token count
-            size_t chunk_end = find_optimal_chunk_end(text, current_pos, target_tokens, options, text_unicode_length);
+            size_t chunk_end = find_optimal_chunk_end(text, current_pos, target_tokens, options, text_unicode_length, chars_per_token);
             
             // Make sure chunk end is at a word boundary
             if (options.preserve_word_boundaries && chunk_end < text.length()) {
@@ -250,7 +253,7 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
             if (effective_content_tokens < 1) effective_content_tokens = 1;
             
             // Convert back to characters to find next start position
-            size_t advance_chars = estimate_characters_for_tokens(text, current_pos, effective_content_tokens, options.token_method, text_unicode_length);
+            size_t advance_chars = static_cast<size_t>(std::round(effective_content_tokens * chars_per_token));
             current_pos += advance_chars;
             
             // If we've reached the end, break
@@ -496,7 +499,8 @@ size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
                                             size_t start_pos,
                                             size_t target_tokens,
                                             const ChunkingOptions& options,
-                                            size_t text_unicode_length) const {
+                                            size_t text_unicode_length,
+                                            double chars_per_token) const {
     if (start_pos >= text.length()) {
         return text.length();
     }
@@ -518,61 +522,19 @@ size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
     }
     
     // Start with a conservative character estimate
-    size_t estimated_chars = tokens_to_characters(target_tokens, options.token_method);
-    estimated_chars = static_cast<size_t>(estimated_chars * CONSERVATIVE_ESTIMATE_FACTOR); // Conservative estimate
+    size_t estimated_chars = static_cast<size_t>(target_tokens * chars_per_token);
     
-    size_t target_end_char_pos = std::min(start_char_pos + estimated_chars, text_unicode_length);  // Character boundary check
+    size_t target_end_char_pos = std::min(start_char_pos + estimated_chars, text_unicode_length);
     
-    // Iteratively adjust to get closer to target token count (work in character space)
-    size_t current_end_char_pos = target_end_char_pos;  // UTF-8 character position
-    size_t iterations = 0;
-    const size_t max_iterations = 8;
-    
-    while (iterations < max_iterations) {
-        // Extract chunk content using character positions
-        size_t chunk_char_count = current_end_char_pos - start_char_pos;  // Character count, not bytes
-        if (chunk_char_count == 0) break;
-        
-        std::string chunk_content = documentCacher.get_utf8_substring_cached(start_char_pos, chunk_char_count);  // Use character positions
-        size_t actual_tokens = estimate_token_count(chunk_content, options.token_method);
-        
-        // Check if we're close enough
-        double token_ratio = static_cast<double>(actual_tokens) / target_tokens;
-        if (token_ratio >= TOKEN_COUNT_TOLERANCE_MIN && token_ratio <= TOKEN_COUNT_TOLERANCE_MAX) {
-            break;
-        }
-        
-        // Adjust position (character space)
-        if (actual_tokens < target_tokens * TOKEN_COUNT_TOLERANCE_MIN) {
-            // Too few tokens, extend chunk
-            size_t deficit_tokens = target_tokens - actual_tokens;
-            size_t chars_needed = tokens_to_characters(deficit_tokens, options.token_method);
-            chars_needed = static_cast<size_t>(chars_needed * CONSERVATIVE_ADJUSTMENT_FACTOR); // Conservative
-            current_end_char_pos = std::min(current_end_char_pos + chars_needed, text_unicode_length);  // Character boundary check
-        } else if (actual_tokens > target_tokens * TOKEN_COUNT_TOLERANCE_MAX) {
-            // Too many tokens, shrink chunk
-            size_t excess_tokens = actual_tokens - target_tokens;
-            size_t chars_to_remove = tokens_to_characters(excess_tokens, options.token_method);
-            current_end_char_pos = (current_end_char_pos > chars_to_remove) ? 
-                                   current_end_char_pos - chars_to_remove : start_char_pos + 1;
-        }
-        
-        // Ensure we don't go past bounds (character space)
-        current_end_char_pos = std::max(start_char_pos + 1, std::min(current_end_char_pos, text_unicode_length));
-        iterations++;
-    }
+    // DIRECT CALCULATION - No iterations needed!
+    // Since we know the exact density, calculate the precise character count for target tokens
+    size_t precise_chars = static_cast<size_t>(std::round(target_tokens * chars_per_token));
+    size_t final_end_char_pos = std::min(start_char_pos + precise_chars, text_unicode_length);
     
     // Convert final character position back to byte position
-    size_t final_byte_pos = documentCacher.get_byte_pos_for_char_index_cached(current_end_char_pos);
+    size_t final_byte_pos = documentCacher.get_byte_pos_for_char_index_cached(final_end_char_pos);
     
-    // Safety limit check
-    size_t max_chars = tokens_to_characters(target_tokens, options.token_method) * 2;
-    if (current_end_char_pos - start_char_pos > max_chars) {
-        size_t limited_end_char_pos = start_char_pos + max_chars;  // Character position
-        final_byte_pos = documentCacher.get_byte_pos_for_char_index_cached(limited_end_char_pos);  // Convert to bytes
-    }
-    
-    return std::min(final_byte_pos, text.length());  // Return byte position
+    return std::min(final_byte_pos, text.length());
 }
 
 /**
@@ -717,6 +679,63 @@ size_t LeafraChunker::tokens_to_characters(size_t token_count, TokenApproximatio
     
     // Use single factor for all methods - simplicity over micro-optimization
     return static_cast<size_t>(std::round(token_count * SIMPLE_CHARS_PER_TOKEN));
+}
+
+/**
+ * Sample text density to learn actual characters per token ratio for this specific text
+ * @param text The text to sample from
+ * @param options Chunking options
+ * @return Actual characters per token ratio for this text
+ */
+double LeafraChunker::sample_text_density(const std::string& text, const ChunkingOptions& options) const {
+    if (text.empty()) {
+        return SIMPLE_CHARS_PER_TOKEN; // Fall back to default
+    }
+    
+    // Sample multiple segments to get better average density
+    const size_t sample_size_chars = 200;  // Sample 200 characters at a time
+    const size_t max_samples = 5;          // Take up to 5 samples
+    
+    size_t text_unicode_length = documentCacher.get_unicode_length_cached();
+    size_t available_samples = std::min(max_samples, text_unicode_length / sample_size_chars);
+    
+    if (available_samples == 0) {
+        // Text too short, just sample the whole thing
+        size_t tokens = estimate_token_count(text, options.token_method);
+        return tokens > 0 ? static_cast<double>(text_unicode_length) / tokens : SIMPLE_CHARS_PER_TOKEN;
+    }
+    
+    double total_chars = 0;
+    double total_tokens = 0;
+    
+    // Take samples from different parts of the text
+    for (size_t i = 0; i < available_samples; ++i) {
+        size_t sample_start_char = (i * text_unicode_length) / available_samples;
+        size_t sample_end_char = std::min(sample_start_char + sample_size_chars, text_unicode_length);
+        size_t sample_char_count = sample_end_char - sample_start_char;
+        
+        if (sample_char_count > 0) {
+            std::string sample = documentCacher.get_utf8_substring_cached(sample_start_char, sample_char_count);
+            size_t sample_tokens = estimate_token_count(sample, options.token_method);
+            
+            if (sample_tokens > 0) {
+                total_chars += sample_char_count;
+                total_tokens += sample_tokens;
+            }
+        }
+    }
+    
+    if (total_tokens > 0) {
+        double density = total_chars / total_tokens;
+        
+        // Clamp to reasonable bounds (2-8 chars per token)
+        density = std::max(2.0, std::min(8.0, density));
+        
+        LEAFRA_DEBUG_LOG("DENSITY", "Sampled text density: " + std::to_string(density) + " chars/token");
+        return density;
+    }
+    
+    return SIMPLE_CHARS_PER_TOKEN; // Fall back to default
 }
 
 } // namespace leafra
