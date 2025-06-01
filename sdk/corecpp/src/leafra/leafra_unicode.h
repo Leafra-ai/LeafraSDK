@@ -33,14 +33,21 @@ namespace leafra {
 class UnicodeCacher {
 private:
     std::string cached_text;
-    std::vector<UChar32> codepoints_by_byte;  // maps byte_pos -> codepoint
-    std::vector<size_t> next_byte_pos_by_byte; // maps byte_pos -> next_byte_pos
-    size_t cached_unicode_length;
+    UChar32* codepoints_by_byte;      // maps byte_pos -> codepoint (C-style array)
+    size_t* next_byte_pos_by_byte;    // maps byte_pos -> next_byte_pos (C-style array)
+    size_t array_size;                // size of the allocated arrays
+    size_t unicode_length_cached;     // cached length of the string
     void initialize_cache(const std::string& text);
+    void cleanup_arrays();            // helper to free memory
 
 public:
     UnicodeCacher();
     UnicodeCacher(const std::string& text);
+    ~UnicodeCacher();                 // destructor to free memory
+    
+    // Copy constructor and assignment operator for proper memory management
+    UnicodeCacher(const UnicodeCacher& other);
+    UnicodeCacher& operator=(const UnicodeCacher& other);
 
     /*regenerate the cache for a new text*/
     void reinitialize(const std::string& text);

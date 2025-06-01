@@ -23,16 +23,36 @@ namespace leafra {
 
 // UnicodeCacher member function implementations
 
+void UnicodeCacher::cleanup_arrays() {
+    if (codepoints_by_byte) {
+        delete[] codepoints_by_byte;
+        codepoints_by_byte = nullptr;
+    }
+    if (next_byte_pos_by_byte) {
+        delete[] next_byte_pos_by_byte;
+        next_byte_pos_by_byte = nullptr;
+    }
+    array_size = 0;
+}
+
 void UnicodeCacher::initialize_cache(const std::string& text) {
     //LEAFRA_DEBUG_LOG("CACHE", "Creating new cache entry");
     
+    // Clean up existing arrays
+    cleanup_arrays();
+    
     cached_text = text;
-
-    if (cached_text.empty()) cached_unicode_length = 0;
-
-
-    codepoints_by_byte.assign(text.size() + 1, U_SENTINEL);
-    next_byte_pos_by_byte.assign(text.size() + 1, text.size());
+    array_size = text.size() + 1;
+    
+    // Allocate new arrays
+    codepoints_by_byte = new UChar32[array_size];
+    next_byte_pos_by_byte = new size_t[array_size];
+    
+    // Initialize arrays
+    for (size_t i = 0; i < array_size; ++i) {
+        codepoints_by_byte[i] = U_SENTINEL;
+        next_byte_pos_by_byte[i] = text.size();
+    }
     
     const uint8_t* s = reinterpret_cast<const uint8_t*>(text.data());
     int32_t len = static_cast<int32_t>(text.length());
@@ -63,30 +83,70 @@ void UnicodeCacher::initialize_cache(const std::string& text) {
             i++;
         }
     }
-        
-    size_t char_count = 0;
-    size_t byte_pos = 0;
-    
+    //calculate the unicode length of the string and cache it
+    if (cached_text.empty()) {
+        unicode_length_cached = 0;
+        return;
+    }
+    size_t byte_pos = 0;    
     while (byte_pos < cached_text.length()) {
         size_t next_pos;
         UChar32 c = get_unicode_char_at_cached(byte_pos, next_pos);
         if (c != U_SENTINEL) {
-            char_count++;
+            unicode_length_cached++;
         }
         byte_pos = next_pos;
-        
         // Safety check to prevent infinite loops
         if (next_pos <= byte_pos) {
             byte_pos++;
         }
-    }
-    cached_unicode_length = char_count;
+    }    
+} //end of initialize_cache
+
+UnicodeCacher::UnicodeCacher() : cached_text(""), codepoints_by_byte(nullptr), next_byte_pos_by_byte(nullptr), array_size(0), unicode_length_cached(0) {}
+
+UnicodeCacher::UnicodeCacher(const std::string& text) : cached_text(""), codepoints_by_byte(nullptr), next_byte_pos_by_byte(nullptr), array_size(0), unicode_length_cached(0) {
+    initialize_cache(text);
 }
 
-UnicodeCacher::UnicodeCacher() : cached_text(""), codepoints_by_byte(0), next_byte_pos_by_byte(0), cached_unicode_length(0) {}
+UnicodeCacher::~UnicodeCacher() {
+    cleanup_arrays();
+}
 
-UnicodeCacher::UnicodeCacher(const std::string& text) : cached_text(""), codepoints_by_byte(0), next_byte_pos_by_byte(0), cached_unicode_length(0)   {
-    initialize_cache(text);
+// Copy constructor
+UnicodeCacher::UnicodeCacher(const UnicodeCacher& other) : cached_text(other.cached_text), codepoints_by_byte(nullptr), next_byte_pos_by_byte(nullptr), array_size(0) {
+    if (other.array_size > 0) {
+        array_size = other.array_size;
+        codepoints_by_byte = new UChar32[array_size];
+        next_byte_pos_by_byte = new size_t[array_size];
+        
+        for (size_t i = 0; i < array_size; ++i) {
+            codepoints_by_byte[i] = other.codepoints_by_byte[i];
+            next_byte_pos_by_byte[i] = other.next_byte_pos_by_byte[i];
+        }
+    }
+}
+
+// Assignment operator
+UnicodeCacher& UnicodeCacher::operator=(const UnicodeCacher& other) {
+    if (this != &other) {
+        // Clean up existing resources
+        cleanup_arrays();
+        
+        // Copy data
+        cached_text = other.cached_text;
+        if (other.array_size > 0) {
+            array_size = other.array_size;
+            codepoints_by_byte = new UChar32[array_size];
+            next_byte_pos_by_byte = new size_t[array_size];
+            
+            for (size_t i = 0; i < array_size; ++i) {
+                codepoints_by_byte[i] = other.codepoints_by_byte[i];
+                next_byte_pos_by_byte[i] = other.next_byte_pos_by_byte[i];
+            }
+        }
+    }
+    return *this;
 }
 
 void UnicodeCacher::reinitialize(const std::string& text) {
@@ -168,7 +228,7 @@ std::string UnicodeCacher::get_utf8_substring_cached(size_t start_char_pos, size
 }
 
 size_t UnicodeCacher::get_unicode_length_cached() const {
-    return cached_unicode_length;
+    return unicode_length_cached;
 }
 
 
