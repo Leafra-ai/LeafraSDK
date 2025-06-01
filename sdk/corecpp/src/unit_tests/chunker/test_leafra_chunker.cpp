@@ -87,7 +87,7 @@ bool test_chunker_initialization() {
     
     // Check default options
     const ChunkingOptions& defaults = chunker.get_default_options();
-    TEST_ASSERT_EQUAL(static_cast<size_t>(1000), defaults.chunk_size, "Default chunk size should be 1000");
+    TEST_ASSERT_EQUAL(static_cast<size_t>(500), defaults.chunk_size, "Default chunk size should be 500");
     TEST_ASSERT(defaults.overlap_percentage >= 0.09 && defaults.overlap_percentage <= 0.11, "Default overlap should be around 0.1");
     TEST_ASSERT_EQUAL(true, defaults.preserve_word_boundaries, "Default should preserve word boundaries");
     
@@ -105,7 +105,7 @@ bool test_single_text_chunking_basic() {
     std::string text = "This is a test text that should be chunked into smaller pieces for testing purposes.";
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_text(text, ChunkingOptions(30, 0.2), chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(30, 0.2, ChunkSizeUnit::CHARACTERS), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Basic text chunking should succeed");
     
     TEST_ASSERT(chunks.size() > 1, "Text should be split into multiple chunks");
@@ -151,8 +151,8 @@ bool test_single_text_chunking_overlap() {
         // Check for overlap between consecutive chunks
         bool has_overlap = false;
         for (size_t i = 0; i < chunks.size() - 1; ++i) {
-            std::string chunk1_end = chunks[i].content.substr(chunks[i].content.length() - 10);
-            std::string chunk2_start = chunks[i + 1].content.substr(0, 10);
+            std::string chunk1_end = std::string(chunks[i].content.substr(chunks[i].content.length() - 10));
+            std::string chunk2_start = std::string(chunks[i + 1].content.substr(0, 10));
             
             // Simple overlap check - look for common words
             if (chunk1_end.find("word") != std::string::npos && 
@@ -178,7 +178,7 @@ bool test_multi_page_document_chunking() {
     
     std::vector<TextChunk> chunks;
     
-    ResultCode result = chunker.chunk_document(pages, ChunkingOptions(80, 0.1), chunks);
+    ResultCode result = chunker.chunk_document(pages, ChunkingOptions(80, 0.1, ChunkSizeUnit::CHARACTERS), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Multi-page document chunking should succeed");
     
     TEST_ASSERT(chunks.size() >= pages.size(), "Should have at least as many chunks as pages");
@@ -256,14 +256,14 @@ bool test_word_boundary_preservation() {
     std::vector<TextChunk> chunks;
     
     // Use small chunk size to force word boundary decisions
-    ResultCode result = chunker.chunk_text(text, ChunkingOptions(25, 0.1), chunks);
+    ResultCode result = chunker.chunk_text(text, ChunkingOptions(25, 0.1, ChunkSizeUnit::CHARACTERS), chunks);
     TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "Word boundary test should succeed");
     
     // Check that chunks don't break words inappropriately
     for (const auto& chunk : chunks) {
         if (!chunk.content.empty()) {
             // Chunks should typically start and end at word boundaries
-            std::string trimmed = chunk.content;
+            std::string trimmed = std::string(chunk.content);
             // Remove leading/trailing whitespace for testing
             size_t start = trimmed.find_first_not_of(" \t\n\r");
             size_t end = trimmed.find_last_not_of(" \t\n\r");
@@ -299,8 +299,8 @@ bool test_statistics_tracking() {
     
     // Reset statistics
     chunker.reset_statistics();
-    TEST_ASSERT_EQUAL(static_cast<size_t>(0), chunker.get_chunk_count(), "Reset chunk count should be 0");
-    TEST_ASSERT_EQUAL(static_cast<size_t>(0), chunker.get_total_characters(), "Reset character count should be 0");
+    TEST_ASSERT_EQUAL(static_cast<size_t>(0), chunker.get_chunk_count(), "Chunk count should reset to 0");
+    TEST_ASSERT_EQUAL(static_cast<size_t>(0), chunker.get_total_characters(), "Character count should reset to 0");
     
     return true;
 }
@@ -311,7 +311,7 @@ bool test_default_options_management() {
     
     // Get initial defaults
     ChunkingOptions initial = chunker.get_default_options();
-    TEST_ASSERT_EQUAL(static_cast<size_t>(1000), initial.chunk_size, "Initial default chunk size");
+    TEST_ASSERT_EQUAL(static_cast<size_t>(500), initial.chunk_size, "Initial default chunk size");
     TEST_ASSERT_EQUAL(true, initial.preserve_word_boundaries, "Initial word boundary setting");
     
     // Change defaults

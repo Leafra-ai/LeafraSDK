@@ -96,7 +96,7 @@ void test_token_chunking() {
                 for (size_t j = 0; j < chunks.size() && j < 3; ++j) {  // Show first 3 chunks
                     std::cout << "  Chunk " << (j+1) << " (" << chunks[j].estimated_tokens 
                               << " tokens, " << chunks[j].content.length() << " chars): ";
-                    std::string preview = chunks[j].content.substr(0, 50);
+                    std::string preview = std::string(chunks[j].content.substr(0, 50));
                     if (chunks[j].content.length() > 50) preview += "...";
                     std::cout << "\"" << preview << "\"" << std::endl;
                     
@@ -158,7 +158,7 @@ void test_multi_page_token_chunking() {
             for (size_t i = 0; i < chunks.size(); ++i) {
                 std::cout << "Chunk " << (i+1) << " (Page " << chunks[i].page_number 
                           << ", " << chunks[i].estimated_tokens << " tokens): ";
-                std::string preview = chunks[i].content.substr(0, 60);
+                std::string preview = std::string(chunks[i].content.substr(0, 60));
                 if (chunks[i].content.length() > 60) preview += "...";
                 std::cout << "\"" << preview << "\"" << std::endl;
                 

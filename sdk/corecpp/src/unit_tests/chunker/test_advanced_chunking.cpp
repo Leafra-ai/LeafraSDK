@@ -642,17 +642,17 @@ bool test_overlap_with_word_boundaries() {
         bool has_meaningful_overlap = false;
         for (size_t i = 0; i < chunks.size() - 1; ++i) {
             // Use UTF-8 aware character counting and substring extraction
-            size_t chunk1_chars = get_unicode_length(chunks[i].content);
-            size_t chunk2_chars = get_unicode_length(chunks[i + 1].content);
+            size_t chunk1_chars = get_unicode_length(std::string(chunks[i].content));
+            size_t chunk2_chars = get_unicode_length(std::string(chunks[i + 1].content));
             
             // Extract last 50 characters (not bytes) from first chunk
             size_t chunk1_extract_chars = std::min(50UL, chunk1_chars);
             size_t chunk1_start_char = (chunk1_chars >= chunk1_extract_chars) ? chunk1_chars - chunk1_extract_chars : 0;
-            std::string chunk1_end = get_utf8_substring(chunks[i].content, chunk1_start_char, chunk1_extract_chars);
+            std::string chunk1_end = get_utf8_substring(std::string(chunks[i].content), chunk1_start_char, chunk1_extract_chars);
             
-            // Extract first 50 characters (not bytes) from second chunk  
-            size_t chunk2_extract_chars = std::min(50UL, chunk2_chars);
-            std::string chunk2_start = get_utf8_substring(chunks[i + 1].content, 0, chunk2_extract_chars);
+            // Extract first 50 characters (not bytes) from second chunk
+            size_t chunk2_extract_chars = std::min(chunk2_chars, static_cast<size_t>(50));
+            std::string chunk2_start = get_utf8_substring(std::string(chunks[i + 1].content), 0, chunk2_extract_chars);
             
             // Look for common words between consecutive chunks
             std::istringstream iss1(chunk1_end);

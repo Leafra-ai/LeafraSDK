@@ -226,13 +226,24 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
                 chunk_end = find_word_boundary(text, chunk_end, 100);
             }
             
-            // Create chunk
+            // Create chunk - but only if it would be non-empty
             TextChunk chunk = create_chunk(text, current_pos, chunk_end, 0, current_pos);
             
-            // Calculate actual token count
-            chunk.estimated_tokens = estimate_token_count(chunk.content, options.token_method);
-            
-            chunks.push_back(chunk);
+            // Skip empty chunks - don't add them to the result
+            if (!chunk.content.empty()) {
+                // Calculate actual token count
+                chunk.estimated_tokens = estimate_token_count(chunk.content, options.token_method);
+                chunks.push_back(chunk);
+            } else if (chunks.empty() && current_pos < text.length()) {
+                // Special case: if we have no chunks yet and there's still text,
+                // create a chunk from current position to end of text to avoid empty result
+                chunk = create_chunk(text, current_pos, text.length(), 0, current_pos);
+                if (!chunk.content.empty()) {
+                    chunk.estimated_tokens = estimate_token_count(chunk.content, options.token_method);
+                    chunks.push_back(chunk);
+                }
+                break; // Exit the loop since we've processed all remaining text
+            }
             
             // Calculate next position with proper overlap
             size_t effective_content_tokens = static_cast<size_t>(target_tokens * (1.0 - options.overlap_percentage));
@@ -375,13 +386,13 @@ size_t LeafraChunker::find_word_boundary(const std::string& text,
 }
 
 /**
- * Create a text chunk with proper Unicode trimming
- * @param text Source UTF-8 text
- * @param start Start byte position
- * @param end End byte position  
- * @param page_number Page number for metadata
- * @param global_start Absolute byte position in the full document
- * @return TextChunk object with content and metadata
+ * Creates a TextChunk from the specified range with zero-copy string_view
+ * @param text Original text to create chunk from
+ * @param start Starting byte position in text
+ * @param end Ending byte position in text
+ * @param page_number Page number for this chunk
+ * @param global_start Global byte position in the entire document
+ * @return TextChunk object with content view and metadata
  */
 TextChunk LeafraChunker::create_chunk(const std::string& text,
                                      size_t start,
@@ -392,61 +403,78 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
         return TextChunk("", start, end, page_number);
     }
     
-    std::string chunk_content = text.substr(start, end - start);
+    size_t content_start = start;
+    size_t content_end = end;
     
-
-    // Trim leading and trailing whitespace if preserve_word_boundaries is enabled
-    if (default_options_.preserve_word_boundaries) {
+    // FIRST: Ensure we're at valid UTF-8 character boundaries
+    // Align content_start to a valid UTF-8 character boundary
+    while (content_start < content_end && content_start < text.length() && 
+           (text[content_start] & 0xC0) == 0x80) {
+        content_start++; // Skip UTF-8 continuation bytes
+    }
+    
+    // Align content_end to a valid UTF-8 character boundary
+    while (content_end > content_start && content_end > 0 &&
+           (text[content_end - 1] & 0xC0) == 0x80) {
+        content_end--; // Move back to avoid cutting UTF-8 character
+    }
+    
+    // SECOND: Trim leading and trailing whitespace if preserve_word_boundaries is enabled
+    if (default_options_.preserve_word_boundaries && content_start < content_end) {
         // Find content start by skipping leading Unicode whitespace
-        size_t content_start_byte = 0;
-        while (content_start_byte < chunk_content.length()) {
+        size_t trimmed_start = content_start;
+        while (trimmed_start < content_end) {
             size_t next_pos;
-            UChar32 c = documentCacher.get_unicode_char_at_cached(global_start + content_start_byte, next_pos);
+            UChar32 c = documentCacher.get_unicode_char_at_cached(trimmed_start, next_pos);
             if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
                 break;
             }
-            content_start_byte = next_pos;
+            trimmed_start = next_pos;
         }
         
         // Find content end by working backwards from end, skipping trailing Unicode whitespace
-        size_t content_end_byte = chunk_content.length();
-        while (content_end_byte > content_start_byte) {
-            // Find the start of the last character
-            size_t last_char_start = 0;
-            size_t temp_pos = 0;
+        size_t trimmed_end = content_end;
+        while (trimmed_end > trimmed_start) {
+            // Find the start of the last character before trimmed_end
+            size_t last_char_start = trimmed_start;
+            size_t temp_pos = trimmed_start;
             
-            while (temp_pos < content_end_byte) {
+            while (temp_pos < trimmed_end) {
                 last_char_start = temp_pos;
-                UChar32 temp_c = documentCacher.get_unicode_char_at_cached(global_start + temp_pos, temp_pos);
-                if (temp_c == U_SENTINEL || temp_pos >= content_end_byte) break;
+                UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp_pos, temp_pos);
+                if (temp_c == U_SENTINEL || temp_pos >= trimmed_end) break;
             }
             
-            UChar32 c = documentCacher.get_unicode_char_at_cached(global_start + last_char_start, temp_pos);
+            UChar32 c = documentCacher.get_unicode_char_at_cached(last_char_start, temp_pos);
             if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
                 break;
             }
             
-            content_end_byte = last_char_start;
+            trimmed_end = last_char_start;
         }
         
-        if (content_start_byte < content_end_byte) {
-            chunk_content = chunk_content.substr(content_start_byte, content_end_byte - content_start_byte);
-        } else {
-            chunk_content.clear();
-        }
+        content_start = trimmed_start;
+        content_end = trimmed_end;
     }
-    //LEAFRA_DEBUG_LOG("CHUNKING", "Creating chunk: " + chunk_content);
-    return TextChunk(chunk_content, global_start, global_start + (end - start), page_number);
+    
+    // Create string_view directly into the original text - no copying!
+    if (content_start < content_end) {
+        std::string_view chunk_view(text.data() + content_start, content_end - content_start);
+        return TextChunk(chunk_view, global_start, global_start + (end - start), page_number);
+    } else {
+        // Empty content after trimming - return empty but valid chunk
+        return TextChunk("", global_start, global_start + (end - start), page_number);
+    }
 }
 
 /**
  * Estimates token count from text using the unified simple approach.
  * 
- * @param text The text to analyze
+ * @param text The text to analyze (as string_view for efficiency)
  * @param method The approximation method (only SIMPLE is supported now)
  * @return Estimated number of tokens
  */
-size_t LeafraChunker::estimate_token_count(const std::string& text, TokenApproximationMethod method) {
+size_t LeafraChunker::estimate_token_count(std::string_view text, TokenApproximationMethod method) {
     if (text.empty()) return 0;
     
     // Use unified approach: ~4 characters per token

@@ -3,6 +3,7 @@
 #include "types.h"
 #include "../../src/leafra/leafra_unicode.h"
 #include <string>
+#include <string_view>
 #include <vector>
 #include <cstdint>
 #include <memory>
@@ -53,18 +54,23 @@ enum class TokenApproximationMethod : int32_t {
 };
 
 /**
- * @brief Text chunk with metadata
+ * @brief Text chunk with metadata using string_view to avoid copying
  */
 struct TextChunk {
-    std::string content;
-    size_t start_index = 0; //relative to the start of the document
-    size_t end_index = 0; //relative to the start of the document
+    std::string_view content;       // View into original text - no copying!
+    size_t start_index = 0;
+    size_t end_index = 0;
     size_t page_number = 0;
     size_t estimated_tokens = 0;  // Estimated token count for this chunk
     
     TextChunk() = default;
-    TextChunk(const std::string& text, size_t start, size_t end, size_t page = 0)
+    TextChunk(std::string_view text, size_t start, size_t end, size_t page = 0)
         : content(text), start_index(start), end_index(end), page_number(page), estimated_tokens(0) {}
+        
+    // Helper method to get content as string when needed
+    std::string to_string() const {
+        return std::string(content);
+    }
 };
 
 /**
@@ -167,12 +173,12 @@ public:
     // ========== TOKEN UTILITIES ==========
 
     /**
-     * @brief Estimate token count for a given text
-     * @param text Input text
-     * @param method Approximation method to use
+     * @brief Estimate token count from text
+     * @param text Text to analyze (as string_view for efficiency)
+     * @param method Token approximation method
      * @return Estimated token count
      */
-    static size_t estimate_token_count(const std::string& text, TokenApproximationMethod method);
+    static size_t estimate_token_count(std::string_view text, TokenApproximationMethod method);
     
     /**
      * @brief Convert tokens to approximate character count

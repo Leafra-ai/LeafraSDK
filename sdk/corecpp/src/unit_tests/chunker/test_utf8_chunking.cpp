@@ -66,22 +66,17 @@ void validate_chunk_properties(const std::vector<TextChunk>& chunks,
                               const std::string& test_name) {
     assert(!chunks.empty());
     
-    std::cout << "  [" << test_name << "] Generated " << chunks.size() << " chunks, ";
+    std::cout << " [" << test_name << "] Generated " << chunks.size() << " chunks, ";
     
-    for (size_t i = 0; i < chunks.size(); i++) {
-        const auto& chunk = chunks[i];
+    for (const auto& chunk : chunks) {
+        // All chunks should be non-empty since we don't create empty chunks
         assert(!chunk.content.empty());
         
         // Validate UTF-8 boundaries - this is the key test
-        if (!chunk.content.empty()) {
-            unsigned char first_byte = static_cast<unsigned char>(chunk.content[0]);
-            
-            // Should not start with UTF-8 continuation byte
-            assert((first_byte & 0x80) == 0 || (first_byte & 0xC0) != 0x80);
-        }
+        unsigned char first_byte = static_cast<unsigned char>(chunk.content[0]);
         
-        // Basic sanity check - chunks should have some reasonable content
-        assert(chunk.content.length() > 0);
+        // Should not start with UTF-8 continuation byte
+        assert((first_byte & 0x80) == 0 || (first_byte & 0xC0) != 0x80);
     }
     
     std::cout << "validated ✓";

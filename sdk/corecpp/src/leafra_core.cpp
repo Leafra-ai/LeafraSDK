@@ -330,7 +330,7 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                     LEAFRA_INFO() << chunk.content;
                                 } else if (pImpl->config_.chunking.print_chunks_brief) {
                                     // Print first N lines
-                                    std::istringstream stream(chunk.content);
+                                    std::istringstream stream(std::string(chunk.content));
                                     std::string line;
                                     int line_count = 0;
                                     int max_lines = pImpl->config_.chunking.max_lines;
