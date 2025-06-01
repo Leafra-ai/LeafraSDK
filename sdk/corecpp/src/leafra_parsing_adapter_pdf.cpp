@@ -158,14 +158,61 @@ std::string PDFParsingAdapter::extractTextFromPage(void* page) const {
     
     FPDFText_ClosePage(textPage);
     
-    // Convert UTF-16 to UTF-8
+    // Convert UTF-16 to UTF-8 properly
     std::string result;
+    result.reserve(actualLength * 2); // Reserve space to avoid reallocations
+    
     for (int i = 0; i < actualLength - 1; ++i) {
-        if (buffer[i] < 128) {
-            result += static_cast<char>(buffer[i]);
+        uint16_t codeUnit = static_cast<uint16_t>(buffer[i]);
+        uint32_t codePoint;
+        
+        // Check for surrogate pairs (UTF-16 encoding for characters > U+FFFF)
+        if (codeUnit >= 0xD800 && codeUnit <= 0xDBFF) {
+            // High surrogate - need to read low surrogate
+            if (i + 1 < actualLength - 1) {
+                uint16_t lowSurrogate = static_cast<uint16_t>(buffer[i + 1]);
+                if (lowSurrogate >= 0xDC00 && lowSurrogate <= 0xDFFF) {
+                    // Valid surrogate pair - combine to get full code point
+                    codePoint = 0x10000 + ((codeUnit & 0x3FF) << 10) + (lowSurrogate & 0x3FF);
+                    ++i; // Skip the low surrogate in next iteration
+                } else {
+                    // Invalid surrogate pair
+                    codePoint = 0xFFFD; // Unicode replacement character
+                }
+            } else {
+                // Truncated surrogate pair
+                codePoint = 0xFFFD; // Unicode replacement character
+            }
+        } else if (codeUnit >= 0xDC00 && codeUnit <= 0xDFFF) {
+            // Lone low surrogate (invalid)
+            codePoint = 0xFFFD; // Unicode replacement character
         } else {
-            // Simple UTF-16 to UTF-8 conversion for basic characters
-            result += "?"; // Placeholder for complex characters
+            // Regular BMP character
+            codePoint = codeUnit;
+        }
+        
+        // Encode code point as UTF-8
+        if (codePoint <= 0x7F) {
+            // 1-byte sequence (ASCII)
+            result += static_cast<char>(codePoint);
+        } else if (codePoint <= 0x7FF) {
+            // 2-byte sequence
+            result += static_cast<char>(0xC0 | (codePoint >> 6));
+            result += static_cast<char>(0x80 | (codePoint & 0x3F));
+        } else if (codePoint <= 0xFFFF) {
+            // 3-byte sequence
+            result += static_cast<char>(0xE0 | (codePoint >> 12));
+            result += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+            result += static_cast<char>(0x80 | (codePoint & 0x3F));
+        } else if (codePoint <= 0x10FFFF) {
+            // 4-byte sequence
+            result += static_cast<char>(0xF0 | (codePoint >> 18));
+            result += static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F));
+            result += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+            result += static_cast<char>(0x80 | (codePoint & 0x3F));
+        } else {
+            // Invalid code point
+            result += "\xEF\xBF\xBD"; // UTF-8 encoded replacement character (U+FFFD)
         }
     }
     

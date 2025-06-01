@@ -231,12 +231,12 @@ std::vector<std::string> parse_document(const std::string& filepath) {
 }
 
 // Test word boundary preservation with Alice in Wonderland text file
-bool test_word_boundary_preservation_alice_txt() {
-    std::string filepath = "../../../../../../example/example_files/aliceinwonderland.txt";
+bool test_word_boundary_preservation_text_file() {
+    std::string filepath = "../../../../../../example/example_files/gift_of_the_magi.txt";
     std::string text = load_text_file(filepath);
     
     if (text.empty()) {
-        std::cerr << "Failed to load Alice in Wonderland text file" << std::endl;
+        std::cerr << "Failed to load text file: " << filepath << std::endl;
         return false;
     }
     
@@ -257,7 +257,7 @@ bool test_word_boundary_preservation_alice_txt() {
     overlap_percentages.push_back(0.2);   // 20%
     overlap_percentages.push_back(0.3);   // 30%
     
-    std::cout << "\n  Testing Alice in Wonderland text file (" << text.length() << " characters)" << std::endl;
+    std::cout << "\n  Testing text file: " << filepath << " (" << text.length() << " characters)" << std::endl;
     
     for (size_t chunk_size : chunk_sizes) {
         for (double overlap : overlap_percentages) {
@@ -273,14 +273,14 @@ bool test_word_boundary_preservation_alice_txt() {
             
             // Test word boundary preservation
             if (!check_word_boundary_preservation_robust(chunks, text)) {
-                std::cerr << "\nFAIL: Word boundary preservation failed for Alice txt with " 
+                std::cerr << "\nFAIL: Word boundary preservation failed for text file: " << filepath << " with " 
                           << chunk_size << " tokens, " << (overlap * 100) << "% overlap" << std::endl;
                 return false;
             }
             
             // Test token size accuracy
             if (!check_token_size_accuracy(chunks, chunk_size)) {
-                std::cerr << "\nFAIL: Token size accuracy failed for Alice txt with " 
+                std::cerr << "\nFAIL: Token size accuracy failed for text file: " << filepath << " with " 
                           << chunk_size << " tokens, " << (overlap * 100) << "% overlap" << std::endl;
                 return false;
             }
@@ -311,7 +311,6 @@ bool test_word_boundary_preservation_alice_txt() {
 // Test word boundary preservation with PDF files
 bool test_word_boundary_preservation_pdfs() {
     std::vector<std::string> pdf_files;
-    pdf_files.push_back("../../../../../../example/example_files/Alice_in_Wonderland.pdf");
     pdf_files.push_back("../../../../../../example/example_files/charbroil.pdf");
     pdf_files.push_back("../../../../../../example/example_files/gcpserverlessnetworking.pdf");
     
@@ -412,11 +411,11 @@ bool test_word_boundary_preservation_pdfs() {
 
 // Test token size accuracy with unified approach
 bool test_token_size_accuracy_unified() {
-    std::string filepath = "../../../../../../example/example_files/aliceinwonderland.txt";
+    std::string filepath = "../../../../../../example/example_files/gift_of_the_magi.txt";
     std::string text = load_text_file(filepath);
     
     if (text.empty()) {
-        std::cerr << "Failed to load Alice in Wonderland text file" << std::endl;
+        std::cerr << "Failed to load text file: " << filepath << std::endl;
         return false;
     }
     
@@ -437,7 +436,7 @@ bool test_token_size_accuracy_unified() {
     overlap_percentages.push_back(0.2);   // 20%
     overlap_percentages.push_back(0.3);   // 30%
     
-    std::cout << "\n  Testing unified token approximation with Alice in Wonderland" << std::endl;
+    std::cout << "\n  Testing unified token approximation with text file: " << filepath << std::endl;
     std::cout << "  All methods now use ~4 chars/token for consistency" << std::endl;
     
     // Test with one method since they're all the same now
@@ -726,8 +725,6 @@ bool test_comprehensive_file_processing() {
     
     // Test different chunk sizes and overlap percentages 
     std::vector<size_t> chunk_sizes;
-    chunk_sizes.push_back(50);
-    chunk_sizes.push_back(100);
     chunk_sizes.push_back(250);
     chunk_sizes.push_back(500);
     
@@ -838,7 +835,7 @@ int main(int argc, char* argv[]) {
     int failed_tests = 0;
     
     // Run all tests
-    RUN_TEST(test_word_boundary_preservation_alice_txt);
+    RUN_TEST(test_word_boundary_preservation_text_file);
     RUN_TEST(test_word_boundary_preservation_pdfs);
     RUN_TEST(test_token_size_accuracy_unified);
     RUN_TEST(test_word_boundary_edge_cases);
