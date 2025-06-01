@@ -1,5 +1,6 @@
 #include "leafra/leafra_chunker.h"
 #include "leafra/leafra_unicode.h"
+#include "leafra/leafra_debug.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -35,10 +36,14 @@ ResultCode LeafraChunker::initialize() {
 ResultCode LeafraChunker::chunk_text(const std::string& text,
                                     const ChunkingOptions& options,
                                     std::vector<TextChunk>& chunks) {
+    LEAFRA_DEBUG_LOG("CHUNKING", "Starting text chunking with " + std::to_string(text.length()) + " characters");
+    
     // Simple wrapper: Convert single text to single-page document
     std::vector<std::string> pages;
     pages.push_back(text);
-    return chunk_document(pages, options, chunks);
+    ResultCode result = chunk_document(pages, options, chunks);
+    
+    return result;
 }
 
 
@@ -49,17 +54,24 @@ ResultCode LeafraChunker::chunk_text(const std::string& text,
 ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
                                                  const ChunkingOptions& options,
                                                  std::vector<TextChunk>& chunks) {
+    LEAFRA_DEBUG_TIMER("chunk_document");
+    
     if (pages.empty()) {
+        LEAFRA_DEBUG_LOG("ERROR", "chunk_document called with empty pages");
         return ResultCode::ERROR_INVALID_PARAMETER;
     }
     
     if (options.chunk_size == 0) {
+        LEAFRA_DEBUG_LOG("ERROR", "chunk_document called with zero chunk size");
         return ResultCode::ERROR_INVALID_PARAMETER;
     }
     
     if (options.overlap_percentage < 0.0 || options.overlap_percentage >= 1.0) {
+        LEAFRA_DEBUG_LOG("ERROR", "chunk_document called with invalid overlap percentage: " + std::to_string(options.overlap_percentage));
         return ResultCode::ERROR_INVALID_PARAMETER;
     }
+    
+    auto start_time = debug::timer::now();
     
     try {
         chunks.clear();
@@ -70,6 +82,11 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
             total_length += page.length();
         }
         last_total_characters_ = total_length;
+        
+        LEAFRA_DEBUG_LOG("CHUNKING", "Processing document with " + std::to_string(pages.size()) + 
+                        " pages, " + std::to_string(total_length) + " total characters");
+        LEAFRA_DEBUG_LOG("OPTIONS", "Chunk size: " + std::to_string(options.chunk_size) + 
+                        ", Overlap: " + std::to_string(options.overlap_percentage * 100.0) + "%");
         
         // Store current default options and set new ones temporarily
         ChunkingOptions old_options = default_options_;
@@ -83,9 +100,12 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
             if (approx_tokens < 1) approx_tokens = 1;
             effective_options.chunk_size = approx_tokens;
             effective_options.size_unit = ChunkSizeUnit::TOKENS;
+            LEAFRA_DEBUG_LOG("CONVERSION", "Converted " + std::to_string(options.chunk_size) + 
+                           " characters to " + std::to_string(approx_tokens) + " tokens");
         }
         
         // Combine all pages into a single text with page separators
+        auto combine_start = debug::timer::now();
         std::string combined_text;
         std::vector<size_t> page_starts;
         page_starts.push_back(0);
@@ -98,17 +118,28 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
             }
         }
         
+        auto combine_end = debug::timer::now();
+        double combine_ms = debug::timer::elapsed_milliseconds(combine_start, combine_end);
+        LEAFRA_DEBUG_LOG("TIMING", "Text combination took " + std::to_string(combine_ms) + "ms");
+        
         // Use core chunking method
+        auto chunk_start = debug::timer::now();
         std::vector<TextChunk> temp_chunks;
         ResultCode result = actual_chunker(combined_text, effective_options, temp_chunks);
         
+        auto chunk_end = debug::timer::now();
+        double chunk_ms = debug::timer::elapsed_milliseconds(chunk_start, chunk_end);
+        LEAFRA_DEBUG_LOG("TIMING", "Core chunking took " + std::to_string(chunk_ms) + "ms");
+        
         if (result != ResultCode::SUCCESS) {
+            LEAFRA_DEBUG_LOG("ERROR", "actual_chunker failed with result code: " + std::to_string(static_cast<int>(result)));
             // Restore old options before returning
             default_options_ = old_options;
             return result;
         }
         
         // Update chunk metadata with correct page numbers
+        auto metadata_start = debug::timer::now();
         for (auto& chunk : temp_chunks) {
             size_t page_number = 0;
             for (size_t i = 0; i < page_starts.size(); ++i) {
@@ -121,6 +152,10 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
             chunk.page_number = page_number;
         }
         
+        auto metadata_end = debug::timer::now();
+        double metadata_ms = debug::timer::elapsed_milliseconds(metadata_start, metadata_end);
+        LEAFRA_DEBUG_LOG("TIMING", "Metadata update took " + std::to_string(metadata_ms) + "ms");
+        
         chunks = std::move(temp_chunks);
         
         // Restore old options
@@ -129,9 +164,26 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
         // Update statistics
         last_chunk_count_ = chunks.size();
         
+        // Log final performance metrics
+        if (debug::is_debug_enabled()) {
+            auto end_time = debug::timer::now();
+            double total_duration_ms = debug::timer::elapsed_milliseconds(start_time, end_time);
+            debug::debug_log_performance("chunk_document", total_length, chunks.size(), total_duration_ms);
+            
+            // Log individual chunk details
+            for (size_t i = 0; i < chunks.size() && i < 5; ++i) { // Log first 5 chunks only           
+                debug::debug_log_chunking_details("CREATED", i, chunks[i].start_index, chunks[i].end_index, 
+                                                 chunks[i].estimated_tokens, effective_options.chunk_size);
+            }
+            if (chunks.size() > 5) {
+                LEAFRA_DEBUG_LOG("CHUNKING", "... and " + std::to_string(chunks.size() - 5) + " more chunks");
+            }
+        }
+        
         return ResultCode::SUCCESS;
         
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        LEAFRA_DEBUG_LOG("ERROR", "Exception in chunk_document: " + std::string(e.what()));
         return ResultCode::ERROR_PROCESSING_FAILED;
     }
 }
@@ -151,6 +203,10 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
         size_t current_pos = 0;
         size_t target_tokens = options.chunk_size;
         
+        // PERFORMANCE OPTIMIZATION: Calculate Unicode length once at the beginning
+        // since the text doesn't change throughout the chunking process
+        size_t text_unicode_length = get_unicode_length(text);
+        
         while (current_pos < text.length()) {
             // Ensure we start at a word boundary
             if (options.preserve_word_boundaries && current_pos > 0) {
@@ -161,7 +217,7 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
             }
             
             // Find the best chunk end that respects word boundaries and target token count
-            size_t chunk_end = find_optimal_chunk_end(text, current_pos, target_tokens, options);
+            size_t chunk_end = find_optimal_chunk_end(text, current_pos, target_tokens, options, text_unicode_length);
             
             // Make sure chunk end is at a word boundary
             if (options.preserve_word_boundaries && chunk_end < text.length()) {
@@ -182,7 +238,7 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
             if (effective_content_tokens < 1) effective_content_tokens = 1;
             
             // Convert back to characters to find next start position
-            size_t advance_chars = estimate_characters_for_tokens(text, current_pos, effective_content_tokens, options.token_method);
+            size_t advance_chars = estimate_characters_for_tokens(text, current_pos, effective_content_tokens, options.token_method, text_unicode_length);
             current_pos += advance_chars;
             
             // If we've reached the end, break
@@ -377,7 +433,7 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
             chunk_content.clear();
         }
     }
-    
+    //LEAFRA_DEBUG_LOG("CHUNKING", "Creating chunk: " + chunk_content);
     return TextChunk(chunk_content, global_start, global_start + (end - start), page_number);
 }
 
@@ -396,9 +452,6 @@ size_t LeafraChunker::estimate_token_count(const std::string& text, TokenApproxi
 }
 
 
-
-
-
 // Helper methods for improved token-based chunking
 /**
  * Find where to end a chunk to match target token count
@@ -412,13 +465,13 @@ size_t LeafraChunker::estimate_token_count(const std::string& text, TokenApproxi
 size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
                                             size_t start_pos,
                                             size_t target_tokens,
-                                            const ChunkingOptions& options) const {
+                                            const ChunkingOptions& options,
+                                            size_t text_unicode_length) const {
     if (start_pos >= text.length()) {
         return text.length();
     }
     
     // Convert start byte position to character position for Unicode-aware processing
-    size_t text_unicode_length = get_unicode_length(text);  // Total UTF-8 characters in text
     size_t start_char_pos = 0;  // UTF-8 character position (not bytes)
     size_t byte_pos = 0;        // Byte position for conversion
     
@@ -503,7 +556,8 @@ size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
 size_t LeafraChunker::estimate_characters_for_tokens(const std::string& text,
                                                     size_t start_pos,
                                                     size_t target_tokens,
-                                                    TokenApproximationMethod method) const {
+                                                    TokenApproximationMethod method,
+                                                    size_t text_unicode_length) const {
     if (start_pos >= text.length() || target_tokens == 0) {
         return 0;
     }
@@ -523,7 +577,6 @@ size_t LeafraChunker::estimate_characters_for_tokens(const std::string& text,
     }
     
     // Use local token density if we have enough context
-    size_t text_unicode_length = get_unicode_length(text);
     size_t remaining_chars = text_unicode_length - start_char_pos;
     size_t sample_chars = std::min(static_cast<size_t>(100), remaining_chars); // Sample in characters, not bytes
     

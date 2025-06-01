@@ -1,4 +1,5 @@
 #include "../../../include/leafra/leafra_chunker.h"
+#include "../../../include/leafra/leafra_debug.h"
 #include <iostream>
 #include <cassert>
 #include <vector>
@@ -593,7 +594,36 @@ bool is_word_split(const std::vector<TextChunk>& chunks) {
     return false; // Placeholder return, actual implementation needed
 }
 
-int main() {
+// Helper function to setup debug based on command line arguments
+bool setup_debug_mode(int argc, char* argv[]) {
+    bool debug_enabled = true; // Default: debug enabled
+    
+    if (argc > 1) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg == "--no-debug" || arg == "--disable-debug") {
+                debug_enabled = false;
+            } else if (arg == "--debug" || arg == "-d") {
+                debug_enabled = true; // Explicitly enable (already default)
+            } else if (arg == "--help" || arg == "-h") {
+                std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
+                std::cout << "Options:" << std::endl;
+                std::cout << "  --debug, -d          Enable debug output (default)" << std::endl;
+                std::cout << "  --no-debug           Disable debug output" << std::endl;
+                std::cout << "  --help, -h           Show this help message" << std::endl;
+                exit(0);
+            }
+        }
+    }
+    
+    debug::set_debug_enabled(debug_enabled);
+    return debug_enabled;
+}
+
+int main(int argc, char* argv[]) {
+    // Setup debug mode based on command line arguments
+    bool debug_enabled = setup_debug_mode(argc, argv);
+    
     std::cout << "=== LeafraChunker Unit Tests ===" << std::endl;
     std::cout << "Platform: ";
 #ifdef _WIN32
@@ -612,6 +642,7 @@ int main() {
     std::cout << "Unknown";
 #endif
     std::cout << std::endl << std::endl;
+    std::cout << "Debug mode: " << (debug_enabled ? "ENABLED" : "DISABLED") << std::endl;
     
     int total_tests = 0;
     int passed_tests = 0;

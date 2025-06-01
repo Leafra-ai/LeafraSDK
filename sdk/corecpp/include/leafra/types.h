@@ -58,11 +58,11 @@ enum class ResultCode : int32_t {
  */
 struct LEAFRA_API ChunkingConfig {
     bool enabled = true;                    // Whether to enable chunking during file processing
-    size_t chunk_size = 500;               // Size of each chunk (in tokens by default)
+    size_t chunk_size = 500;               // Size of each chunk (UTF-8 characters or tokens, depending on size_unit)
     double overlap_percentage = 0.15;       // Overlap percentage (0.0 to 1.0)
     bool preserve_word_boundaries = true;   // Whether to avoid breaking words
     bool include_metadata = true;           // Whether to include chunk metadata
-    ChunkSizeUnit size_unit;                // Unit for chunk_size (CHARACTERS or TOKENS)
+    ChunkSizeUnit size_unit;                // Unit for chunk_size (CHARACTERS = UTF-8 chars, TOKENS = approximate)
     TokenApproximationMethod token_method;  // Token approximation method
     
     // Debug/Development options for chunk content printing

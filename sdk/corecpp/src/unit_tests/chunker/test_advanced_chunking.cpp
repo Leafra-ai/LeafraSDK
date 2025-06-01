@@ -1,5 +1,7 @@
 #include "../../../include/leafra/leafra_chunker.h"
 #include "../../../include/leafra/leafra_parsing.h"
+#include "../../../include/leafra/leafra_debug.h"
+#include "../../../src/leafra/leafra_unicode.h"
 #include <iostream>
 #include <cassert>
 #include <vector>
@@ -52,22 +54,70 @@ using namespace leafra;
         total_tests++; \
     } while(0)
 
+// Helper function to setup debug based on command line arguments
+bool setup_debug_mode(int argc, char* argv[]) {
+    bool debug_enabled = true; // Default: debug enabled
+    
+    if (argc > 1) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg == "--no-debug" || arg == "--disable-debug") {
+                debug_enabled = false;
+            } else if (arg == "--debug" || arg == "-d") {
+                debug_enabled = true; // Explicitly enable (already default)
+            } else if (arg == "--help" || arg == "-h") {
+                std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
+                std::cout << "Options:" << std::endl;
+                std::cout << "  --debug, -d          Enable debug output (default)" << std::endl;
+                std::cout << "  --no-debug           Disable debug output" << std::endl;
+                std::cout << "  --help, -h           Show this help message" << std::endl;
+                exit(0);
+            }
+        }
+    }
+    
+    debug::set_debug_enabled(debug_enabled);
+    return debug_enabled;
+}
+
 // Helper function to check if a word is split at a specific position in the original text
 bool is_word_split_at_position(const std::string& original_text, size_t position) {
     if (position >= original_text.length()) return false;
     
-    // Simple approach: A word is split if we have non-space characters on both sides
+    // Much more efficient approach: only check characters immediately around the boundary
     bool has_non_space_before = false;
     bool has_non_space_after = false;
     
-    // Look at character before the split position
+    // Look at character before the split position (if any)
     if (position > 0) {
-        has_non_space_before = !std::isspace(original_text[position - 1]);
+        // Find the start of the character that contains or precedes this position
+        size_t check_pos = position - 1;
+        // Walk backwards to find a valid UTF-8 character start
+        while (check_pos > 0 && (original_text[check_pos] & 0xC0) == 0x80) {
+            check_pos--;
+        }
+        
+        size_t next_pos;
+        UChar32 prev_char = get_unicode_char_at(original_text, check_pos, next_pos);
+        if (prev_char != U_SENTINEL) {
+            has_non_space_before = !is_unicode_whitespace(prev_char);
+        }
     }
     
-    // Look at character at the split position
+    // Look at character at the split position  
     if (position < original_text.length()) {
-        has_non_space_after = !std::isspace(original_text[position]);
+        // Find the start of the character at this position
+        size_t check_pos = position;
+        // Walk backwards to find a valid UTF-8 character start if we're in the middle of a character
+        while (check_pos > 0 && (original_text[check_pos] & 0xC0) == 0x80) {
+            check_pos--;
+        }
+        
+        size_t next_pos;
+        UChar32 char_at_pos = get_unicode_char_at(original_text, check_pos, next_pos);
+        if (char_at_pos != U_SENTINEL) {
+            has_non_space_after = !is_unicode_whitespace(char_at_pos);
+        }
     }
     
     // A word is split if we have non-space characters on both sides of the boundary
@@ -96,14 +146,15 @@ bool check_word_boundary_preservation_robust(const std::vector<TextChunk>& chunk
                 std::cerr << "Word split detected between chunks " << (i + 1) << " and " << (i + 2) 
                           << " at position " << boundary_pos;
                 
-                // Show context around the split
-                size_t context_start = (boundary_pos >= 10) ? boundary_pos - 10 : 0;
-                size_t context_end = std::min(boundary_pos + 10, original_text.length());
-                std::string context = original_text.substr(context_start, context_end - context_start);
+                // Show context around the split - use simpler approach for efficiency
+                size_t context_start = (boundary_pos >= 20) ? boundary_pos - 20 : 0;
+                size_t context_end = std::min(boundary_pos + 20, original_text.length());
+                size_t context_len = context_end - context_start;
                 
-                // Replace the split position with a marker
-                if (boundary_pos >= context_start && boundary_pos - context_start < context.length()) {
-                    context.insert(boundary_pos - context_start, "|");
+                std::string context = original_text.substr(context_start, context_len);
+                size_t marker_pos = boundary_pos - context_start;
+                if (marker_pos <= context.length()) {
+                    context.insert(marker_pos, "|");
                 }
                 
                 std::cerr << " - Context: \"" << context << "\"" << std::endl;
@@ -493,7 +544,7 @@ bool test_word_boundary_edge_cases() {
                                  "optimal enzymatic activity in physiological conditions.";
     
     // Store all test texts with descriptions
-    std::vector<std::pair<std::string, std::string>> test_texts;
+    std::vector<std::pair<std::string, std::string> > test_texts;
     test_texts.push_back(std::make_pair(punctuation_text, "punctuation"));
     test_texts.push_back(std::make_pair(contractions_text, "contractions"));
     test_texts.push_back(std::make_pair(numbers_text, "numbers and special chars"));
@@ -591,8 +642,18 @@ bool test_overlap_with_word_boundaries() {
     if (chunks.size() > 1) {
         bool has_meaningful_overlap = false;
         for (size_t i = 0; i < chunks.size() - 1; ++i) {
-            std::string chunk1_end = chunks[i].content.substr(std::max(0, static_cast<int>(chunks[i].content.length()) - 50));
-            std::string chunk2_start = chunks[i + 1].content.substr(0, std::min(50UL, chunks[i + 1].content.length()));
+            // Use UTF-8 aware character counting and substring extraction
+            size_t chunk1_chars = get_unicode_length(chunks[i].content);
+            size_t chunk2_chars = get_unicode_length(chunks[i + 1].content);
+            
+            // Extract last 50 characters (not bytes) from first chunk
+            size_t chunk1_extract_chars = std::min(50UL, chunk1_chars);
+            size_t chunk1_start_char = (chunk1_chars >= chunk1_extract_chars) ? chunk1_chars - chunk1_extract_chars : 0;
+            std::string chunk1_end = get_utf8_substring(chunks[i].content, chunk1_start_char, chunk1_extract_chars);
+            
+            // Extract first 50 characters (not bytes) from second chunk  
+            size_t chunk2_extract_chars = std::min(50UL, chunk2_chars);
+            std::string chunk2_start = get_utf8_substring(chunks[i + 1].content, 0, chunk2_extract_chars);
             
             // Look for common words between consecutive chunks
             std::istringstream iss1(chunk1_end);
@@ -760,10 +821,17 @@ bool test_comprehensive_file_processing() {
     }
 }
 
-int main() {
-    std::cout << "Advanced Chunking Tests" << std::endl;
-    std::cout << "======================" << std::endl;
-    std::cout << "Testing word boundary preservation and token size accuracy..." << std::endl;
+int main(int argc, char* argv[]) {
+    std::cout << "=== Advanced Chunking Test ===" << std::endl;
+    
+    // Setup debug mode based on command line arguments  
+    bool debug_enabled = setup_debug_mode(argc, argv);
+    
+    if (debug_enabled) {
+        std::cout << "Debug mode enabled - detailed timing and logging will be shown" << std::endl;
+    } else {
+        std::cout << "Debug mode disabled - running silently" << std::endl;
+    }
     
     int total_tests = 0;
     int passed_tests = 0;

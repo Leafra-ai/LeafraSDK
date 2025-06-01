@@ -6,6 +6,7 @@
 #ifdef LEAFRA_HAS_ICU
 #include <unicode/uchar.h>
 #include <unicode/utypes.h>
+#include <unicode/utf8.h>
 
 // macOS ICU Core has limited headers
 #ifndef U_ICU_VERSION_MAJOR_NUM
@@ -29,8 +30,33 @@ namespace leafra {
  * @param byte_pos Byte position in the string
  * @param next_byte_pos Output: byte position of the next character
  * @return Unicode code point, or U_SENTINEL if invalid
+ * 
  */
 UChar32 get_unicode_char_at(const std::string& text, size_t byte_pos, size_t& next_byte_pos);
+
+/**
+ * Safely get the Unicode code point at a given byte position in a UTF-8 string
+ * This version uses cached values for performance with memory trade-off - note that cached values are only valid for the same text string
+ * and are invalidated when the text string changes.
+ * @param text UTF-8 encoded string
+ * @param byte_pos Byte position in the string
+ * @param next_byte_pos Output: byte position of the next character
+ * @return Unicode code point, or U_SENTINEL if invalid
+ * 
+ */
+UChar32 get_unicode_char_at_cached(const std::string& text, size_t byte_pos, size_t& next_byte_pos);
+UChar32 get_unicode_char_at_cached_chunk(const std::string& text, size_t byte_pos, size_t& next_byte_pos);
+
+
+
+inline bool is_word_char_optimized(UChar32 c) {
+#ifdef LEAFRA_HAS_ICU
+    return (c < 128) ? std::isalnum(static_cast<char>(c)) || c == '_' : u_isalnum(c);
+#else
+    // Fallback for when ICU is not available - treat as ASCII
+    return std::isalnum(static_cast<int>(c)) || c == '_';
+#endif
+}
 
 /**
  * Find the byte position of the Nth Unicode character

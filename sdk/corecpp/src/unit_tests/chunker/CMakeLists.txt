@@ -104,6 +104,7 @@ set(COMMON_SOURCES
     ../../../src/leafra_parsing_adapter_docx.cpp
     ../../../src/leafra_parsing_adapter_excel.cpp
     ../../../src/logger.cpp
+    ../../../src/leafra_debug.cpp
 )
 
 # Add individual test executables
@@ -129,6 +130,11 @@ add_executable(test_advanced_chunking
 
 add_executable(test_utf8_chunking 
     test_utf8_chunking.cpp
+    ${COMMON_SOURCES}
+)
+
+add_executable(test_debug_functionality 
+    test_debug_functionality.cpp
     ${COMMON_SOURCES}
 )
 
@@ -170,6 +176,7 @@ if(APPLE)
     target_link_libraries(test_unified_api ${APPLE_LINK_LIBRARIES})
     target_link_libraries(test_advanced_chunking ${APPLE_LINK_LIBRARIES})
     target_link_libraries(test_utf8_chunking ${APPLE_LINK_LIBRARIES})
+    target_link_libraries(test_debug_functionality ${APPLE_LINK_LIBRARIES})
     
     # Add compile definitions for feature flags
     if(PDFIUM_FOUND)
@@ -178,6 +185,7 @@ if(APPLE)
         target_compile_definitions(test_unified_api PRIVATE LEAFRA_HAS_PDFIUM=1)
         target_compile_definitions(test_advanced_chunking PRIVATE LEAFRA_HAS_PDFIUM=1)
         target_compile_definitions(test_utf8_chunking PRIVATE LEAFRA_HAS_PDFIUM=1)
+        target_compile_definitions(test_debug_functionality PRIVATE LEAFRA_HAS_PDFIUM=1)
     endif()
     
     if(SQLITE_FOUND)
@@ -186,6 +194,7 @@ if(APPLE)
         target_compile_definitions(test_unified_api PRIVATE LEAFRA_HAS_SQLITE=1 LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1)
         target_compile_definitions(test_advanced_chunking PRIVATE LEAFRA_HAS_SQLITE=1 LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1)
         target_compile_definitions(test_utf8_chunking PRIVATE LEAFRA_HAS_SQLITE=1 LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1)
+        target_compile_definitions(test_debug_functionality PRIVATE LEAFRA_HAS_SQLITE=1 LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1)
     endif()
     
     if(SENTENCEPIECE_FOUND)
@@ -194,6 +203,7 @@ if(APPLE)
         target_compile_definitions(test_unified_api PRIVATE LEAFRA_HAS_SENTENCEPIECE=1)
         target_compile_definitions(test_advanced_chunking PRIVATE LEAFRA_HAS_SENTENCEPIECE=1)
         target_compile_definitions(test_utf8_chunking PRIVATE LEAFRA_HAS_SENTENCEPIECE=1)
+        target_compile_definitions(test_debug_functionality PRIVATE LEAFRA_HAS_SENTENCEPIECE=1)
     endif()
     
     if(ICU_FOUND)
@@ -202,6 +212,7 @@ if(APPLE)
         target_compile_definitions(test_unified_api PRIVATE LEAFRA_HAS_ICU=1)
         target_compile_definitions(test_advanced_chunking PRIVATE LEAFRA_HAS_ICU=1)
         target_compile_definitions(test_utf8_chunking PRIVATE LEAFRA_HAS_ICU=1)
+        target_compile_definitions(test_debug_functionality PRIVATE LEAFRA_HAS_ICU=1)
     endif()
 endif()
 
@@ -212,7 +223,8 @@ add_custom_target(run_chunker_tests
     COMMAND test_unified_api
     COMMAND test_advanced_chunking
     COMMAND test_utf8_chunking
-    DEPENDS test_leafra_chunker test_token_chunking test_unified_api test_advanced_chunking test_utf8_chunking
+    COMMAND test_debug_functionality
+    DEPENDS test_leafra_chunker test_token_chunking test_unified_api test_advanced_chunking test_utf8_chunking test_debug_functionality
     COMMENT "Running all chunker tests"
 )
 
@@ -268,6 +280,6 @@ add_custom_target(run_unified_demo
 )
 
 # Install target (optional)
-install(TARGETS test_leafra_chunker test_token_chunking test_unified_api test_advanced_chunking test_utf8_chunking
+install(TARGETS test_leafra_chunker test_token_chunking test_unified_api test_advanced_chunking test_utf8_chunking test_debug_functionality
     RUNTIME DESTINATION bin/tests
 ) 

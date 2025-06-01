@@ -38,7 +38,7 @@ class LeafraChunker;
  * @brief Enum for chunk size units
  */
 enum class ChunkSizeUnit : int32_t {
-    CHARACTERS = 0,  // Default: chunk size in characters
+    CHARACTERS = 0,  // Chunk size in UTF-8 characters (Unicode code points, not bytes)
     TOKENS = 1       // Chunk size in tokens (approximate)
 };
 
@@ -69,11 +69,11 @@ struct TextChunk {
  * @brief Chunking options structure
  */
 struct ChunkingOptions {
-    size_t chunk_size = 500;          // Size of each chunk (characters or tokens)
+    size_t chunk_size = 500;          // Size of each chunk (UTF-8 characters or tokens depending on size_unit)
     double overlap_percentage = 0.1;    // Overlap percentage (0.0 to 1.0)
     bool preserve_word_boundaries = true; // Whether to avoid breaking words
     bool include_metadata = true;       // Whether to include chunk metadata
-    ChunkSizeUnit size_unit = ChunkSizeUnit::TOKENS;  // Unit for chunk_size
+    ChunkSizeUnit size_unit = ChunkSizeUnit::TOKENS;  // Unit for chunk_size (CHARACTERS = UTF-8 chars, TOKENS = approximate)
     TokenApproximationMethod token_method = TokenApproximationMethod::SIMPLE;  // Token approximation method
     
     ChunkingOptions() = default;
@@ -231,12 +231,14 @@ private:
      * @param start_pos Starting position
      * @param target_tokens Target number of tokens
      * @param options Chunking options
+     * @param text_unicode_length Pre-calculated Unicode length of the text
      * @return Optimal end position
      */
     size_t find_optimal_chunk_end(const std::string& text,
                                  size_t start_pos,
                                  size_t target_tokens,
-                                 const ChunkingOptions& options) const;
+                                 const ChunkingOptions& options,
+                                 size_t text_unicode_length) const;
     
     /**
      * @brief Estimate character count needed for target tokens
@@ -244,12 +246,14 @@ private:
      * @param start_pos Starting position
      * @param target_tokens Target number of tokens
      * @param method Token approximation method
+     * @param text_unicode_length Pre-calculated Unicode length of the text
      * @return Estimated character count
      */
     size_t estimate_characters_for_tokens(const std::string& text,
                                          size_t start_pos,
                                          size_t target_tokens,
-                                         TokenApproximationMethod method) const;
+                                         TokenApproximationMethod method,
+                                         size_t text_unicode_length) const;
     
     /**
      * @brief Find the start of the next word from given position
