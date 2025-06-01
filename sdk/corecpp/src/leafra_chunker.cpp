@@ -206,7 +206,7 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
         
         // PERFORMANCE OPTIMIZATION: Calculate Unicode length once at the beginning
         // since the text doesn't change throughout the chunking process
-        size_t text_unicode_length = get_unicode_length(text);
+        size_t text_unicode_length = documentCacher.get_unicode_length_cached();
         
         while (current_pos < text.length()) {
             // Ensure we start at a word boundary
@@ -305,7 +305,7 @@ size_t LeafraChunker::find_word_boundary(const std::string& text,
     
     // Check if we're already at a word boundary using Unicode-aware detection
     size_t next_pos;
-    UChar32 c = get_unicode_char_at(text, target_position, next_pos);
+    UChar32 c = documentCacher.get_unicode_char_at_cached(target_position, next_pos);
     if (c != U_SENTINEL && is_unicode_whitespace(c)) {
         return target_position;
     }
@@ -322,18 +322,18 @@ size_t LeafraChunker::find_word_boundary(const std::string& text,
         
         while (temp_pos < byte_pos && temp_pos < text.length()) {
             prev_pos = temp_pos;
-            UChar32 temp_c = get_unicode_char_at(text, temp_pos, temp_pos);
+            UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp_pos, temp_pos);
             if (temp_c == U_SENTINEL || temp_pos >= byte_pos) break;
         }
         
         if (prev_pos == 0) break;
         
-        UChar32 prev_c = get_unicode_char_at(text, prev_pos, next_pos);
+        UChar32 prev_c = documentCacher.get_unicode_char_at_cached(prev_pos, next_pos);
         if (prev_c != U_SENTINEL && is_unicode_whitespace(prev_c)) {
             // Found whitespace - find the start of the next word
             size_t word_start = next_pos;
             while (word_start < text.length()) {
-                UChar32 word_c = get_unicode_char_at(text, word_start, next_pos);
+                UChar32 word_c = documentCacher.get_unicode_char_at_cached(word_start, next_pos);
                 if (word_c == U_SENTINEL || !is_unicode_whitespace(word_c)) {
                     break;
                 }
@@ -350,7 +350,7 @@ size_t LeafraChunker::find_word_boundary(const std::string& text,
     byte_pos = target_position;
     
     while (byte_pos < search_end) {
-        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        UChar32 c = documentCacher.get_unicode_char_at_cached(byte_pos, next_pos);
         if (c == U_SENTINEL) {
             byte_pos = next_pos;
             continue;
@@ -365,13 +365,13 @@ size_t LeafraChunker::find_word_boundary(const std::string& text,
     }
     
     // If limited search failed, use the Unicode word boundary function with backward search
-    size_t word_boundary = find_word_boundary_helper_for_unicode(text, target_position, false);
+    size_t word_boundary = documentCacher.find_word_boundary_helper_for_unicode_cached(target_position, false);
     if (word_boundary != target_position) {
         return word_boundary;
     }
     
     // Last resort: search forward without limit using Unicode word boundary
-    return find_word_boundary_helper_for_unicode(text, target_position, true);
+    return documentCacher.find_word_boundary_helper_for_unicode_cached(target_position, true);
 }
 
 /**
@@ -394,9 +394,6 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
     
     std::string chunk_content = text.substr(start, end - start);
     
-    //AD TODO: we shouldn't need to use a separate cacher for this - there's a single document cacher!!
-    //TEMPORARY FIX 
-    chunkCacher.reinitialize(chunk_content);
 
     // Trim leading and trailing whitespace if preserve_word_boundaries is enabled
     if (default_options_.preserve_word_boundaries) {
@@ -404,7 +401,7 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
         size_t content_start_byte = 0;
         while (content_start_byte < chunk_content.length()) {
             size_t next_pos;
-            UChar32 c = chunkCacher.get_unicode_char_at_cached(content_start_byte, next_pos);
+            UChar32 c = documentCacher.get_unicode_char_at_cached(global_start + content_start_byte, next_pos);
             if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
                 break;
             }
@@ -420,11 +417,11 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
             
             while (temp_pos < content_end_byte) {
                 last_char_start = temp_pos;
-                UChar32 temp_c = chunkCacher.get_unicode_char_at_cached(temp_pos, temp_pos);
+                UChar32 temp_c = documentCacher.get_unicode_char_at_cached(global_start + temp_pos, temp_pos);
                 if (temp_c == U_SENTINEL || temp_pos >= content_end_byte) break;
             }
             
-            UChar32 c = chunkCacher.get_unicode_char_at_cached(last_char_start, temp_pos);
+            UChar32 c = documentCacher.get_unicode_char_at_cached(global_start + last_char_start, temp_pos);
             if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
                 break;
             }
@@ -483,7 +480,7 @@ size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
     // Find character position corresponding to start_pos byte position
     while (byte_pos < start_pos && byte_pos < text.length()) {
         size_t next_pos;
-        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        UChar32 c = documentCacher.get_unicode_char_at_cached(byte_pos, next_pos);
         if (c != U_SENTINEL) {
             start_char_pos++;  // Count UTF-8 characters
         }
@@ -508,7 +505,7 @@ size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
         size_t chunk_char_count = current_end_char_pos - start_char_pos;  // Character count, not bytes
         if (chunk_char_count == 0) break;
         
-        std::string chunk_content = get_utf8_substring(text, start_char_pos, chunk_char_count);  // Use character positions
+        std::string chunk_content = documentCacher.get_utf8_substring_cached(start_char_pos, chunk_char_count);  // Use character positions
         size_t actual_tokens = estimate_token_count(chunk_content, options.token_method);
         
         // Check if we're close enough
@@ -538,13 +535,13 @@ size_t LeafraChunker::find_optimal_chunk_end(const std::string& text,
     }
     
     // Convert final character position back to byte position
-    size_t final_byte_pos = get_byte_pos_for_char_index(text, current_end_char_pos);
+    size_t final_byte_pos = documentCacher.get_byte_pos_for_char_index_cached(current_end_char_pos);
     
     // Safety limit check
     size_t max_chars = tokens_to_characters(target_tokens, options.token_method) * 2;
     if (current_end_char_pos - start_char_pos > max_chars) {
         size_t limited_end_char_pos = start_char_pos + max_chars;  // Character position
-        final_byte_pos = get_byte_pos_for_char_index(text, limited_end_char_pos);  // Convert to bytes
+        final_byte_pos = documentCacher.get_byte_pos_for_char_index_cached(limited_end_char_pos);  // Convert to bytes
     }
     
     return std::min(final_byte_pos, text.length());  // Return byte position

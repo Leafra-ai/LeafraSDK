@@ -35,7 +35,7 @@ private:
     std::string cached_text;
     std::vector<UChar32> codepoints_by_byte;  // maps byte_pos -> codepoint
     std::vector<size_t> next_byte_pos_by_byte; // maps byte_pos -> next_byte_pos
-
+    size_t cached_unicode_length;
     void initialize_cache(const std::string& text);
 
 public:
@@ -46,8 +46,26 @@ public:
     void reinitialize(const std::string& text);
 
     UChar32 get_unicode_char_at_cached(size_t byte_pos, size_t& next_byte_pos) const;
+    
+    // Additional cached Unicode utility functions
+    size_t get_byte_pos_for_char_index_cached(size_t char_index) const;
+    std::string get_utf8_substring_cached(size_t start_char_pos, size_t char_count) const;
+    size_t get_unicode_length_cached() const;
+    size_t find_word_boundary_helper_for_unicode_cached(size_t start_byte_pos, bool search_forward) const;
 };
 
+inline bool is_word_char_optimized(UChar32 c) {
+#ifdef LEAFRA_HAS_ICU
+    return (c < 128) ? std::isalnum(static_cast<char>(c)) || c == '_' : u_isalnum(c);
+#else
+    // Fallback for when ICU is not available - treat as ASCII
+    return std::isalnum(static_cast<int>(c)) || c == '_';
+#endif
+}
+
+
+//NONCACHED/SLOW C API FOR UNICODE HANDLING 
+//Use the unicode_cacher.cpp file for the cached version of these functions where possible!!
 /**
  * Safely get the Unicode code point at a given byte position in a UTF-8 string
  * @param text UTF-8 encoded string
@@ -58,16 +76,6 @@ public:
  */
 UChar32 get_unicode_char_at(const std::string& text, size_t byte_pos, size_t& next_byte_pos);
 
-
-
-inline bool is_word_char_optimized(UChar32 c) {
-#ifdef LEAFRA_HAS_ICU
-    return (c < 128) ? std::isalnum(static_cast<char>(c)) || c == '_' : u_isalnum(c);
-#else
-    // Fallback for when ICU is not available - treat as ASCII
-    return std::isalnum(static_cast<int>(c)) || c == '_';
-#endif
-}
 
 /**
  * Find the byte position of the Nth Unicode character

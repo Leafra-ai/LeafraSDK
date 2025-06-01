@@ -57,8 +57,8 @@ enum class TokenApproximationMethod : int32_t {
  */
 struct TextChunk {
     std::string content;
-    size_t start_index = 0;
-    size_t end_index = 0;
+    size_t start_index = 0; //relative to the start of the document
+    size_t end_index = 0; //relative to the start of the document
     size_t page_number = 0;
     size_t estimated_tokens = 0;  // Estimated token count for this chunk
     

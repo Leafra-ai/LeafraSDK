@@ -354,8 +354,8 @@ int main(int argc, char* argv[]) {
          test_utf8_overlap_behavior();
          std::cout << std::endl;
         
-        //  test_utf8_performance();
-        //  std::cout << std::endl;
+         test_utf8_performance();
+         std::cout << std::endl;
         
         std::cout << "✅ All comprehensive UTF-8 tests passed!" << std::endl;
         return 0;

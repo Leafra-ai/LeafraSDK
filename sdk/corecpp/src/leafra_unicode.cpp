@@ -19,7 +19,9 @@ namespace leafra {
 #include <unicode/utypes.h>
 #include <unicode/utf8.h>
 
-// UTF-8 Helper Functions with ICU support
+//NONCACHED/SLOW C API FOR UNICODE HANDLING 
+//Use the unicode_cacher.cpp file for the cached version of these functions where possible!!
+
 
 bool is_unicode_whitespace(UChar32 c) {
     if (c < 128) {
