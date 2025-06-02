@@ -63,6 +63,9 @@ struct TextChunk {
     size_t page_number = 0;
     size_t estimated_tokens = 0;  // Estimated token count for this chunk
     
+    // SentencePiece token IDs (empty if SentencePiece not used)
+    std::vector<int> token_ids;   // Actual token IDs from SentencePiece encoding
+    
     TextChunk() = default;
     TextChunk(std::string_view text, size_t start, size_t end, size_t page = 0)
         : content(text), start_index(start), end_index(end), page_number(page), estimated_tokens(0) {}
@@ -70,6 +73,11 @@ struct TextChunk {
     // Helper method to get content as string when needed
     std::string to_string() const {
         return std::string(content);
+    }
+    
+    // Helper method to check if chunk has actual token IDs
+    bool has_token_ids() const {
+        return !token_ids.empty();
     }
 };
 

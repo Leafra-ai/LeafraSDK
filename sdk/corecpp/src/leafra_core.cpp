@@ -5,6 +5,7 @@
 #include "leafra/logger.h"
 #include "leafra/leafra_parsing.h"
 #include "leafra/leafra_chunker.h"
+#include "leafra/leafra_sentencepiece.h"
 #include <iostream>
 #include <sstream>
 
@@ -39,12 +40,14 @@ public:
     std::unique_ptr<MathUtils> math_utils_;
     std::unique_ptr<FileParsingWrapper> file_parser_;
     std::unique_ptr<LeafraChunker> chunker_;
+    std::unique_ptr<SentencePieceTokenizer> tokenizer_;
     
     Impl() : initialized_(false), event_callback_(nullptr) {
         data_processor_ = std::make_unique<DataProcessor>();
         math_utils_ = std::make_unique<MathUtils>();
         file_parser_ = std::make_unique<FileParsingWrapper>();
         chunker_ = std::make_unique<LeafraChunker>();
+        tokenizer_ = std::make_unique<SentencePieceTokenizer>();
     }
     
     void send_event(const std::string& message) {
@@ -127,6 +130,26 @@ ResultCode LeafraCore::initialize(const Config& config) {
                           << (config.chunking.size_unit == ChunkSizeUnit::TOKENS ? " tokens" : " characters");
             LEAFRA_INFO() << "  - Overlap: " << (config.chunking.overlap_percentage * 100.0) << "%";
             LEAFRA_INFO() << "  - Token method: Simple";
+        }
+        
+        // Initialize SentencePiece tokenizer if enabled
+        if (pImpl->tokenizer_ && config.tokenizer.enable_sentencepiece) {
+            LEAFRA_INFO() << "Initializing SentencePiece tokenizer";
+            
+            if (!config.tokenizer.sentencepiece_model_path.empty()) {
+                bool loaded = pImpl->tokenizer_->load_model(config.tokenizer.sentencepiece_model_path);
+                if (loaded) {
+                    LEAFRA_INFO() << "✅ SentencePiece model loaded from: " << config.tokenizer.sentencepiece_model_path;
+                    LEAFRA_INFO() << "  - Vocabulary size: " << pImpl->tokenizer_->get_vocab_size();
+                    //here
+                } else {
+                    LEAFRA_WARNING() << "⚠️  Failed to load SentencePiece model from: " << config.tokenizer.sentencepiece_model_path;                    
+                }
+            } else {
+                LEAFRA_WARNING() << "⚠️  SentencePiece enabled but no model path specified";
+            }
+        } else if (config.tokenizer.enable_sentencepiece) {
+            LEAFRA_WARNING() << "⚠️  SentencePiece requested but tokenizer not available";
         }
         
         pImpl->initialized_ = true;
@@ -284,24 +307,68 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                         LEAFRA_INFO() << "✅ Successfully created " << chunks.size() << " chunks";
                         pImpl->send_event("🧩 Created " + std::to_string(chunks.size()) + " chunks");
                         
-                        // Log chunk statistics
+                        // Use SentencePiece for accurate token counting if available
+                        size_t total_actual_tokens = 0;
+                        bool using_sentencepiece = false;
+                        
+                        if (pImpl->config_.tokenizer.enable_sentencepiece && 
+                            pImpl->tokenizer_ && 
+                            pImpl->tokenizer_->is_loaded()) {
+                            
+                            using_sentencepiece = true;
+                            LEAFRA_DEBUG() << "Using SentencePiece for accurate token counting";
+                            
+                            // Get accurate token counts for each chunk
+                            for (auto& chunk : chunks) {
+                                std::string chunk_text = std::string(chunk.content);
+                                std::vector<int> token_ids = pImpl->tokenizer_->encode_as_ids(chunk_text, SentencePieceTokenizer::TokenizeOptions());
+                                
+                                // Store both the token count and the actual token IDs
+                                chunk.estimated_tokens = token_ids.size(); // Replace estimate with actual count
+                                chunk.token_ids = std::move(token_ids);    // Store the actual token IDs
+                                total_actual_tokens += chunk.estimated_tokens;
+                                
+                                // Debug log for first few chunks
+                                if (pImpl->config_.debug_mode && &chunk - &chunks[0] < 3) {
+                                    LEAFRA_DEBUG() << "Chunk " << (&chunk - &chunks[0] + 1) 
+                                                 << " - Characters: " << chunk_text.length() 
+                                                 << ", Actual tokens: " << chunk.estimated_tokens
+                                                 << ", Token IDs stored: " << chunk.token_ids.size()
+                                                 << ", Chars/token ratio: " << (chunk.estimated_tokens > 0 ? static_cast<double>(chunk_text.length()) / chunk.estimated_tokens : 0.0);
+                                }
+                            }
+                            
+                            LEAFRA_INFO() << "✅ SentencePiece tokenization completed";
+                            LEAFRA_INFO() << "  - Total actual tokens: " << total_actual_tokens;
+                            LEAFRA_INFO() << "  - Chunks with token IDs: " << chunks.size();
+                            LEAFRA_DEBUG() << "✅ Token IDs stored for all " << chunks.size() << " chunks";
+                            
+                        } else if (pImpl->config_.tokenizer.enable_sentencepiece) {
+                            LEAFRA_WARNING() << "SentencePiece requested but not available, using estimates";
+                        }
+                        
+                        // Calculate statistics (using actual tokens if available, estimates otherwise)
                         size_t total_chunk_chars = 0;
-                        size_t total_estimated_tokens = 0;
+                        size_t total_tokens = 0;
                         for (const auto& chunk : chunks) {
                             total_chunk_chars += chunk.content.length();
-                            total_estimated_tokens += chunk.estimated_tokens;
+                            total_tokens += chunk.estimated_tokens;
                         }
                         
                         LEAFRA_INFO() << "Chunk statistics:";
                         LEAFRA_INFO() << "  - Total chunks: " << chunks.size();
                         LEAFRA_INFO() << "  - Total characters in chunks: " << total_chunk_chars;
-                        LEAFRA_INFO() << "  - Estimated tokens: " << total_estimated_tokens;
+                        LEAFRA_INFO() << "  - " << (using_sentencepiece ? "Actual" : "Estimated") << " tokens: " << total_tokens;
                         LEAFRA_INFO() << "  - Avg chunk size: " << (chunks.size() > 0 ? total_chunk_chars / chunks.size() : 0) << " chars";
-                        LEAFRA_INFO() << "  - Avg tokens per chunk: " << (chunks.size() > 0 ? total_estimated_tokens / chunks.size() : 0);
+                        LEAFRA_INFO() << "  - Avg tokens per chunk: " << (chunks.size() > 0 ? total_tokens / chunks.size() : 0);
+                        if (using_sentencepiece && total_tokens > 0) {
+                            LEAFRA_INFO() << "  - Actual chars/token ratio: " << static_cast<double>(total_chunk_chars) / total_tokens;
+                        }
                         
+                        std::string token_type = using_sentencepiece ? "actual" : "estimated";
                         pImpl->send_event("📊 Chunks: " + std::to_string(chunks.size()) + 
                                         ", Avg size: " + std::to_string(chunks.size() > 0 ? total_chunk_chars / chunks.size() : 0) + " chars, " +
-                                        std::to_string(chunks.size() > 0 ? total_estimated_tokens / chunks.size() : 0) + " tokens");
+                                        std::to_string(chunks.size() > 0 ? total_tokens / chunks.size() : 0) + " " + token_type + " tokens");
                         
                         // Print detailed chunk content if requested (development/debug feature)
                         if (pImpl->config_.chunking.print_chunks_full || pImpl->config_.chunking.print_chunks_brief) {
@@ -319,9 +386,15 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                 LEAFRA_INFO() << "----------------------------------------";
                                 LEAFRA_INFO() << "Chunk " << (i + 1) << " of " << chunks.size() << ":";
                                 LEAFRA_INFO() << "  📐 Length: " << chunk.content.length() << " characters";
-                                LEAFRA_INFO() << "  🔤 Tokens: " << chunk.estimated_tokens << " (estimated)";
+                                LEAFRA_INFO() << "  🔤 Tokens: " << chunk.estimated_tokens << " (" << (using_sentencepiece ? "actual" : "estimated") << ")";
+                                if (chunk.has_token_ids()) {
+                                    LEAFRA_INFO() << "  🔢 Token IDs: " << chunk.token_ids.size() << " stored";
+                                }
                                 LEAFRA_INFO() << "  📄 Page: " << (chunk.page_number + 1);
                                 LEAFRA_INFO() << "  📍 Position: " << chunk.start_index << "-" << chunk.end_index;
+                                if (using_sentencepiece && chunk.estimated_tokens > 0) {
+                                    LEAFRA_INFO() << "  📊 Chars/token ratio: " << static_cast<double>(chunk.content.length()) / chunk.estimated_tokens;
+                                }
                                 LEAFRA_INFO() << "Content:";
                                 
                                 // Print content based on print mode
@@ -384,6 +457,10 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
         }
     }
     
+    
+
+
+
     // Summary
     LEAFRA_INFO() << "File processing completed - Processed: " << processed_count 
                   << ", Errors: " << error_count << ", Total: " << file_paths.size();
@@ -415,6 +492,25 @@ std::string LeafraCore::get_version() {
 
 std::string LeafraCore::get_platform() {
     return PlatformUtils::get_platform_name();
+}
+
+std::vector<ChunkTokenInfo> LeafraCore::extract_chunk_token_info(const std::vector<TextChunk>& chunks) {
+    std::vector<ChunkTokenInfo> token_info;
+    token_info.reserve(chunks.size());
+    
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        const auto& chunk = chunks[i];
+        token_info.emplace_back(
+            i,                              // chunk_index
+            chunk.content,                  // content (string_view)
+            chunk.token_ids,                // token_ids (copy the vector)
+            chunk.content.length(),         // character_count
+            chunk.estimated_tokens,         // token_count (actual token count when SentencePiece is used)
+            chunk.page_number               // page_number
+        );
+    }
+    
+    return token_info;
 }
 
 shared_ptr<LeafraCore> LeafraCore::create() {

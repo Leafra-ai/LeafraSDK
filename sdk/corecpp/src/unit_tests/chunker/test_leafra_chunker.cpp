@@ -620,6 +620,38 @@ bool setup_debug_mode(int argc, char* argv[]) {
     return debug_enabled;
 }
 
+bool test_chunk_token_ids_storage() {
+    // Test that TextChunk can store token IDs properly
+    
+    TextChunk chunk;
+    chunk.content = "This is a test chunk";
+    chunk.estimated_tokens = 5;
+    
+    // Simulate storing token IDs
+    std::vector<int> test_token_ids;
+    test_token_ids.push_back(123);
+    test_token_ids.push_back(456);
+    test_token_ids.push_back(789);
+    test_token_ids.push_back(101112);
+    test_token_ids.push_back(131415);
+    chunk.token_ids = test_token_ids;
+    
+    // Test that token IDs are stored correctly
+    TEST_ASSERT_EQUAL(test_token_ids.size(), chunk.token_ids.size(), "Token IDs size should match");
+    TEST_ASSERT(chunk.has_token_ids(), "Chunk should report having token IDs");
+    
+    // Test individual token IDs
+    for (size_t i = 0; i < test_token_ids.size(); ++i) {
+        TEST_ASSERT_EQUAL(test_token_ids[i], chunk.token_ids[i], "Individual token IDs should match");
+    }
+    
+    // Test empty token IDs
+    TextChunk empty_chunk;
+    TEST_ASSERT(!empty_chunk.has_token_ids(), "Empty chunk should not have token IDs");
+    
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     // Setup debug mode based on command line arguments
     bool debug_enabled = setup_debug_mode(argc, argv);
@@ -670,6 +702,7 @@ int main(int argc, char* argv[]) {
     RUN_TEST(test_token_multipage_chunking);
     RUN_TEST(test_token_chunking_error_handling);
     RUN_TEST(test_approximation_methods_comparison);
+    RUN_TEST(test_chunk_token_ids_storage);
     
     // Print results
     std::cout << std::endl << "=== Test Results ===" << std::endl;

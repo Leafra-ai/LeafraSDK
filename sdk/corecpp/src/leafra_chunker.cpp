@@ -11,15 +11,6 @@ namespace leafra {
 // Based on empirical analysis: ~4 characters per token works well across different content types
 constexpr double SIMPLE_CHARS_PER_TOKEN = 4.0;
 
-// Conservative estimate factor for initial chunk sizing to avoid overshooting
-constexpr double CONSERVATIVE_ESTIMATE_FACTOR = 0.8;
-
-// Token count tolerance thresholds for iterative chunk sizing
-constexpr double TOKEN_COUNT_TOLERANCE_MIN = 0.92;  // 92% of target
-constexpr double TOKEN_COUNT_TOLERANCE_MAX = 1.08;  // 108% of target
-
-// Conservative factor for chunk size adjustments during iteration
-constexpr double CONSERVATIVE_ADJUSTMENT_FACTOR = 0.7;
 
 LeafraChunker::LeafraChunker() = default;
 
@@ -237,6 +228,15 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
                 // Calculate actual token count
                 chunk.estimated_tokens = estimate_token_count(chunk.content, options.token_method);
                 chunks.push_back(chunk);
+                
+                // Calculate next position with proper overlap based on ACTUAL chunk size
+                size_t actual_chunk_tokens = chunk.estimated_tokens;
+                size_t effective_content_tokens = static_cast<size_t>(actual_chunk_tokens * (1.0 - options.overlap_percentage));
+                if (effective_content_tokens < 1) effective_content_tokens = 1;
+                
+                // Convert back to characters to find next start position
+                size_t advance_chars = static_cast<size_t>(std::round(effective_content_tokens * chars_per_token));
+                current_pos += advance_chars;
             } else if (chunks.empty() && current_pos < text.length()) {
                 // Special case: if we have no chunks yet and there's still text,
                 // create a chunk from current position to end of text to avoid empty result
@@ -247,14 +247,6 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
                 }
                 break; // Exit the loop since we've processed all remaining text
             }
-            
-            // Calculate next position with proper overlap
-            size_t effective_content_tokens = static_cast<size_t>(target_tokens * (1.0 - options.overlap_percentage));
-            if (effective_content_tokens < 1) effective_content_tokens = 1;
-            
-            // Convert back to characters to find next start position
-            size_t advance_chars = static_cast<size_t>(std::round(effective_content_tokens * chars_per_token));
-            current_pos += advance_chars;
             
             // If we've reached the end, break
             if (chunk_end >= text.length()) {

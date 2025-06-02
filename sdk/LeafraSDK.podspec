@@ -45,13 +45,13 @@ Pod::Spec.new do |s|
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'CLANG_CXX_LIBRARY' => 'libc++',
     'GCC_PREPROCESSOR_DEFINITIONS' => 'LEAFRA_EXPORTS=1 LEAFRA_HAS_PDFIUM=1 LEAFRA_HAS_SQLITE=1 LEAFRA_USE_SYSTEM_SQLITE_HEADERS=1 LEAFRA_HAS_SENTENCEPIECE=1 LEAFRA_HAS_ICU=1',
-    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include $(PODS_TARGET_SRCROOT)/corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/include',
+    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include $(PODS_TARGET_SRCROOT)/corecpp/src $(PODS_TARGET_SRCROOT)/corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/include',
     'OTHER_CPLUSPLUSFLAGS' => '-fvisibility=hidden -fvisibility-inlines-hidden'
   }
   
   # User target settings
   s.user_target_xcconfig = {
-    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include $(PODS_TARGET_SRCROOT)/corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/include'
+    'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/corecpp/include $(PODS_TARGET_SRCROOT)/corecpp/src $(PODS_TARGET_SRCROOT)/corecpp/third_party/prebuilt/pdfium/paulocoutinhox/ios/release/include'
   }
   
   # Framework settings
@@ -83,11 +83,11 @@ Pod::Spec.new do |s|
     touch corecpp/src/leafra_parsing_adapter_docx.cpp
     touch corecpp/src/leafra_parsing_adapter_excel.cpp
     touch corecpp/src/leafra_sqlite.cpp
+    touch corecpp/src/leafra_sentencepiece.cpp
     touch corecpp/src/leafra_chunker.cpp
     touch corecpp/src/leafra_unicode.cpp
-    
-    # Ensure Unicode module header exists
-    touch corecpp/include/leafra/leafra_unicode.h
+    touch corecpp/src/leafra_unicode_cacher.cpp
+    touch corecpp/src/leafra_debug.cpp
   CMD
   
   # Subspecs for modular inclusion

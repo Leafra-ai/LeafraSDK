@@ -19,6 +19,8 @@ set(LEAFRA_CORE_SOURCES
     src/leafra_sqlite.cpp
     src/leafra_sentencepiece.cpp
     src/leafra_chunker.cpp
+    src/leafra_unicode.cpp
+    src/leafra_unicode_cacher.cpp
     src/leafra_debug.cpp
 )
 

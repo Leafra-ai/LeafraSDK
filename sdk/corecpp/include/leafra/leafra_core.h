@@ -5,6 +5,11 @@
 
 namespace leafra {
 
+// Forward declarations
+class DataProcessor;
+struct TextChunk;
+struct ChunkTokenInfo;
+
 /**
  * @brief Main SDK interface class
  * 
@@ -80,6 +85,13 @@ public:
      * @return Platform string
      */
     static std::string get_platform();
+    
+    /**
+     * @brief Extract chunk token information from processed chunks
+     * @param chunks Vector of TextChunk objects with token IDs
+     * @return Vector of ChunkTokenInfo for easy access to chunk data and token IDs
+     */
+    static std::vector<ChunkTokenInfo> extract_chunk_token_info(const std::vector<TextChunk>& chunks);
     
     /**
      * @brief Create SDK instance

@@ -43,6 +43,37 @@ using byte_t = uint8_t;
 using data_buffer_t = std::vector<byte_t>;
 using callback_t = std::function<void(const std::string&)>;
 
+/**
+ * @brief Helper structure for accessing chunk token information
+ * 
+ * This structure provides easy access to chunk content and its associated 
+ * SentencePiece token IDs, making it simple to match chunks with their tokens.
+ */
+struct LEAFRA_API ChunkTokenInfo {
+    size_t chunk_index;                    // Index of the chunk in the original chunks vector
+    std::string_view content;              // Reference to the chunk content
+    std::vector<int> token_ids;            // SentencePiece token IDs for this chunk
+    size_t character_count;                // Number of characters in the chunk
+    size_t token_count;                    // Number of tokens (same as token_ids.size())
+    size_t page_number;                    // Page number this chunk originated from
+    
+    ChunkTokenInfo() = default;
+    ChunkTokenInfo(size_t idx, std::string_view text, const std::vector<int>& ids, 
+                   size_t chars, size_t tokens, size_t page)
+        : chunk_index(idx), content(text), token_ids(ids), 
+          character_count(chars), token_count(tokens), page_number(page) {}
+    
+    // Helper method to check if this chunk has valid token IDs
+    bool has_valid_tokens() const {
+        return !token_ids.empty() && token_count == token_ids.size();
+    }
+    
+    // Helper method to get chars per token ratio
+    double get_chars_per_token_ratio() const {
+        return token_count > 0 ? static_cast<double>(character_count) / token_count : 0.0;
+    }
+};
+
 // Result types
 enum class ResultCode : int32_t {
     SUCCESS = 0,
@@ -51,6 +82,27 @@ enum class ResultCode : int32_t {
     ERROR_PROCESSING_FAILED = -3,
     ERROR_NOT_IMPLEMENTED = -4,
     ERROR_OUT_OF_MEMORY = -5
+};
+
+/**
+ * @brief Tokenizer configuration for the SDK
+ */
+struct LEAFRA_API TokenizerConfig {
+    // SentencePiece tokenizer configuration
+    bool enable_sentencepiece = false;      // Whether to use SentencePiece for accurate token counting
+    std::string sentencepiece_model_path;   // Path to SentencePiece model file (.model)
+    
+    // Future tokenizer options can be added here
+    // bool enable_tiktoken = false;         // For OpenAI models
+    // bool enable_huggingface_tokenizer = false; // For HuggingFace models
+    // std::string tokenizer_type = "sentencepiece"; // Default tokenizer type
+    
+    // Default constructor
+    TokenizerConfig() = default;
+    
+    // Constructor with SentencePiece model path
+    TokenizerConfig(const std::string& model_path, bool enable = true) 
+        : enable_sentencepiece(enable), sentencepiece_model_path(model_path) {}
 };
 
 /**
@@ -85,6 +137,7 @@ struct LEAFRA_API Config {
     int32_t max_threads = 4;
     size_t buffer_size = 1024;
     ChunkingConfig chunking;               // Chunking configuration
+    TokenizerConfig tokenizer;             // Tokenization configuration
 };
 
 // Data structures

@@ -66,6 +66,16 @@ int main() {
         config.chunking.preserve_word_boundaries = true;
         config.chunking.include_metadata = true;
         
+        // Configure SentencePiece tokenization (optional - will fallback if model not found)
+        config.tokenizer.enable_sentencepiece = true;
+        config.tokenizer.sentencepiece_model_path = "tokenizer.model"; // Optional: specify if you have a model
+        
+        // NOTE: To test with actual SentencePiece models:
+        // 1. Download a .model file (e.g., from LLaMA, T5, or train your own)
+        // 2. Place it in the same directory as this executable
+        // 3. Update the path above to match your model filename
+        // 4. The system will automatically fall back to estimates if model not found
+        
         print_separator("SDK Configuration");
         std::cout << "Application: " << config.name << std::endl;
         std::cout << "Platform: Desktop (macOS/Linux/Windows)" << std::endl;
@@ -75,6 +85,10 @@ int main() {
         std::cout << "Overlap: " << (config.chunking.overlap_percentage * 100) << "%" << std::endl;
         std::cout << "Token Method: Simple approximation" << std::endl;
         std::cout << "Preserve Word Boundaries: " << (config.chunking.preserve_word_boundaries ? "Yes" : "No") << std::endl;
+        std::cout << "SentencePiece Enabled: " << (config.tokenizer.enable_sentencepiece ? "Yes" : "No") << std::endl;
+        if (config.tokenizer.enable_sentencepiece && !config.tokenizer.sentencepiece_model_path.empty()) {
+            std::cout << "SentencePiece Model: " << config.tokenizer.sentencepiece_model_path << std::endl;
+        }
         
         // Set up event callback to monitor SDK operations
         std::vector<std::string> events;
@@ -96,7 +110,7 @@ int main() {
         // Process the sample file (end-to-end testing)
         print_separator("End-to-End Document Processing");
         std::cout << "Processing file: " << sample_file << std::endl;
-        std::cout << "Testing: Parsing → Chunking → Processing pipeline" << std::endl;
+        std::cout << "Testing: Parsing → Chunking → Tokenizer --> Processing pipeline" << std::endl;
         
         std::vector<std::string> files = {sample_file};
         ResultCode process_result = sdk->process_user_files(files);
@@ -136,6 +150,38 @@ int main() {
         std::cout << "🔧 This tool makes SDK development faster and more reliable." << std::endl;
         std::cout << "📋 All SDK components tested: Parsing, Chunking, Events, Configuration" << std::endl;
         std::cout << "🖥️  Platform: Desktop environments (macOS/Linux/Windows)" << std::endl;
+        
+        // Demonstrate token ID access (if SentencePiece was used)
+        print_separator("Token ID Access Example");
+        std::cout << "📝 Example: How to access token IDs from chunks" << std::endl;
+        std::cout << std::endl;
+        std::cout << "// After processing files, you can access stored token IDs:" << std::endl;
+        std::cout << "std::vector<TextChunk> chunks = /* your chunks from chunking */;" << std::endl;
+        std::cout << std::endl;
+        std::cout << "for (size_t i = 0; i < chunks.size(); ++i) {" << std::endl;
+        std::cout << "    const auto& chunk = chunks[i];" << std::endl;
+        std::cout << "    if (chunk.has_token_ids()) {" << std::endl;
+        std::cout << "        // Access the actual SentencePiece token IDs" << std::endl;
+        std::cout << "        const std::vector<int>& token_ids = chunk.token_ids;" << std::endl;
+        std::cout << "        std::cout << \"Chunk \" << i << \" has \" << token_ids.size() << \" tokens\" << std::endl;" << std::endl;
+        std::cout << "        " << std::endl;
+        std::cout << "        // Example: Print first few token IDs" << std::endl;
+        std::cout << "        for (size_t j = 0; j < std::min(size_t(5), token_ids.size()); ++j) {" << std::endl;
+        std::cout << "            std::cout << token_ids[j] << \" \";" << std::endl;
+        std::cout << "        }" << std::endl;
+        std::cout << "        std::cout << std::endl;" << std::endl;
+        std::cout << "    }" << std::endl;
+        std::cout << "}" << std::endl;
+        std::cout << std::endl;
+        std::cout << "// Or use the helper function:" << std::endl;
+        std::cout << "auto token_info = LeafraCore::extract_chunk_token_info(chunks);" << std::endl;
+        std::cout << "for (const auto& info : token_info) {" << std::endl;
+        std::cout << "    if (info.has_valid_tokens()) {" << std::endl;
+        std::cout << "        // Easy access to chunk index, content, and token IDs" << std::endl;
+        std::cout << "        std::cout << \"Chunk \" << info.chunk_index << \" (page \" << info.page_number + 1 << \")\" << std::endl;" << std::endl;
+        std::cout << "        std::cout << \"  \" << info.token_count << \" tokens, chars/token: \" << info.get_chars_per_token_ratio() << std::endl;" << std::endl;
+        std::cout << "    }" << std::endl;
+        std::cout << "}" << std::endl;
         
     } catch (const std::exception& e) {
         std::cerr << "❌ Error: " << e.what() << std::endl;
