@@ -54,17 +54,98 @@ void print_usage(const char* program_name) {
 
 void create_sample_text_file(const std::string& filename) {
     std::ofstream file(filename);
-    file << "This is the first page of our sample document. ";
-    file << "It contains multiple sentences to demonstrate chunking. ";
-    file << "The chunking system will automatically split this content into smaller pieces. ";
-    file << "Each chunk will be token-aware and respect word boundaries. ";
-    file << "This makes it perfect for LLM processing and RAG systems. ";
-    file << "\n\nThis is the second paragraph on the same page. ";
-    file << "It adds more content to work with during the chunking process. ";
-    file << "The token estimation helps optimize chunk sizes for language models. ";
-    file << "You can configure chunk size, overlap percentage, and token approximation methods. ";
-    file << "The system supports character-based and token-based chunking modes.";
+    
+    // Check if file opened successfully
+    if (!file.is_open()) {
+        std::cerr << "❌ Error: Could not create sample file: " << filename << std::endl;
+        std::cerr << "   Check permissions and disk space" << std::endl;
+        return;
+    }
+    
+    std::cout << "📝 Creating sample text file: " << filename << std::endl;
+    
+    file << "🌍 International Document Chunking Test 📝\n\n";
+    
+    file << "This is a comprehensive UTF-8 document designed to test the chunking system's ";
+    file << "ability to handle diverse character encodings and international text. ";
+    file << "The SentencePiece tokenizer should properly process all these characters. ";
+    file << "Each chunk will be token-aware and respect Unicode word boundaries. 🔤\n\n";
+    
+    file << "📊 Languages & Scripts:\n";
+    file << "• English: Hello World! How are you today?\n";
+    file << "• French: Bonjour le monde! Comment allez-vous? Café, résumé, naïve, Noël\n";
+    file << "• German: Hallo Welt! Wie geht es Ihnen? Straße, München, Größe, Weiß\n";
+    file << "• Spanish: ¡Hola mundo! ¿Cómo está usted? Niño, señor, mañana, corazón\n";
+    file << "• Russian: Привет мир! Как дела? Москва, Россия, информация\n";
+    file << "• Japanese: こんにちは世界！元気ですか？東京、日本、情報\n";
+    file << "• Chinese: 你好世界！你好吗？北京，中国，信息\n";
+    file << "• Arabic: مرحبا بالعالم! كيف حالك؟ معلومات، تكنولوجيا\n\n";
+    
+    file << "🔣 Special Characters & Symbols:\n";
+    file << "Mathematical: ∑ ∏ ∫ √ ∞ ≈ ≠ ≤ ≥ ± × ÷ π α β γ δ λ μ σ φ ψ ω\n";
+    file << "Currency: $ € £ ¥ ₹ ₽ ₩ ₪ ¢ ₵ ₡ ₦ ₨ ₫ ₱ ₲\n";
+    file << "Arrows: ← → ↑ ↓ ↖ ↗ ↘ ↙ ⇐ ⇒ ⇑ ⇓ ↔ ↕ ⇔ ⇕\n";
+    file << "Shapes: ▲ ▼ ◄ ► ◆ ◇ ■ □ ● ○ ★ ☆ ♠ ♣ ♥ ♦\n";
+    file << "Weather: ☀ ☁ ☂ ☃ ❄ ⛅ ⛈ 🌈 🌙 ⭐\n";
+    file << "Emojis: 😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗\n\n";
+    
+    file << "📝 Technical Content:\n";
+    file << "This document demonstrates how the LeafraSDK chunking system handles UTF-8 ";
+    file << "encoded text with various character sets. The token estimation should accurately ";
+    file << "count tokens across different languages and scripts. Character boundaries must ";
+    file << "be preserved properly, especially for multi-byte UTF-8 sequences.\n\n";
+    
+    file << "🔧 Configuration Details:\n";
+    file << "• Token-based chunking with SentencePiece integration ✅\n";
+    file << "• Word boundary preservation for international text 🌐\n";
+    file << "• Overlap percentage handling across language transitions 🔄\n";
+    file << "• Metadata extraction from multilingual documents 📋\n";
+    file << "• Character encoding validation and normalization 🔤\n\n";
+    
+    file << "🎯 Test Scenarios:\n";
+    file << "1. Mixed language paragraphs with transitions between scripts\n";
+    file << "2. Special character sequences that might affect tokenization\n";
+    file << "3. Emoji and symbol placement within sentences 📱\n";
+    file << "4. Mathematical expressions: E = mc² ∴ F = ma ∵ a² + b² = c²\n";
+    file << "5. Code snippets: function(π, α) { return √(x² + y²); } // UTF-8 vars\n";
+    file << "6. URLs with Unicode: https://测试.example.com/路径?参数=值\n";
+    file << "7. Email addresses: użytkownik@примеру.рф, тест@مثال.كوم\n\n";
+    
+    file << "📚 Extended Content for Chunking:\n";
+    file << "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor ";
+    file << "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis ";
+    file << "nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ";
+    file << "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore ";
+    file << "eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, ";
+    file << "sunt in culpa qui officia deserunt mollit anim id est laborum.\n\n";
+    
+    file << "Ñoño pequeño soñó con niños en España. El señor García visitó São Paulo ";
+    file << "para encontrar información sobre tecnología avanzada. Les résumés français ";
+    file << "contiennent des caractères accentués comme é, è, ê, ë, à, ù, ç. Deutsche ";
+    file << "Straßennamen enthalten oft Umlaute: München, Köln, Düsseldorf, Größe.\n\n";
+    
+    file << "🌐 Conclusion:\n";
+    file << "This UTF-8 test document validates that the LeafraSDK chunking system properly ";
+    file << "handles international character sets, maintains character encoding integrity, ";
+    file << "and produces accurate token counts across diverse linguistic content. The ";
+    file << "SentencePiece integration should seamlessly process all included characters ";
+    file << "while preserving semantic boundaries. Success! ✨🎉\n";
+    
     file.close();
+    
+    // Verify file was actually created and has content
+    std::ifstream verify_file(filename);
+    if (verify_file.is_open()) {
+        verify_file.seekg(0, std::ios::end);
+        std::streamsize size = verify_file.tellg();
+        verify_file.close();
+        
+        std::cout << "✅ Sample file created successfully: " << filename 
+                  << " (" << size << " bytes)" << std::endl;
+    } else {
+        std::cerr << "❌ Failed to create sample file: " << filename << std::endl;
+        std::cerr << "   File does not exist after creation attempt" << std::endl;
+    }
 }
 
 bool file_exists(const std::string& filename) {
@@ -162,6 +243,27 @@ int main(int argc, char* argv[]) {
         config.chunking.preserve_word_boundaries = true;
         config.chunking.include_metadata = true;
         
+        // Configure SentencePiece tokenization (optional - will fallback if model not found)
+        config.tokenizer.enable_sentencepiece = true;
+        config.tokenizer.model_name = "multilingual-e5-small"; // Model name corresponds to folder in models/
+        
+        // Resolve the model path from the model name
+        bool model_found = config.tokenizer.resolve_model_path();
+        if (model_found) {
+            std::cout << "📍 Found SentencePiece model: " << config.tokenizer.model_name << std::endl;
+            std::cout << "   Model file: " << config.tokenizer.sentencepiece_model_path << std::endl;
+            if (!config.tokenizer.sentencepiece_json_path.empty()) {
+                std::cout << "   Config file: " << config.tokenizer.sentencepiece_json_path << std::endl;
+            } else {
+                std::cout << "   Config file: not found (optional)" << std::endl;
+            }
+        } else {
+            std::cout << "⚠️  SentencePiece model '" << config.tokenizer.model_name << "' not found" << std::endl;
+            std::cout << "   Expected location: sdk/corecpp/third_party/models/embedding/" << config.tokenizer.model_name << "/sentencepiece.bpe.model" << std::endl;
+            std::cout << "   Expected config: sdk/corecpp/third_party/models/embedding/" << config.tokenizer.model_name << "/tokenizer_config.json" << std::endl;
+            std::cout << "   Using fallback: " << config.tokenizer.sentencepiece_model_path << std::endl;
+        }
+        
         // Set chunk printing options based on command line flags
         config.chunking.print_chunks_full = print_chunks_full;
         config.chunking.print_chunks_brief = print_chunks_brief;
@@ -178,6 +280,10 @@ int main(int argc, char* argv[]) {
         std::cout << "Overlap: " << (config.chunking.overlap_percentage * 100) << "%" << std::endl;
         std::cout << "Token Method: Simple approximation" << std::endl;
         std::cout << "Preserve Word Boundaries: " << (config.chunking.preserve_word_boundaries ? "Yes" : "No") << std::endl;
+        std::cout << "SentencePiece Enabled: " << (config.tokenizer.enable_sentencepiece ? "Yes" : "No") << std::endl;
+        if (config.tokenizer.enable_sentencepiece && !config.tokenizer.sentencepiece_model_path.empty()) {
+            std::cout << "SentencePiece Model: " << config.tokenizer.sentencepiece_model_path << std::endl;
+        }
         
         // Set up event callback to monitor SDK operations
         std::vector<std::string> events;

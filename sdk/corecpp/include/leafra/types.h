@@ -90,8 +90,9 @@ enum class ResultCode : int32_t {
 struct LEAFRA_API TokenizerConfig {
     // SentencePiece tokenizer configuration
     bool enable_sentencepiece = false;      // Whether to use SentencePiece for accurate token counting
-    std::string sentencepiece_model_path;   // Path to SentencePiece model file (.model)
-    
+    std::string model_name = "multilingual-e5-small";         // Model name (corresponds to folder in sdk/corecpp/third_party/models/)
+    std::string sentencepiece_model_path;       // Path to SentencePiece model file (.model) - can be set manually or resolved from model_name
+    std::string sentencepiece_json_path;        // Path to tokenizer config JSON file (tokenizer_config.json) - resolved from model_name
     // Future tokenizer options can be added here
     // bool enable_tiktoken = false;         // For OpenAI models
     // bool enable_huggingface_tokenizer = false; // For HuggingFace models
@@ -100,9 +101,19 @@ struct LEAFRA_API TokenizerConfig {
     // Default constructor
     TokenizerConfig() = default;
     
-    // Constructor with SentencePiece model path
-    TokenizerConfig(const std::string& model_path, bool enable = true) 
-        : enable_sentencepiece(enable), sentencepiece_model_path(model_path) {}
+    // Constructor with model name
+    TokenizerConfig(const std::string& model_name_param, bool enable = true) 
+        : enable_sentencepiece(enable), model_name(model_name_param) {}
+    
+    /**
+     * @brief Resolve the model path from the model name
+     * 
+     * This method looks for the model in prebuilt/models/{model_name}/ directory
+     * and sets the sentencepiece_model_path accordingly.
+     * 
+     * @return true if model path was resolved successfully, false otherwise
+     */
+    bool resolve_model_path();
 };
 
 /**

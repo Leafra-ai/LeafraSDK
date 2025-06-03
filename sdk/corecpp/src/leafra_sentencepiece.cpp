@@ -163,7 +163,7 @@ std::vector<std::string> SentencePieceTokenizer::encode(const std::string& text,
         std::reverse(pieces.begin(), pieces.end());
     }
     
-    LEAFRA_DEBUG() << "Encoded text '" << text << "' into " << pieces.size() << " pieces";
+    //LEAFRA_DEBUG() << "Encoded text '" << text << "' into " << pieces.size() << " pieces";
     return pieces;
 #else
     pImpl->set_error("SentencePiece not available");
@@ -205,7 +205,7 @@ std::vector<int> SentencePieceTokenizer::encode_as_ids(const std::string& text, 
         std::reverse(ids.begin(), ids.end());
     }
     
-    LEAFRA_DEBUG() << "Encoded text '" << text << "' into " << ids.size() << " token IDs";
+    //LEAFRA_DEBUG() << "Encoded text '" << text << "' into " << ids.size() << " token IDs";
     return ids;
 #else
     pImpl->set_error("SentencePiece not available");

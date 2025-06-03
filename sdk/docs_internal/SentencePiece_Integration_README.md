@@ -27,23 +27,79 @@ config.chunking.chunk_size = 500; // Target tokens per chunk
 config.chunking.overlap_percentage = 0.10; // Now accurately 10% token overlap
 config.chunking.size_unit = leafra::ChunkSizeUnit::TOKENS;
 
-// SentencePiece Configuration (separate from chunking)
+// SentencePiece Configuration (separate from chunking) - NEW: Model Name Approach
 config.tokenizer.enable_sentencepiece = true;
-config.tokenizer.sentencepiece_model_path = "/path/to/your/model.model";
+config.tokenizer.model_name = "llama2"; // Model name corresponds to folder in prebuilt/models/
+
+// Resolve the model path from the model name  
+bool model_found = config.tokenizer.resolve_model_path();
+if (!model_found) {
+    std::cout << "Warning: SentencePiece model not found, will use fallback" << std::endl;
+}
 ```
 
-### 2. SentencePiece Model Setup
+### 2. SentencePiece Model Setup - NEW: Simple Model Name Approach
 
-You need a SentencePiece model file (`.model`). You can:
+**The LeafraSDK now uses a simple model name approach for SentencePiece models!**
 
-- **Use an existing model**: Download from Hugging Face or other sources
-- **Train your own**: Use the included `SentencePieceTokenizer::train_model()` method
-- **Use a pretrained model**: Many LLMs provide their SentencePiece models
+#### How It Works
 
-Example model sources:
-- **LLaMA/Alpaca models**: Usually include `tokenizer.model`
-- **T5 models**: Available on Hugging Face
-- **Custom training**: Train on your specific domain data
+1. **Set the model name**: `config.tokenizer.model_name = "your_model_name"`
+2. **SDK finds the model**: Looks for `sdk/corecpp/third_party/models/{model_name}/sentencepiece.bpe.model`
+3. **Auto-resolves path**: Uses SDK path resolution to find the actual file location
+
+#### Directory Structure
+
+```
+LeafraSDK/  ← SDK Root
+├── sdk/
+│   └── corecpp/
+│       └── third_party/
+│           └── models/
+│               ├── llama2/
+│               │   ├── sentencepiece.bpe.model
+│               │   └── tokenizer_config.json
+│               ├── t5/
+│               │   ├── sentencepiece.bpe.model
+│               │   └── tokenizer_config.json
+│               └── default/
+│                   ├── sentencepiece.bpe.model
+│                   └── tokenizer_config.json
+└── your-app-executable
+```
+
+#### Available Models
+
+Set `config.tokenizer.model_name` to one of:
+- `"default"` - General purpose model
+- `"llama2"` - LLaMA 2 tokenizer
+- `"t5"` - T5 tokenizer  
+- `"custom"` - Your custom model
+- Any folder name you place in `prebuilt/models/`
+
+#### Usage Examples
+
+**Basic Usage:**
+```cpp
+config.tokenizer.enable_sentencepiece = true;
+config.tokenizer.model_name = "llama2";
+config.tokenizer.resolve_model_path();
+```
+
+**Custom Model:**
+```cpp
+config.tokenizer.enable_sentencepiece = true;
+config.tokenizer.model_name = "my_custom_model";
+if (!config.tokenizer.resolve_model_path()) {
+    std::cout << "Custom model not found, using fallback" << std::endl;
+}
+```
+
+**Manual Path (if needed):**
+```cpp
+// If you need specific control
+config.tokenizer.sentencepiece_model_path = "/custom/path/to/model.model";
+```
 
 ### 3. Integration Example
 
@@ -64,7 +120,8 @@ int main() {
     
     // Configure SentencePiece tokenization (separate configuration)
     config.tokenizer.enable_sentencepiece = true;
-    config.tokenizer.sentencepiece_model_path = "models/llama-tokenizer.model";
+    config.tokenizer.model_name = "llama2";
+    config.tokenizer.resolve_model_path();
     
     // Initialize SDK
     if (sdk->initialize(config) == leafra::ResultCode::SUCCESS) {
@@ -109,7 +166,9 @@ int main() {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enable_sentencepiece` | `bool` | `false` | Enable SentencePiece tokenization |
-| `sentencepiece_model_path` | `string` | `""` | Path to `.model` file |
+| `model_name` | `string` | `"default"` | Model name corresponding to folder in sdk/corecpp/third_party/models/ |
+| `sentencepiece_model_path` | `string` | `""` | Path to `.model` file - can be set manually or resolved from model_name |
+| `sentencepiece_json_path` | `string` | `""` | Path to `tokenizer_config.json` file - auto-resolved from model_name |
 
 ### ChunkingConfig (config.chunking)
 
@@ -176,7 +235,7 @@ If you see significantly different token counts, this is expected! The estimates
 ### From Character-based Chunking
 1. **Set your desired token count**: Use the same chunk size but now in actual tokens
 2. **Enable SentencePiece**: Configure `config.tokenizer.enable_sentencepiece = true`
-3. **Set model path**: Configure `config.tokenizer.sentencepiece_model_path = "/path/to/model.model"`
+3. **Set model name**: Configure `config.tokenizer.model_name = "your_model_name"`
 4. **Provide a model**: Download or train a SentencePiece model for your use case
 5. **Test and adjust**: Your chunk sizes may change since estimates were inaccurate
 

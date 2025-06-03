@@ -36,7 +36,7 @@ public:
         
         // Default constructor
         TokenizeOptions() : enable_sampling(false), alpha(0.1f), nbest_size(-1), 
-                           add_bos(false), add_eos(false), reverse(false) {}
+                           add_bos(true), add_eos(true), reverse(false) {}
     };
 
     /**

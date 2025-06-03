@@ -69,7 +69,7 @@ struct TextChunk {
     TextChunk() = default;
     TextChunk(std::string_view text, size_t start, size_t end, size_t page = 0)
         : content(text), start_index(start), end_index(end), page_number(page), estimated_tokens(0) {}
-        
+    
     // Helper method to get content as string when needed
     std::string to_string() const {
         return std::string(content);
@@ -293,6 +293,9 @@ private:
     ChunkingOptions default_options_;
     size_t last_chunk_count_ = 0;
     size_t last_total_characters_ = 0;
+    
+    // Combined document text storage for zero-copy string_view chunks
+    std::string combined_text_;
     
     // Unicode caching for performance optimization
     UnicodeCacher documentCacher;

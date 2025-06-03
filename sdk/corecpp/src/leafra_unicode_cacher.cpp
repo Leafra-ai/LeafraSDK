@@ -95,10 +95,11 @@ void UnicodeCacher::initialize_cache(const std::string& text) {
         if (c != U_SENTINEL) {
             unicode_length_cached++;
         }
-        byte_pos = next_pos;
-        // Safety check to prevent infinite loops
         if (next_pos <= byte_pos) {
+            // Defensive fallback: make sure we always advance at least 1 byte
             byte_pos++;
+        } else {
+            byte_pos = next_pos;
         }
     }    
 } //end of initialize_cache
@@ -284,8 +285,10 @@ size_t UnicodeCacher::find_word_boundary_helper_for_unicode_cached(size_t start_
             
             while (temp_pos < byte_pos && temp_pos < cached_text.length()) {
                 prev_pos = temp_pos;
-                UChar32 temp_c = get_unicode_char_at_cached(temp_pos, temp_pos);
+                size_t next_temp_pos;
+                UChar32 temp_c = get_unicode_char_at_cached(temp_pos, next_temp_pos);
                 if (temp_c == U_SENTINEL) break;
+                temp_pos = next_temp_pos;
             }
             
             UChar32 prev_c = get_unicode_char_at_cached(prev_pos, next_pos);

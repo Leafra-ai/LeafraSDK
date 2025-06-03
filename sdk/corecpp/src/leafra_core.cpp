@@ -399,8 +399,19 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                 
                                 // Print content based on print mode
                                 if (pImpl->config_.chunking.print_chunks_full) {
-                                    // Print full content
-                                    LEAFRA_INFO() << chunk.content;
+                                    // Print full content - convert string_view to string to prevent UTF-8 streaming issues
+                                    LEAFRA_INFO() << std::string(chunk.content);
+                                    
+                                    // Print full token IDs if available
+                                    if (chunk.has_token_ids() && !chunk.token_ids.empty()) {
+                                        LEAFRA_INFO() << "🔢 Token IDs (" << chunk.token_ids.size() << " tokens):";
+                                        std::ostringstream token_stream;
+                                        for (size_t k = 0; k < chunk.token_ids.size(); ++k) {
+                                            token_stream << chunk.token_ids[k];
+                                            if (k < chunk.token_ids.size() - 1) token_stream << " ";
+                                        }
+                                        LEAFRA_INFO() << token_stream.str();
+                                    }
                                 } else if (pImpl->config_.chunking.print_chunks_brief) {
                                     // Print first N lines
                                     std::istringstream stream(std::string(chunk.content));
@@ -417,6 +428,25 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                     if (std::getline(stream, line)) {
                                         LEAFRA_INFO() << "... (content truncated, " << max_lines << " lines shown)";
                                     }
+                                    
+                                    // Print brief token IDs if available
+                                    if (chunk.has_token_ids() && !chunk.token_ids.empty()) {
+                                        const size_t max_tokens_to_show = 20; // Show first 20 token IDs
+                                        LEAFRA_INFO() << "🔢 Token IDs (" << chunk.token_ids.size() << " tokens):";
+                                        std::ostringstream token_stream;
+                                        
+                                        size_t tokens_to_display = std::min(max_tokens_to_show, chunk.token_ids.size());
+                                        for (size_t k = 0; k < tokens_to_display; ++k) {
+                                            token_stream << chunk.token_ids[k];
+                                            if (k < tokens_to_display - 1) token_stream << " ";
+                                        }
+                                        
+                                        if (chunk.token_ids.size() > max_tokens_to_show) {
+                                            token_stream << " ... (showing first " << max_tokens_to_show << " of " << chunk.token_ids.size() << " tokens)";
+                                        }
+                                        
+                                        LEAFRA_INFO() << token_stream.str();
+                                    }
                                 }
                                 
                                 if (i < chunks.size() - 1) {
@@ -431,10 +461,16 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                         if (pImpl->config_.debug_mode && chunks.size() > 0) {
                             size_t chunks_to_log = std::min(size_t(3), chunks.size());
                             for (size_t i = 0; i < chunks_to_log; ++i) {
+                                std::string content_preview = std::string(chunks[i].content);
+                                if (content_preview.length() > 100) {
+                                    content_preview = content_preview.substr(0, 100) + "...";
+                                } else {
+                                    content_preview += "...";
+                                }
                                 LEAFRA_DEBUG() << "Chunk " << (i + 1) << " (page " << chunks[i].page_number + 1 
                                              << ", " << chunks[i].content.length() << " chars, " 
                                              << chunks[i].estimated_tokens << " tokens): "
-                                             << chunks[i].content.substr(0, 100) << "...";
+                                             << content_preview;
                             }
                         }
                         

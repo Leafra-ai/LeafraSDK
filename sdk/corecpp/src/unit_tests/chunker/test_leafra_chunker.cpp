@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <functional>
 
 using namespace leafra;
 
@@ -652,6 +653,151 @@ bool test_chunk_token_ids_storage() {
     return true;
 }
 
+// Test 22: Comprehensive UTF-8 International Text Chunking
+bool test_utf8_international_chunking() {
+    std::cout << "\n--- Testing UTF-8 International Content Chunking ---" << std::endl;
+    
+    LeafraChunker chunker;
+    TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, chunker.initialize(), "Chunker initialization failed");
+    
+    // Use the exact UTF-8 content from create_sample_text_file function
+    std::string utf8_text = 
+        "🌍 International Document Chunking Test 📝\n\n"
+        
+        "This is a comprehensive UTF-8 document designed to test the chunking system's "
+        "ability to handle diverse character encodings and international text. "
+        "The SentencePiece tokenizer should properly process all these characters. "
+        "Each chunk will be token-aware and respect Unicode word boundaries. 🔤\n\n"
+        
+        "📊 Languages & Scripts:\n"
+        "• English: Hello World! How are you today?\n"
+        "• French: Bonjour le monde! Comment allez-vous? Café, résumé, naïve, Noël\n"
+        "• German: Hallo Welt! Wie geht es Ihnen? Straße, München, Größe, Weiß\n"
+        "• Spanish: ¡Hola mundo! ¿Cómo está usted? Niño, señor, mañana, corazón\n"
+        "• Russian: Привет мир! Как дела? Москва, Россия, информация\n"
+        "• Japanese: こんにちは世界！元気ですか？東京、日本、情報\n"
+        "• Chinese: 你好世界！你好吗？北京，中国，信息\n"
+        "• Arabic: مرحبا بالعالم! كيف حالك؟ معلومات، تكنولوجيا\n\n"
+        
+        "🔣 Special Characters & Symbols:\n"
+        "Mathematical: ∑ ∏ ∫ √ ∞ ≈ ≠ ≤ ≥ ± × ÷ π α β γ δ λ μ σ φ ψ ω\n"
+        "Currency: $ € £ ¥ ₹ ₽ ₩ ₪ ¢ ₵ ₡ ₦ ₨ ₫ ₱ ₲\n"
+        "Arrows: ← → ↑ ↓ ↖ ↗ ↘ ↙ ⇐ ⇒ ⇑ ⇓ ↔ ↕ ⇔ ⇕\n"
+        "Shapes: ▲ ▼ ◄ ► ◆ ◇ ■ □ ● ○ ★ ☆ ♠ ♣ ♥ ♦\n"
+        "Weather: ☀ ☁ ☂ ☃ ❄ ⛅ ⛈ 🌈 🌙 ⭐\n"
+        "Emojis: 😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗\n\n"
+        
+        "📝 Technical Content:\n"
+        "This document demonstrates how the LeafraSDK chunking system handles UTF-8 "
+        "encoded text with various character sets. The token estimation should accurately "
+        "count tokens across different languages and scripts. Character boundaries must "
+        "be preserved properly, especially for multi-byte UTF-8 sequences.\n\n"
+        
+        "🔧 Configuration Details:\n"
+        "• Token-based chunking with SentencePiece integration ✅\n"
+        "• Word boundary preservation for international text 🌐\n"
+        "• Overlap percentage handling across language transitions 🔄\n"
+        "• Metadata extraction from multilingual documents 📋\n"
+        "• Character encoding validation and normalization 🔤\n\n"
+        
+        "🎯 Test Scenarios:\n"
+        "1. Mixed language paragraphs with transitions between scripts\n"
+        "2. Special character sequences that might affect tokenization\n"
+        "3. Emoji and symbol placement within sentences 📱\n"
+        "4. Mathematical expressions: E = mc² ∴ F = ma ∵ a² + b² = c²\n"
+        "5. Code snippets: function(π, α) { return √(x² + y²); } // UTF-8 vars\n"
+        "6. URLs with Unicode: https://测试.example.com/路径?参数=值\n"
+        "7. Email addresses: użytkownik@примеру.рф, тест@مثال.كوم\n\n"
+        
+        "📚 Extended Content for Chunking:\n"
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor "
+        "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis "
+        "nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. "
+        "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore "
+        "eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, "
+        "sunt in culpa qui officia deserunt mollit anim id est laborum.\n\n"
+        
+        "Ñoño pequeño soñó con niños en España. El señor García visitó São Paulo "
+        "para encontrar información sobre tecnología avanzada. Les résumés français "
+        "contiennent des caractères accentués comme é, è, ê, ë, à, ù, ç. Deutsche "
+        "Straßennamen enthalten oft Umlaute: München, Köln, Düsseldorf, Größe.\n\n"
+        
+        "🌐 Conclusion:\n"
+        "This UTF-8 test document validates that the LeafraSDK chunking system properly "
+        "handles international character sets, maintains character encoding integrity, "
+        "and produces accurate token counts across diverse linguistic content. The "
+        "SentencePiece integration should seamlessly process all included characters "
+        "while preserving semantic boundaries. Success! ✨🎉\n";
+    
+    std::cout << "📏 Text length: " << utf8_text.length() << " bytes" << std::endl;
+    
+    // Test with various chunk sizes to ensure robust handling
+    std::vector<size_t> test_chunk_sizes;
+    test_chunk_sizes.push_back(50);
+    test_chunk_sizes.push_back(100);
+    test_chunk_sizes.push_back(200);
+    test_chunk_sizes.push_back(500);
+    
+    std::vector<double> test_overlaps;
+    test_overlaps.push_back(0.1);
+    test_overlaps.push_back(0.2);
+    
+    for (size_t chunk_size : test_chunk_sizes) {
+        for (double overlap : test_overlaps) {
+            std::cout << "🧪 Testing: " << chunk_size << " tokens, " << (overlap * 100) << "% overlap" << std::endl;
+            
+            std::vector<TextChunk> chunks;
+            ChunkingOptions options(chunk_size, overlap, ChunkSizeUnit::TOKENS, TokenApproximationMethod::SIMPLE);
+            options.preserve_word_boundaries = true;
+            
+            ResultCode result = chunker.chunk_text(utf8_text, options, chunks);
+            TEST_ASSERT_RESULT_CODE(ResultCode::SUCCESS, result, "UTF-8 chunking should succeed");
+            TEST_ASSERT(!chunks.empty(), "Should create chunks from UTF-8 text");
+            
+            // Verify chunks are valid
+            for (size_t i = 0; i < chunks.size(); ++i) {
+                const auto& chunk = chunks[i];
+                
+                // Check basic chunk validity
+                TEST_ASSERT(!chunk.content.empty(), "Chunk content should not be empty");
+                TEST_ASSERT(chunk.estimated_tokens > 0, "Chunk should have token estimate");
+                TEST_ASSERT(chunk.end_index > chunk.start_index, "Chunk should have valid range");
+                
+                // Test string_view content access (this was causing hangs before)
+                size_t content_length = chunk.content.length();
+                TEST_ASSERT(content_length > 0, "Content length should be positive");
+                
+                // Test safe string conversion (critical for UTF-8)
+                std::string chunk_string = std::string(chunk.content);
+                TEST_ASSERT(chunk_string.length() == content_length, "String conversion should preserve length");
+                
+                // Test that content contains valid UTF-8 characters
+                // Check for common international characters
+                if (chunk_string.find("🌍") != std::string::npos ||
+                    chunk_string.find("Café") != std::string::npos ||
+                    chunk_string.find("Москва") != std::string::npos ||
+                    chunk_string.find("こんにちは") != std::string::npos ||
+                    chunk_string.find("北京") != std::string::npos ||
+                    chunk_string.find("مرحبا") != std::string::npos) {
+                    std::cout << "✅ Found international characters in chunk " << (i + 1) << std::endl;
+                }
+                
+                // Verify no buffer overruns by accessing first/last character safely
+                if (!chunk.content.empty()) {
+                    char first = chunk.content[0];
+                    char last = chunk.content[chunk.content.length() - 1];
+                    (void)first; (void)last; // Suppress unused variable warnings
+                }
+            }
+            
+            std::cout << "✅ Created " << chunks.size() << " chunks successfully" << std::endl;
+        }
+    }
+    
+    std::cout << "🎉 UTF-8 international chunking test completed successfully!" << std::endl;
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     // Setup debug mode based on command line arguments
     bool debug_enabled = setup_debug_mode(argc, argv);
@@ -703,6 +849,7 @@ int main(int argc, char* argv[]) {
     RUN_TEST(test_token_chunking_error_handling);
     RUN_TEST(test_approximation_methods_comparison);
     RUN_TEST(test_chunk_token_ids_storage);
+    RUN_TEST(test_utf8_international_chunking);
     
     // Print results
     std::cout << std::endl << "=== Test Results ===" << std::endl;

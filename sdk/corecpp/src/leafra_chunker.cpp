@@ -11,6 +11,24 @@ namespace leafra {
 // Based on empirical analysis: ~4 characters per token works well across different content types
 constexpr double SIMPLE_CHARS_PER_TOKEN = 4.0;
 
+/**
+ * Ensure a byte position is aligned to a valid UTF-8 character boundary
+ * @param text The UTF-8 text
+ * @param pos The byte position to check/adjust
+ * @return A valid UTF-8 character start position
+ */
+static size_t ensure_utf8_boundary(const std::string& text, size_t pos) {
+    if (pos >= text.length()) {
+        return text.length();
+    }
+    
+    // If we're at a UTF-8 continuation byte, move forward to the next character start
+    while (pos < text.length() && (text[pos] & 0xC0) == 0x80) {
+        pos++; // Skip UTF-8 continuation bytes
+    }
+    
+    return pos;
+}
 
 LeafraChunker::LeafraChunker() = default;
 
@@ -97,15 +115,15 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
         
         // Combine all pages into a single text with page separators
         auto combine_start = debug::timer::now();
-        std::string combined_text;
+        combined_text_.clear(); // Clear previous document content
         std::vector<size_t> page_starts;
         page_starts.push_back(0);
         
         for (size_t i = 0; i < pages.size(); ++i) {
-            combined_text += pages[i];
+            combined_text_ += pages[i];
             if (i < pages.size() - 1) {
-                combined_text += "\n\n"; // Page separator
-                page_starts.push_back(combined_text.length());
+                combined_text_ += "\n\n"; // Page separator
+                page_starts.push_back(combined_text_.length());
             }
         }
         
@@ -116,8 +134,8 @@ ResultCode LeafraChunker::chunk_document(const std::vector<std::string>& pages,
         // Use core chunking method
         auto chunk_start = debug::timer::now();
         std::vector<TextChunk> temp_chunks;
-        documentCacher.reinitialize(combined_text);
-        ResultCode result = actual_chunker(combined_text, effective_options, temp_chunks);
+        documentCacher.reinitialize(combined_text_);
+        ResultCode result = actual_chunker(combined_text_, effective_options, temp_chunks);
         
         auto chunk_end = debug::timer::now();
         double chunk_ms = debug::timer::elapsed_milliseconds(chunk_start, chunk_end);
@@ -205,7 +223,11 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
         while (current_pos < text.length()) {
             // Ensure we start at a word boundary
             if (options.preserve_word_boundaries && current_pos > 0) {
+                size_t original_pos = current_pos;
                 current_pos = find_next_word_start(text, current_pos);
+                // CRITICAL: Ensure the word boundary is also UTF-8 aligned
+                current_pos = ensure_utf8_boundary(text, current_pos);
+                
                 if (current_pos >= text.length()) {
                     break;
                 }
@@ -237,6 +259,8 @@ ResultCode LeafraChunker::actual_chunker(const std::string& text,
                 // Convert back to characters to find next start position
                 size_t advance_chars = static_cast<size_t>(std::round(effective_content_tokens * chars_per_token));
                 current_pos += advance_chars;
+                // CRITICAL: Ensure current_pos is on a UTF-8 character boundary
+                current_pos = ensure_utf8_boundary(text, current_pos);
             } else if (chunks.empty() && current_pos < text.length()) {
                 // Special case: if we have no chunks yet and there's still text,
                 // create a chunk from current position to end of text to avoid empty result
@@ -328,24 +352,35 @@ size_t LeafraChunker::find_word_boundary(const std::string& text,
         
         while (temp_pos < byte_pos && temp_pos < text.length()) {
             prev_pos = temp_pos;
-            UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp_pos, temp_pos);
+            size_t next_temp_pos;
+            UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp_pos, next_temp_pos);
             if (temp_c == U_SENTINEL || temp_pos >= byte_pos) break;
+            temp_pos = next_temp_pos;
         }
         
         if (prev_pos == 0) break;
         
         UChar32 prev_c = documentCacher.get_unicode_char_at_cached(prev_pos, next_pos);
         if (prev_c != U_SENTINEL && is_unicode_whitespace(prev_c)) {
-            // Found whitespace - find the start of the next word
-            size_t word_start = next_pos;
-            while (word_start < text.length()) {
-                UChar32 word_c = documentCacher.get_unicode_char_at_cached(word_start, next_pos);
-                if (word_c == U_SENTINEL || !is_unicode_whitespace(word_c)) {
-                    break;
+            // Skip all consecutive whitespace
+            do {
+                byte_pos = prev_pos;
+                if (byte_pos == 0) break;
+                size_t before_prev = 0;
+                size_t temp = 0;
+                while (temp < byte_pos && temp < text.length()) {
+                    before_prev = temp;
+                    size_t next_temp;
+                    UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp, next_temp);
+                    if (temp_c == U_SENTINEL || temp >= byte_pos)
+                        break;
+                    temp = next_temp;
                 }
-                word_start = next_pos;
-            }
-            return word_start;
+                prev_c = documentCacher.get_unicode_char_at_cached(before_prev, next_pos);
+                prev_pos = before_prev;
+            } while (prev_c != U_SENTINEL && is_unicode_whitespace(prev_c));
+
+            return next_pos;
         }
         
         byte_pos = prev_pos;
@@ -395,7 +430,8 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
                                      size_t page_number,
                                      size_t global_start) {
     if (start >= text.length() || end > text.length() || start >= end) {
-        return TextChunk("", start, end, page_number);
+        
+        return TextChunk(std::string_view(), start, end, page_number);
     }
     
     size_t content_start = start;
@@ -436,8 +472,10 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
             
             while (temp_pos < trimmed_end) {
                 last_char_start = temp_pos;
-                UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp_pos, temp_pos);
+                size_t next_temp_pos;
+                UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp_pos, next_temp_pos);
                 if (temp_c == U_SENTINEL || temp_pos >= trimmed_end) break;
+                temp_pos = next_temp_pos;
             }
             
             UChar32 c = documentCacher.get_unicode_char_at_cached(last_char_start, temp_pos);
@@ -454,11 +492,33 @@ TextChunk LeafraChunker::create_chunk(const std::string& text,
     
     // Create string_view directly into the original text - no copying!
     if (content_start < content_end) {
+        // Safety checks to prevent string_view corruption
+        if (content_start >= text.length() || content_end > text.length()) {
+            return TextChunk(std::string_view(), global_start, global_start + (end - start), page_number);
+        }
+        
+        // Validate UTF-8 boundaries one more time
+        if (content_start > 0 && (text[content_start] & 0xC0) == 0x80) {           
+            // Find the start of the UTF-8 character
+            while (content_start > 0 && (text[content_start] & 0xC0) == 0x80) {
+                content_start--;
+            }
+        }
+        
+        if (content_end > 0 && content_end < text.length() && (text[content_end] & 0xC0) == 0x80) {
+            // Move to end of the UTF-8 character
+            while (content_end < text.length() && (text[content_end] & 0xC0) == 0x80) {
+                content_end++;
+            }
+        }
+        
+        // Create zero-copy string_view pointing directly to member variable text
+        // This is safe because text parameter references combined_text_ member variable
         std::string_view chunk_view(text.data() + content_start, content_end - content_start);
         return TextChunk(chunk_view, global_start, global_start + (end - start), page_number);
     } else {
         // Empty content after trimming - return empty but valid chunk
-        return TextChunk("", global_start, global_start + (end - start), page_number);
+        return TextChunk(std::string_view(), global_start, global_start + (end - start), page_number);
     }
 }
 
@@ -597,7 +657,7 @@ size_t LeafraChunker::find_next_word_start(const std::string& text, size_t pos) 
     
     // Check if we're already at the start of a word using Unicode-aware detection
     size_t next_pos;
-    UChar32 current_c = get_unicode_char_at(text, pos, next_pos);
+    UChar32 current_c = documentCacher.get_unicode_char_at_cached(pos, next_pos);
     
     if (current_c != U_SENTINEL && !is_unicode_whitespace(current_c)) {
         // Check if previous character is whitespace
@@ -608,11 +668,13 @@ size_t LeafraChunker::find_next_word_start(const std::string& text, size_t pos) 
             
             while (temp_pos < pos && temp_pos < text.length()) {
                 prev_pos = temp_pos;
-                UChar32 temp_c = get_unicode_char_at(text, temp_pos, temp_pos);
+                size_t next_temp_pos;
+                UChar32 temp_c = documentCacher.get_unicode_char_at_cached(temp_pos, next_temp_pos);
                 if (temp_c == U_SENTINEL || temp_pos >= pos) break;
+                temp_pos = next_temp_pos;
             }
             
-            UChar32 prev_c = get_unicode_char_at(text, prev_pos, temp_pos);
+            UChar32 prev_c = documentCacher.get_unicode_char_at_cached(prev_pos, temp_pos);
             if (prev_c != U_SENTINEL && is_unicode_whitespace(prev_c)) {
                 // We're at the start of a word
                 return pos;
@@ -625,7 +687,7 @@ size_t LeafraChunker::find_next_word_start(const std::string& text, size_t pos) 
     bool in_word = (current_c != U_SENTINEL && !is_unicode_whitespace(current_c));
     
     while (byte_pos < text.length()) {
-        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        UChar32 c = documentCacher.get_unicode_char_at_cached(byte_pos, next_pos);
         if (c == U_SENTINEL) {
             byte_pos = next_pos;
             continue;
@@ -648,7 +710,7 @@ size_t LeafraChunker::find_next_word_start(const std::string& text, size_t pos) 
     
     // Skip remaining whitespace to find the start of the next word
     while (byte_pos < text.length()) {
-        UChar32 c = get_unicode_char_at(text, byte_pos, next_pos);
+        UChar32 c = documentCacher.get_unicode_char_at_cached(byte_pos, next_pos);
         if (c == U_SENTINEL || !is_unicode_whitespace(c)) {
             break;
         }

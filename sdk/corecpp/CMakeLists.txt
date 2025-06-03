@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.18)
 
+# Add project declaration if building independently
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(LeafraCore VERSION 1.0.0 LANGUAGES CXX C)
+    message(STATUS "⚠️  Building LeafraCore independently")
+    message(STATUS "⚠️  For full functionality, build from SDK root: cd sdk && cmake -B build -S .")
+endif()
+
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
