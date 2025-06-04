@@ -329,7 +329,10 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                     chunk_text = "passage: " + chunk_text;
                                 }
                                 std::vector<int> token_ids = pImpl->tokenizer_->encode_as_ids(chunk_text, SentencePieceTokenizer::TokenizeOptions());
-                                
+                                //AD TODO: DON'T exceed 512 tokens per chunk otherwise retrieval will be less accurate 
+                                //AD TODO trim the token_ids to 512 if it's greater than 512
+                                //AD TODO: pad the token_ids to 512 exactly 
+                                //load the executorch model and run it on the token_ids
                                 // Store both the token count and the actual token IDs
                                 chunk.estimated_tokens = token_ids.size(); // Replace estimate with actual count
                                 chunk.token_ids = std::move(token_ids);    // Store the actual token IDs
