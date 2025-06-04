@@ -320,7 +320,14 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                             
                             // Get accurate token counts for each chunk
                             for (auto& chunk : chunks) {
+                                //Note: chunk.content is a string_view, so we need to convert it to a string
+                                //This can be prevented for other models which don't require changing the text by overloading the encode_as_ids with string_view
                                 std::string chunk_text = std::string(chunk.content);
+                                // Add "passage: " prefix for multilingual-e5-small model per 
+                                // https://huggingface.co/intfloat/multilingual-e5-small 
+                                if (pImpl->config_.tokenizer.model_name == "multilingual-e5-small") {
+                                    chunk_text = "passage: " + chunk_text;
+                                }
                                 std::vector<int> token_ids = pImpl->tokenizer_->encode_as_ids(chunk_text, SentencePieceTokenizer::TokenizeOptions());
                                 
                                 // Store both the token count and the actual token IDs
