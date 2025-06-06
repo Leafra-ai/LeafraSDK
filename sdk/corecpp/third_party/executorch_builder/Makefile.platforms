@@ -1,0 +1,73 @@
+# Makefile for Executorch cross-platform builds
+# Supports Windows, Linux, and Android configurations
+
+.PHONY: all windows linux android-config help clean
+
+# Default target
+all: help
+
+# Windows build configuration
+windows:
+	@echo "Building Executorch for Windows with XNNPACK backend..."
+	@mkdir -p build-windows
+	@cd build-windows && cmake .. \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DEXECUTORCH_BUILD_XNNPACK=ON \
+		-DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON \
+		-DEXECUTORCH_BUILD_EXTENSION_MODULE=ON \
+		-DEXECUTORCH_BUILD_EXTENSION_TENSOR=ON \
+		-DEXECUTORCH_BUILD_KERNELS_OPTIMIZED=ON \
+		-DEXECUTORCH_BUILD_KERNELS_QUANTIZED=ON \
+		-G "Visual Studio 16 2019" \
+		-A x64
+	@cd build-windows && cmake --build . --config Release
+	@echo "Windows build completed with XNNPACK support"
+
+# Linux build configuration  
+linux:
+	@echo "Building Executorch for Linux with XNNPACK backend..."
+	@mkdir -p build-linux
+	@cd build-linux && cmake .. \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DEXECUTORCH_BUILD_XNNPACK=ON \
+		-DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON \
+		-DEXECUTORCH_BUILD_EXTENSION_MODULE=ON \
+		-DEXECUTORCH_BUILD_EXTENSION_TENSOR=ON \
+		-DEXECUTORCH_BUILD_KERNELS_OPTIMIZED=ON \
+		-DEXECUTORCH_BUILD_KERNELS_QUANTIZED=ON
+	@cd build-linux && make -j$(nproc)
+	@echo "Linux build completed with XNNPACK support"
+
+# Android configuration (doesn't build, just configures)
+android-config:
+	@echo "Configuring Android build environment..."
+	@./build_android_config.sh
+	@echo "Android configuration complete."
+	@echo "Note: This configures the build with:"
+	@echo "  - XNNPACK Backend"
+	@echo "  - Vulkan Backend"  
+	@echo "  - QNN (Qualcomm NPU) Backend"
+	@echo "  - Neuron (MediaTek NPU) Backend"
+
+# Clean build directories
+clean:
+	@echo "Cleaning build directories..."
+	@rm -rf build-windows build-linux
+	@echo "Clean completed"
+
+# Help target
+help:
+	@echo "Executorch Cross-Platform Build System"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  windows       - Build for Windows with XNNPACK backend"
+	@echo "  linux         - Build for Linux with XNNPACK backend"
+	@echo "  android-config- Configure Android build (XNNPACK, Vulkan, QNN, Neuron)"
+	@echo "  clean         - Clean build directories"
+	@echo "  help          - Show this help message"
+	@echo ""
+	@echo "Backend Support by Platform:"
+	@echo "  iOS/macOS:    XNNPACK, CoreML, MPS (already built as XCFrameworks)"
+	@echo "  Android:      XNNPACK, Vulkan, QNN, Neuron"
+	@echo "  Windows:      XNNPACK"
+	@echo "  Linux:        XNNPACK" 
