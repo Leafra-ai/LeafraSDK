@@ -7,7 +7,3 @@
 [submodule "sdk/corecpp/third_party/models/embedding/granite-embedding-107m-multilingual"]
 	path = sdk/corecpp/third_party/models/embedding/granite-embedding-107m-multilingual
 	url = https://huggingface.co/ibm-granite/granite-embedding-107m-multilingual
-[submodule "sdk/corecpp/third_party/executorch"]
-	path = sdk/corecpp/third_party/executorch
-	url = https://github.com/pytorch/executorch.git
-	branch = release/0.6
