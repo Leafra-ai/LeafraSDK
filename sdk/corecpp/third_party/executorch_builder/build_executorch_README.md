@@ -106,6 +106,202 @@ Add the XCFrameworks to your Xcode project:
 2. Ensure they're linked in "Frameworks, Libraries, and Embedded Content"
 3. Set "Embed & Sign" for each framework
 
+## C++ Bridge for iOS/macOS XCFrameworks
+
+The build system now generates C++ bridge files that allow you to use ExecutTorch from C++ code while leveraging the prebuilt iOS/macOS XCFrameworks.
+
+### Bridge Location
+- **Bridge Files**: `sdk/corecpp/third_party/executorch_c++_bridge/`
+- **XCFrameworks**: `sdk/corecpp/third_party/prebuilt/executorch/apple/`
+
+### Building with C++ Bridge
+```bash
+# Build XCFrameworks and generate C++ bridge
+cd sdk/corecpp/third_party/executorch_builder
+make -f Makefile.platforms apple
+```
+
+### Using ExecutTorch from C++
+
+#### 1. Include Headers
+```cpp
+#include "ExecutTorch_Bridge.h"  // Main C bridge API (includes all components)
+```
+
+#### 2. Basic C++ Usage Example
+```cpp
+#include "ExecutTorch_Bridge.h"
+#include <iostream>
+
+int main() {
+    // Create module
+    ExecuTorchModule_Handle module = ExecuTorchModule_createWithDefaultMode("path/to/model.pte");
+    if (!module) {
+        std::cerr << "Failed to create module" << std::endl;
+        return 1;
+    }
+    
+    // Load module
+    char* error = nullptr;
+    if (!ExecuTorchModule_load(module, &error)) {
+        std::cerr << "Failed to load module: " << error << std::endl;
+        free(error);
+        ExecuTorchModule_destroy(module);
+        return 1;
+    }
+    
+    // Create input tensor
+    float inputData[] = {1.0, 2.0, 3.0, 4.0};
+    int64_t shape[] = {2, 2};
+    ExecuTorchTensor_Handle tensor = ExecuTorchTensor_createSimple(
+        inputData, shape, 2, ET_DATA_TYPE_FLOAT);
+    
+    // Create value from tensor
+    ExecuTorchValue_Handle value = ExecuTorchValue_createWithTensor(tensor);
+    
+    // Execute method
+    size_t outputCount;
+    ExecuTorchValue_Handle* outputs = ExecuTorchModule_executeMethod(
+        module, "forward", &value, 1, &outputCount, &error);
+    
+    if (outputs) {
+        std::cout << "Got " << outputCount << " outputs" << std::endl;
+        
+        // Process outputs
+        for (size_t i = 0; i < outputCount; i++) {
+            if (ExecuTorchValue_isTensor(outputs[i])) {
+                ExecuTorchTensor_Handle outTensor = ExecuTorchValue_getTensor(outputs[i]);
+                size_t dims;
+                const int64_t* outShape = ExecuTorchTensor_getShape(outTensor, &dims);
+                std::cout << "Output " << i << " shape: [";
+                for (size_t j = 0; j < dims; j++) {
+                    std::cout << outShape[j];
+                    if (j < dims - 1) std::cout << ", ";
+                }
+                std::cout << "]" << std::endl;
+            }
+        }
+        
+        ExecuTorchModule_freeOutputs(outputs, outputCount);
+    } else {
+        std::cerr << "Execution failed: " << error << std::endl;
+        free(error);
+    }
+    
+    // Cleanup
+    ExecuTorchValue_destroy(value);
+    ExecuTorchTensor_destroy(tensor);
+    ExecuTorchModule_destroy(module);
+    
+    return 0;
+}
+```
+
+#### 3. Compilation Instructions
+
+To compile your C++ code with the ExecutTorch bridge:
+
+```bash
+# Basic compilation
+clang++ -std=c++14 \
+    -I/path/to/executorch_c++_bridge \
+    -I../prebuilt/executorch/apple/executorch.xcframework/macos-arm64/Headers \
+    -F../prebuilt/executorch/apple \
+    -framework Foundation \
+    -framework executorch \
+    your_app.cpp \
+    /path/to/executorch_c++_bridge/*.mm \
+    -o your_app
+
+# For iOS builds, use iOS headers:
+clang++ -std=c++14 \
+    -I/path/to/executorch_c++_bridge \
+    -I../prebuilt/executorch/apple/executorch.xcframework/ios-arm64/Headers \
+    -F../prebuilt/executorch/apple \
+    -framework Foundation \
+    -framework executorch \
+    your_app.cpp \
+    /path/to/executorch_c++_bridge/*.mm \
+    -o your_app
+```
+
+#### 4. Xcode Integration
+
+When integrating with Xcode projects:
+
+1. **Add XCFrameworks**: Drag the `.xcframework` files to your Xcode project:
+   - `executorch.xcframework`
+   - `backend_coreml.xcframework`
+   - `backend_mps.xcframework`  
+   - `backend_xnnpack.xcframework`
+   - `kernels_portable.xcframework`
+   - `kernels_optimized.xcframework`
+
+2. **Add Bridge Files**: Include the C++ bridge files in your project:
+   - All `.h` and `.mm` files from `executorch_c++_bridge/`
+
+3. **Compiler Settings**:
+   - Set file types: `.mm` files should be compiled as Objective-C++
+   - Enable C++ exceptions: `-fexceptions`
+   - C++ standard: C++14 or later
+
+4. **Build Settings**:
+   ```
+   OTHER_CPLUSPLUSFLAGS = -std=c++14 -fexceptions
+   CLANG_ENABLE_OBJC_ARC = YES
+   ```
+
+#### 5. CMake Integration
+
+For CMake projects:
+
+```cmake
+# Find the bridge files
+set(EXECUTORCH_BRIDGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdk/corecpp/third_party/executorch_c++_bridge")
+set(EXECUTORCH_XCFRAMEWORK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdk/corecpp/third_party/prebuilt/executorch/apple")
+
+# Add bridge sources
+file(GLOB EXECUTORCH_BRIDGE_SOURCES 
+    "${EXECUTORCH_BRIDGE_DIR}/*.mm"
+    "${EXECUTORCH_BRIDGE_DIR}/*.h"
+)
+
+# Create library
+add_library(executorch_bridge ${EXECUTORCH_BRIDGE_SOURCES})
+
+# Link XCFrameworks
+target_link_libraries(executorch_bridge
+    "${EXECUTORCH_XCFRAMEWORK_DIR}/executorch.xcframework"
+    "${EXECUTORCH_XCFRAMEWORK_DIR}/backend_coreml.xcframework"
+    "${EXECUTORCH_XCFRAMEWORK_DIR}/backend_mps.xcframework"
+    "${EXECUTORCH_XCFRAMEWORK_DIR}/backend_xnnpack.xcframework"
+    "${EXECUTORCH_XCFRAMEWORK_DIR}/kernels_portable.xcframework"
+    "${EXECUTORCH_XCFRAMEWORK_DIR}/kernels_optimized.xcframework"
+    "-framework Foundation"
+)
+
+# Set properties
+set_target_properties(executorch_bridge PROPERTIES
+    CXX_STANDARD 14
+    CXX_STANDARD_REQUIRED ON
+)
+
+# Your app
+add_executable(my_app main.cpp)
+target_link_libraries(my_app executorch_bridge)
+target_include_directories(my_app PRIVATE ${EXECUTORCH_BRIDGE_DIR})
+```
+
+#### 4. Available Bridge Components
+
+- **ExecuTorch_Bridge.h**: Main C bridge header (includes all components)
+- **ExecuTorchModule_Bridge.h/.mm**: Module loading and execution
+- **ExecuTorchTensor_Bridge.h/.mm**: Tensor creation and manipulation  
+- **ExecuTorchValue_Bridge.h/.mm**: Value types (tensors, scalars, strings)
+- **ExecuTorchLog_Bridge.h/.mm**: Logging functionality
+- **ExecuTorchError_Bridge.h/.mm**: Error handling
+- **example_usage.cpp**: Complete working example
+
 ## Android Builds
 
 ### Supported Backends
