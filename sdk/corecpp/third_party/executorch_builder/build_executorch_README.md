@@ -14,9 +14,6 @@ This guide explains how to build Executorch prebuilt libraries from source with 
 - **Platform-specific toolchains** (see per-platform sections)
 
 ### Required Python Packages
-```bash
-pip3 install zstd
-```
 
 ### Initial Setup
 ```bash
@@ -31,7 +28,18 @@ git submodule update --init
 ./install_executorch.sh --clean
 ```
 
-## Quick Start (Using Build System)
+python3 -m venv .venv && source .venv/bin/activate && pip install --upgrade pip
+pip install zstd
+
+#this installs the python package for executorch - you need to use this environment to generate/convert packages for compatability!!!
+./install_executorch.sh 
+
+
+
+
+## AD SKIP TO INDIVIDUAL PLATFORM SECTIONS - I haven't tested this script yet / or it didn't work at first attempt 
+## Follow https://docs.pytorch.org/executorch/stable/using-executorch-building-from-source.html 
+## Quick Start (Using Build System) 
 
 Navigate to the build system directory:
 ```bash
@@ -79,17 +87,15 @@ make -f Makefile.platforms help
 ### Build Command (Manual)
 ```bash
 # Navigate to executorch source
+
 cd sdk/corecpp/third_party/executorch
+# From the root of the executorch repo:
+./install_executorch.sh --clean
+git submodule sync
+git submodule update --init --recursive
 
 # Build XCFrameworks for iOS (device + simulator) and macOS
-./scripts/build_apple_frameworks.sh \
-    --output=apple-frameworks \
-    --Release \
-    --coreml \
-    --mps \
-    --xnnpack \
-    --portable \
-    --optimized
+./scripts/build_apple_frameworks.sh --Release --coreml --mps --optimized --portable --quantized --xnnpack --custom --output=apple-frameworks
 
 # Output location: apple-frameworks/
 # - executorch.xcframework
