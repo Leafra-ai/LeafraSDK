@@ -1,0 +1,54 @@
+A) Built from source for iOS/MacOS 
+This is required to be able to use the C/C++ APIs directly, pod versions only support ObjectiveC and Swift. 
+
+	brew install bazelisk (auto downloads the required bazel during build!)**  
+	git submodule add -b r2.17 https://github.com/tensorflow/tensorflow.git  && cd tensorflow
+	git submodule update --init --recursive 
+
+    go to tensorflow/ 
+	configure
+		Do you wish to build TensorFlow with ROCm support? [y/N]: 
+		No ROCm support will be enabled for TensorFlow.
+
+		Do you wish to build TensorFlow with CUDA support? [y/N]: 
+		No CUDA support will be enabled for TensorFlow.
+
+		Please specify optimization flags to use during compilation when bazel option "--config=opt" is specified [Default is -Wno-sign-compare]:-march=armv8-a -O3 -Wno-sign-compare                                                n                                                      
+
+		Would you like to interactively configure ./WORKSPACE for Android builds? [y/N]: 
+		Not configuring the WORKSPACE for Android builds.
+
+		Do you wish to build TensorFlow with iOS support? [y/N]: Y
+		iOS support will be enabled for TensorFlow.
+
+	bazel build --config=ios_fat -c opt --cxxopt=--std=c++17 \
+  		//tensorflow/lite/ios:TensorFlowLiteC_static_framework		
+
+	bazel build --config=ios_fat -c opt --cxxopt=--std=c++17 \
+		//tensorflow/lite/ios:TensorFlowLiteCMetal_framework
+	
+	bazel build --config=ios_fat -c opt --cxxopt=--std=c++17 \
+		//tensorflow/lite/ios:TensorFlowLiteCCoreML_framework
+
+	bazel build -c opt --config=ios --ios_multi_cpus=arm64,x86_64 \
+  		//tensorflow/lite/ios:TensorFlowLiteSelectTfOps_framework
+	cp bazel-bin/tensorflow/lite/ios/*.zip ...prebuilt/tensorflow/builtfromsource/apple/
+	
+
+B) Getting the xcframeworks using 
+add to podspec of the iOS app 
+	#this automatically brings in TensorFlowLiteC 2.17.0
+	pod 'TensorFlowLiteSwift', '~> 2.17.0', :subspecs => ['CoreML', 'Metal']  
+	pod install 
+go to pod/... and grab the xcframeworks for Swift (for reference) and TensorFlowLiteC (to really use) - put under prebuilts 
+	cd Pods/TensorFlowLiteC/Frameworks
+	cp TensorFlowLiteC.xcframework TensorFlowLiteCCoreML.xcframework TensorFlowLiteCMetal.xcframework 
+
+Reference docs: 
+https://www.tensorflow.org/install/source#macos
+https://ai.google.dev/edge/litert/ios/quickstart
+https://ai.google.dev/edge/litert/build/ios 
+
+
+
+

@@ -14,6 +14,7 @@ This guide explains how to build Executorch prebuilt libraries from source with 
 - **Platform-specific toolchains** (see per-platform sections)
 
 ### Required Python Packages
+** uses venv - after installing remember to source <venv>/bin/activate 
 
 ### Initial Setup
 ```bash

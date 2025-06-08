@@ -39,3 +39,9 @@ yarn-error.*
 #build files
 **/build*/
 
+#venv 
+**/venv/
+**/.venv/
+**/*_venv/
+
+
