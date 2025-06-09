@@ -14,4 +14,4 @@
 [submodule "sdk/corecpp/third_party/tensorflow"]
 	path = sdk/corecpp/third_party/tensorflow
 	url = https://github.com/tensorflow/tensorflow.git
-	branch = r2.19
+	branch = r2.17
