@@ -140,6 +140,36 @@ struct LEAFRA_API ChunkingConfig {
     ChunkingConfig(size_t size, double overlap, bool use_tokens = true);
 };
 
+/**
+ * @brief Embedding model inference configuration
+ */
+struct LEAFRA_API EmbeddingModelConfig {
+    bool enabled = false;                   // Whether to enable embedding model inference
+    std::string framework = "";             // Inference framework ("tensorflow_lite" only for now)
+    std::string model_path = "";            // Path to the model file (.tflite for TensorFlow Lite)
+    
+    // Delegate configurations (TensorFlow Lite specific)
+    bool enable_coreml_delegate = true;     // Enable CoreML delegate (iOS/macOS only)
+    bool enable_metal_delegate = true;      // Enable Metal GPU delegate (iOS/macOS only)
+    bool enable_xnnpack_delegate = true;    // Enable XNNPACK CPU delegate (cross-platform)
+    
+    // Performance settings
+    int32_t num_threads = -1;               // Number of threads (-1 = auto)
+    bool use_nnapi = false;                 // Use Android NNAPI (Android only)
+    
+    // Default constructor
+    EmbeddingModelConfig() = default;
+    
+    // Constructor with model path
+    EmbeddingModelConfig(const std::string& model_path_param, const std::string& framework_param = "tensorflow_lite") 
+        : enabled(true), framework(framework_param), model_path(model_path_param) {}
+    
+    // Check if configuration is valid
+    bool is_valid() const {
+        return enabled && framework == "tensorflow_lite" && !model_path.empty();
+    }
+};
+
 // Configuration structure
 struct LEAFRA_API Config {
     std::string name;
@@ -149,6 +179,7 @@ struct LEAFRA_API Config {
     size_t buffer_size = 1024;
     ChunkingConfig chunking;               // Chunking configuration
     TokenizerConfig tokenizer;             // Tokenization configuration
+    EmbeddingModelConfig embedding_inference; // Embedding model inference configuration
 };
 
 // Data structures

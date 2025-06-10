@@ -23,9 +23,8 @@ target_link_libraries(LeafraSDKiOS PRIVATE LeafraCore)
 
 # Include directories
 target_include_directories(LeafraSDKiOS 
-    PUBLIC 
+    PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}
-    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../corecpp/include
 )
 

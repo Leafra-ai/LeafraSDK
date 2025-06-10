@@ -191,33 +191,112 @@ class SentencePieceBuilder:
         self.run_command(["make", "-j", str(os.cpu_count() or 4)], cwd=ios_device_dir)
         self.run_command(["make", "install"], cwd=ios_device_dir)
         
-        # iOS Simulator (arm64 + x86_64)
-        ios_sim_dir = self.build_dir / "ios-simulator"
-        ios_sim_dir.mkdir(parents=True, exist_ok=True)
+        # iOS Simulator x86_64
+        ios_sim_x86_dir = self.build_dir / "ios-simulator-x86_64"
+        ios_sim_x86_dir.mkdir(parents=True, exist_ok=True)
         
-        cmake_args_sim = self.get_cmake_args_common() + [
-            f"-DCMAKE_INSTALL_PREFIX={self.output_dir / 'ios-simulator'}",
+        cmake_args_sim_x86 = self.get_cmake_args_common() + [
+            f"-DCMAKE_INSTALL_PREFIX={self.output_dir / 'ios-simulator-x86_64'}",
             f"-DCMAKE_TOOLCHAIN_FILE={ios_toolchain}",
-            "-DPLATFORM=SIMULATOR64",  # iOS simulator
+            "-DPLATFORM=SIMULATOR64",  # iOS simulator x86_64
             "-DDEPLOYMENT_TARGET=15.1",
             "-DSPM_ENABLE_SHARED=OFF",
             "-DSPM_ENABLE_TCMALLOC=OFF",
-            "-DSPM_BUILD_EXECUTABLES=OFF",  # Disable executables to avoid set_xcode_property issues
+            "-DSPM_BUILD_EXECUTABLES=OFF",
         ]
         
-        self.run_command(["cmake"] + cmake_args_sim + [str(self.source_dir)], cwd=ios_sim_dir)
-        self.run_command(["make", "-j", str(os.cpu_count() or 4)], cwd=ios_sim_dir)
-        self.run_command(["make", "install"], cwd=ios_sim_dir)
+        self.run_command(["cmake"] + cmake_args_sim_x86 + [str(self.source_dir)], cwd=ios_sim_x86_dir)
+        self.run_command(["make", "-j", str(os.cpu_count() or 4)], cwd=ios_sim_x86_dir)
+        self.run_command(["make", "install"], cwd=ios_sim_x86_dir)
+        
+        # iOS Simulator ARM64
+        ios_sim_arm64_dir = self.build_dir / "ios-simulator-arm64"
+        ios_sim_arm64_dir.mkdir(parents=True, exist_ok=True)
+        
+        cmake_args_sim_arm64 = self.get_cmake_args_common() + [
+            f"-DCMAKE_INSTALL_PREFIX={self.output_dir / 'ios-simulator-arm64'}",
+            f"-DCMAKE_TOOLCHAIN_FILE={ios_toolchain}",
+            "-DPLATFORM=SIMULATORARM64",  # iOS simulator ARM64
+            "-DDEPLOYMENT_TARGET=15.1",
+            "-DSPM_ENABLE_SHARED=OFF",
+            "-DSPM_ENABLE_TCMALLOC=OFF",
+            "-DSPM_BUILD_EXECUTABLES=OFF",
+        ]
+        
+        self.run_command(["cmake"] + cmake_args_sim_arm64 + [str(self.source_dir)], cwd=ios_sim_arm64_dir)
+        self.run_command(["make", "-j", str(os.cpu_count() or 4)], cwd=ios_sim_arm64_dir)
+        self.run_command(["make", "install"], cwd=ios_sim_arm64_dir)
+        
+        # Create universal iOS simulator libraries
+        self.create_universal_simulator_libs()
         
         # Create XCFramework
         self.create_xcframework()
+
+    def create_universal_simulator_libs(self):
+        """Create universal iOS simulator libraries (x86_64 + ARM64)"""
+        print("Creating universal iOS simulator libraries...")
+        
+        # Create universal output directory
+        universal_dir = self.output_dir / "ios-simulator-universal"
+        universal_lib_dir = universal_dir / "lib"
+        universal_include_dir = universal_dir / "include"
+        
+        universal_lib_dir.mkdir(parents=True, exist_ok=True)
+        universal_include_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Copy headers from x86_64 build (they should be identical)
+        x86_include_dir = self.output_dir / "ios-simulator-x86_64" / "include"
+        if x86_include_dir.exists():
+            shutil.copytree(x86_include_dir, universal_include_dir, dirs_exist_ok=True)
+        
+        # Create universal binaries for main library and training library
+        libs_to_combine = ["libsentencepiece.a", "libsentencepiece_train.a"]
+        
+        for lib_name in libs_to_combine:
+            x86_lib = self.output_dir / "ios-simulator-x86_64" / "lib" / lib_name
+            arm64_lib = self.output_dir / "ios-simulator-arm64" / "lib" / lib_name
+            universal_lib = universal_lib_dir / lib_name
+            
+            if x86_lib.exists() and arm64_lib.exists():
+                print(f"Creating universal {lib_name}...")
+                self.run_command([
+                    "lipo", "-create", 
+                    str(x86_lib), str(arm64_lib),
+                    "-output", str(universal_lib)
+                ])
+            elif x86_lib.exists():
+                print(f"Only x86_64 {lib_name} found, copying...")
+                shutil.copy2(x86_lib, universal_lib)
+            elif arm64_lib.exists():
+                print(f"Only ARM64 {lib_name} found, copying...")
+                shutil.copy2(arm64_lib, universal_lib)
+            else:
+                print(f"Warning: {lib_name} not found in either architecture")
+        
+        print("✅ Universal iOS simulator libraries created")
+        
+        # Clean up intermediate architecture-specific builds
+        print("Cleaning up intermediate iOS simulator builds...")
+        x86_64_dir = self.output_dir / "ios-simulator-x86_64"
+        arm64_dir = self.output_dir / "ios-simulator-arm64"
+        
+        if x86_64_dir.exists():
+            shutil.rmtree(x86_64_dir)
+            print("  ✅ Removed ios-simulator-x86_64")
+        
+        if arm64_dir.exists():
+            shutil.rmtree(arm64_dir)
+            print("  ✅ Removed ios-simulator-arm64")
+        
+        print("✅ iOS simulator intermediate files cleaned")
 
     def create_xcframework(self):
         """Create XCFramework for iOS"""
         print("Creating XCFramework...")
         
         device_lib = self.output_dir / "ios-device" / "lib" / "libsentencepiece.a"
-        sim_lib = self.output_dir / "ios-simulator" / "lib" / "libsentencepiece.a"
+        sim_lib = self.output_dir / "ios-simulator-universal" / "lib" / "libsentencepiece.a"
         xcframework_path = self.output_dir / "sentencepiece.xcframework"
         
         if xcframework_path.exists():
@@ -228,7 +307,7 @@ class SentencePieceBuilder:
             "-library", str(device_lib),
             "-headers", str(self.output_dir / "ios-device" / "include"),
             "-library", str(sim_lib), 
-            "-headers", str(self.output_dir / "ios-simulator" / "include"),
+            "-headers", str(self.output_dir / "ios-simulator-universal" / "include"),
             "-output", str(xcframework_path)
         ])
 

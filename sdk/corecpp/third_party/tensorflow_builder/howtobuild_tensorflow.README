@@ -1,4 +1,4 @@
-A) Built from source for iOS/MacOS 
+A) Built from source for iOS/MacOS (CURRENT APPROACH)
 This is required to be able to use the C/C++ APIs directly, pod versions only support ObjectiveC and Swift. 
 
 	brew install bazelisk (auto downloads the required bazel during build!)**  
@@ -21,21 +21,68 @@ This is required to be able to use the C/C++ APIs directly, pod versions only su
 		Do you wish to build TensorFlow with iOS support? [y/N]: Y
 		iOS support will be enabled for TensorFlow.
 
-	bazel build --config=ios_fat -c opt --cxxopt=--std=c++17 \
-  		//tensorflow/lite/ios:TensorFlowLiteC_static_framework		
+	#iOS XCFramework Approach (TO BE FIGURED OUT)
+	# TODO AD: Figure out how to generate xcframeworks for rest (metal and coreml and tfops)
+	# it's explained here: https://developer.apple.com/documentation/xcode/creating-a-multi-platform-binary-framework-bundle 
+	# See: https://github.com/tensorflow/tensorflow/blob/master/configure.py 
+	# Also do bazel query "//tensorflow/lite/ios:*" etc. to see the available targets 
+		bazel build --config=ios_fat -c opt --cxxopt=--std=c++17 \
+	  //tensorflow/lite/ios:TensorFlowLiteC_xcframework
 
-	bazel build --config=ios_fat -c opt --cxxopt=--std=c++17 \
+	#Note that ios_fat generates arm64 for iOS and arm64_x86_64 for Simulator - this is good, but this is the only xcframework target 
+	#check out this xcframework rule: /Users/arifdikici/Documents/Squirrel/LeafraSDK/sdk/corecpp/third_party/tensorflow/tensorflow/lite/ios/BUILD.apple 
+	#maybe we can add similar rules for other targets (coreML, Metal and selecttfops)
+	#the ios_fat approach doesn't work well with simulator and framework - as it creates a single fat library and automatically puts 
+	#iOS_arm64 and simulator_x86 in it - it can't put simulator_arm64 (hence there's a separate target for sim_arm64)
+	 
+
+	#iOS framework approach (separate framework libs for iOS arm64 / Simulator arm64)
+	#ios device arm64
+	bazel build --config=ios_arm64 -c opt --cxxopt=--std=c++17 \
+  		//tensorflow/lite/ios:TensorFlowLiteC_framework
+
+	bazel build --config=ios_arm64 -c opt --cxxopt=--std=c++17 \
 		//tensorflow/lite/ios:TensorFlowLiteCMetal_framework
 	
-	bazel build --config=ios_fat -c opt --cxxopt=--std=c++17 \
+	bazel build --config=ios_arm64 -c opt --cxxopt=--std=c++17 \
 		//tensorflow/lite/ios:TensorFlowLiteCCoreML_framework
 
-	bazel build -c opt --config=ios --ios_multi_cpus=arm64,x86_64 \
+	bazel build -c opt --config=ios_arm64  \
   		//tensorflow/lite/ios:TensorFlowLiteSelectTfOps_framework
+
+	#simulator_arm64
+	bazel build --config=ios_sim_arm64 -c opt --cxxopt=--std=c++17 \
+  		//tensorflow/lite/ios:TensorFlowLiteC_framework
+
+	bazel build --config=ios_sim_arm64 -c opt --cxxopt=--std=c++17 \
+		//tensorflow/lite/ios:TensorFlowLiteCMetal_framework
+	
+	bazel build --config=ios_sim_arm64 -c opt --cxxopt=--std=c++17 \
+		//tensorflow/lite/ios:TensorFlowLiteCCoreML_framework
+
+	bazel build -c opt --config=ios_sim_arm64  \
+  		//tensorflow/lite/ios:TensorFlowLiteSelectTfOps_framework
+
+
+
+
+	MACOS:
+
+	bazel build --config=macos_arm64 -c opt --cxxopt=--std=c++17 \
+  		//tensorflow/lite/ios:TensorFlowLiteC_framework
+
+	bazel build --config=macos_arm64 -c opt --cxxopt=--std=c++17 \
+		//tensorflow/lite/ios:TensorFlowLiteCMetal_framework
+	
+	bazel build --config=macos_arm64 -c opt --cxxopt=--std=c++17 \
+		//tensorflow/lite/ios:TensorFlowLiteCCoreML_framework
+
+	bazel build -c opt --config=macos_arm64  \
+  		//tensorflow/lite/ios:TensorFlowLiteSelectTfOps_framework
+
 	cp bazel-bin/tensorflow/lite/ios/*.zip ...prebuilt/tensorflow/builtfromsource/apple/
 	
-
-B) Getting the xcframeworks using 
+B) Getting the xcframeworks using cocoapods
 add to podspec of the iOS app 
 	#this automatically brings in TensorFlowLiteC 2.17.0
 	pod 'TensorFlowLiteSwift', '~> 2.17.0', :subspecs => ['CoreML', 'Metal']  

@@ -64,7 +64,78 @@ print_error() {
     echo "[ERROR] $1" >&2
 }
 
+check_and_build_dependencies() {
+    local platform=$1
+    print_info "Checking dependencies for $platform..."
+    
+    # Check SentencePiece
+    if [ "$platform" = "ios" ]; then
+        local sp_lib="corecpp/third_party/prebuilt/sentencepiece/ios-device/lib/libsentencepiece.a"
+        local makefile_target="ios"
+    elif [ "$platform" = "ios-simulator" ]; then
+        local sp_lib="corecpp/third_party/prebuilt/sentencepiece/ios-simulator/lib/libsentencepiece.a"
+        local makefile_target="ios"
+    elif [ "$platform" = "macos" ]; then
+        local sp_lib="corecpp/third_party/prebuilt/sentencepiece/macos/lib/libsentencepiece.a"
+        local makefile_target="macos"
+    fi
+    
+    if [ ! -f "$sp_lib" ]; then
+        print_info "SentencePiece not found for $platform, building..."
+        cd corecpp/third_party
+        make -f Makefile.sentencepiece "$makefile_target" || { print_error "Failed to build SentencePiece for $platform"; exit 1; }
+        cd ../..
+        print_info "✅ SentencePiece built successfully for $platform"
+    else
+        print_info "✅ SentencePiece found for $platform"
+    fi
+}
+
+clean_sentencepiece_artifacts() {
+    local platform=${1:-"all"}
+    local sp_dir="corecpp/third_party/prebuilt/sentencepiece"
+    
+    if [ ! -d "$sp_dir" ]; then
+        return 0
+    fi
+    
+    case $platform in
+        "all")
+            print_info "Cleaning all SentencePiece artifacts..."
+            rm -rf "$sp_dir"/*
+            ;;
+        "ios")
+            print_info "Cleaning iOS device SentencePiece artifacts..."
+            rm -rf "$sp_dir"/ios-device "$sp_dir"/build/ios
+            ;;
+        "ios-simulator")
+            print_info "Cleaning iOS simulator SentencePiece artifacts..."
+            rm -rf "$sp_dir"/ios-simulator* "$sp_dir"/build/ios
+            ;;
+        "macos")
+            print_info "Cleaning macOS SentencePiece artifacts..."
+            rm -rf "$sp_dir"/macos "$sp_dir"/build/macos
+            ;;
+    esac
+}
+
+clean_sentencepiece_intermediates() {
+    local sp_dir="corecpp/third_party/prebuilt/sentencepiece"
+    
+    if [ -d "$sp_dir" ]; then
+        print_info "Cleaning SentencePiece intermediate files..."
+        # Keep only final artifacts: ios-device, ios-simulator-universal, sentencepiece.xcframework
+        rm -rf "$sp_dir"/build
+        rm -rf "$sp_dir"/ios-simulator-x86_64
+        rm -rf "$sp_dir"/ios-simulator-arm64
+        rm -rf "$sp_dir"/ios-simulator
+        # Keep ios-device, ios-simulator-universal, sentencepiece.xcframework
+    fi
+}
+
 clean_build() {
+    local platform=${1:-"all"}
+    
     if [ -d "$BUILD_DIR" ]; then
         print_info "Cleaning build directory..."
         rm -rf "$BUILD_DIR"
@@ -73,6 +144,9 @@ clean_build() {
         print_info "Cleaning install directory..."
         rm -rf "$INSTALL_DIR"
     fi
+    
+    # Clean SentencePiece artifacts based on platform
+    clean_sentencepiece_artifacts "$platform"
 }
 
 build_ios() {
@@ -85,11 +159,16 @@ build_ios() {
         local sdk="iphonesimulator"
         local arch="x86_64;arm64"
         local build_dir="${BUILD_DIR}/ios-simulator"
+        local platform="ios-simulator"
     else
         local sdk="iphoneos"
         local arch="arm64"
         local build_dir="${BUILD_DIR}/ios"
+        local platform="ios"
     fi
+    
+    # Check and build dependencies
+    check_and_build_dependencies "$platform"
     
     mkdir -p "$build_dir"
     cd "$build_dir"
@@ -100,7 +179,7 @@ build_ios() {
         -DCMAKE_OSX_ARCHITECTURES="$arch" \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/ios" \
-        -DLEAFRA_BUILD_RN_BINDINGS=ON \
+        -DLEAFRA_BUILD_RN_BINDINGS=OFF \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) $target
@@ -113,6 +192,9 @@ build_macos() {
     local target=${1:-"all"}
     
     print_info "Building for macOS (target: $target)..."
+    
+    # Check and build dependencies
+    check_and_build_dependencies "macos"
     
     local build_dir="${BUILD_DIR}/macos"
     mkdir -p "$build_dir"
@@ -245,7 +327,20 @@ print_info "Build Type: $CMAKE_BUILD_TYPE"
 print_info "Target: $TARGET"
 
 if [ "$CLEAN" = true ]; then
-    clean_build
+    # Determine platform for cleaning
+    if [ "$IOS" = true ]; then
+        if [ "$SIMULATOR" = true ]; then
+            clean_build "ios-simulator"
+        else
+            clean_build "ios"
+        fi
+    elif [ "$MACOS" = true ]; then
+        clean_build "macos"
+    elif [ "$ANDROID" = true ]; then
+        clean_build "android"
+    else
+        clean_build "all"
+    fi
 fi
 
 # Create necessary directories
@@ -255,6 +350,10 @@ mkdir -p "$INSTALL_DIR"
 # Build for specified platforms
 if [ "$IOS" = true ]; then
     build_ios "$TARGET" "$SIMULATOR"
+    # Clean up SentencePiece intermediates after successful build
+    if [ "$SIMULATOR" = true ]; then
+        clean_sentencepiece_intermediates
+    fi
 elif [ "$MACOS" = true ]; then
     build_macos "$TARGET"
 elif [ "$ANDROID" = true ]; then

@@ -239,23 +239,37 @@ set(SENTENCEPIECE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/preb
 # Platform-specific SentencePiece configuration
 if(APPLE)
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        # iOS - Use XCFramework
-        set(SENTENCEPIECE_XCFRAMEWORK_PATH "${SENTENCEPIECE_ROOT_DIR}/sentencepiece.xcframework")
+        # iOS - Detect device vs simulator and use appropriate libraries
+        if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
+            # iOS Simulator - Use universal libraries
+            set(SENTENCEPIECE_PLATFORM_DIR "${SENTENCEPIECE_ROOT_DIR}/ios-simulator-universal")
+            set(IOS_PLATFORM_TYPE "simulator (universal)")
+        else()
+            # iOS Device
+            set(SENTENCEPIECE_PLATFORM_DIR "${SENTENCEPIECE_ROOT_DIR}/ios-device")
+            set(IOS_PLATFORM_TYPE "device")
+        endif()
         
-        if(EXISTS "${SENTENCEPIECE_XCFRAMEWORK_PATH}")
-            message(STATUS "✅ Found SentencePiece XCFramework: ${SENTENCEPIECE_XCFRAMEWORK_PATH}")
+        set(SENTENCEPIECE_LIBRARY "${SENTENCEPIECE_PLATFORM_DIR}/lib/libsentencepiece.a")
+        set(SENTENCEPIECE_TRAIN_LIBRARY "${SENTENCEPIECE_PLATFORM_DIR}/lib/libsentencepiece_train.a")
+        set(SENTENCEPIECE_INCLUDE_DIR "${SENTENCEPIECE_PLATFORM_DIR}/include")
+        
+        if(EXISTS "${SENTENCEPIECE_LIBRARY}" AND EXISTS "${SENTENCEPIECE_TRAIN_LIBRARY}")
+            message(STATUS "✅ Found SentencePiece library: ${SENTENCEPIECE_LIBRARY}")
+            message(STATUS "✅ Found SentencePiece training library: ${SENTENCEPIECE_TRAIN_LIBRARY}")
             
-            # Import the XCFramework
+            # Create a combined target that includes both libraries
             add_library(SentencePiece::SentencePiece STATIC IMPORTED)
             set_target_properties(SentencePiece::SentencePiece PROPERTIES
-                IMPORTED_LOCATION "${SENTENCEPIECE_XCFRAMEWORK_PATH}"
-                INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_ROOT_DIR}/ios-device/include"
+                IMPORTED_LOCATION "${SENTENCEPIECE_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${SENTENCEPIECE_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES "${SENTENCEPIECE_TRAIN_LIBRARY}"
             )
             
             set(SENTENCEPIECE_FOUND TRUE)
-            message(STATUS "✅ SentencePiece integration enabled (iOS XCFramework)")
+            message(STATUS "✅ SentencePiece integration enabled (iOS ${IOS_PLATFORM_TYPE} with training)")
         else()
-            message(WARNING "❌ SentencePiece XCFramework not found at: ${SENTENCEPIECE_XCFRAMEWORK_PATH}")
+            message(WARNING "❌ SentencePiece library not found at: ${SENTENCEPIECE_LIBRARY}")
             message(STATUS "Run: cd sdk/corecpp/third_party && make -f Makefile.sentencepiece ios")
             set(SENTENCEPIECE_FOUND FALSE)
         endif()
@@ -391,41 +405,28 @@ if(APPLE)
     # iOS has ICU in the platform SDK
     
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        # iOS - ICU is available in the iOS SDK
-        find_library(ICU_UC_LIBRARY icuuc HINTS ${CMAKE_OSX_SYSROOT}/usr/lib)
-        find_library(ICU_I18N_LIBRARY icui18n HINTS ${CMAKE_OSX_SYSROOT}/usr/lib)
-        find_library(ICU_DATA_LIBRARY icudata HINTS ${CMAKE_OSX_SYSROOT}/usr/lib)
-        find_path(ICU_INCLUDE_DIR unicode/unistr.h HINTS ${CMAKE_OSX_SYSROOT}/usr/include)
+        # iOS - Use libicucore (Apple's bundled ICU) like macOS
+        find_library(ICU_CORE_LIBRARY icucore HINTS ${CMAKE_OSX_SYSROOT}/usr/lib)
+        find_path(ICU_INCLUDE_DIR unicode/ptypes.h HINTS ${CMAKE_OSX_SYSROOT}/usr/include)
         
-        if(ICU_UC_LIBRARY AND ICU_I18N_LIBRARY AND ICU_DATA_LIBRARY AND ICU_INCLUDE_DIR)
-            message(STATUS "✅ Found iOS ICU libraries:")
-            message(STATUS "  - UC: ${ICU_UC_LIBRARY}")
-            message(STATUS "  - I18N: ${ICU_I18N_LIBRARY}")
-            message(STATUS "  - Data: ${ICU_DATA_LIBRARY}")
+        if(ICU_CORE_LIBRARY AND ICU_INCLUDE_DIR)
+            message(STATUS "✅ Found iOS ICU library:")
+            message(STATUS "  - ICU Core: ${ICU_CORE_LIBRARY}")
             message(STATUS "  - Include: ${ICU_INCLUDE_DIR}")
             
-            # Create ICU targets
-            add_library(ICU::uc SHARED IMPORTED)
-            set_target_properties(ICU::uc PROPERTIES
-                IMPORTED_LOCATION "${ICU_UC_LIBRARY}"
+            # Create a unified ICU target for iOS (like macOS)
+            add_library(ICU::core SHARED IMPORTED)
+            set_target_properties(ICU::core PROPERTIES
+                IMPORTED_LOCATION "${ICU_CORE_LIBRARY}"
                 INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
             )
             
-            add_library(ICU::i18n SHARED IMPORTED)
-            set_target_properties(ICU::i18n PROPERTIES
-                IMPORTED_LOCATION "${ICU_I18N_LIBRARY}"
-                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
-                INTERFACE_LINK_LIBRARIES ICU::uc
-            )
-            
-            add_library(ICU::data SHARED IMPORTED)
-            set_target_properties(ICU::data PROPERTIES
-                IMPORTED_LOCATION "${ICU_DATA_LIBRARY}"
-                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
-            )
+            # Create aliases for compatibility with other platforms
+            add_library(ICU::uc ALIAS ICU::core)
+            add_library(ICU::i18n ALIAS ICU::core)
             
             set(ICU_FOUND TRUE)
-            set(ICU_TYPE "iOS SDK")
+            set(ICU_TYPE "iOS ICU Core")
         else()
             message(WARNING "❌ iOS ICU libraries not found")
             set(ICU_FOUND FALSE)
@@ -680,6 +681,131 @@ else()
     endif()
 endif()
 
+# ==============================================================================
+# TensorFlow Lite Integration
+# ==============================================================================
+
+set(TENSORFLOWLITE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/tensorflowlite_mybuild")
+
+# TensorFlow Lite supported on Apple platforms with custom builds
+if(APPLE)
+    # Determine platform-specific library directory
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
+            # iOS Simulator - ARM64 only (x86_64 not supported)
+            set(TENSORFLOWLITE_PLATFORM_DIR "${TENSORFLOWLITE_ROOT_DIR}/ios_simulator_arm64")
+            set(TENSORFLOWLITE_PLATFORM_NAME "iOS Simulator")
+            
+            # Check if we're building for ARM64
+            if(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+                message(WARNING "⚠️  TensorFlow Lite: x86_64 iOS simulator not supported in custom build")
+                message(STATUS "   Supported architectures:")
+                message(STATUS "   - ARM64 iOS simulator ✅")
+                message(STATUS "   - x86_64 iOS simulator ❌ (not included in custom build)")
+                message(STATUS "💡 Building iOS simulator without TensorFlow Lite for x86_64 architecture")
+                set(TENSORFLOWLITE_FOUND FALSE)
+            else()
+                message(STATUS "✅ Using TensorFlow Lite for iOS Simulator (ARM64)")
+                set(TENSORFLOWLITE_FOUND TRUE)
+            endif()
+        else()
+            # iOS Device - ARM64
+            set(TENSORFLOWLITE_PLATFORM_DIR "${TENSORFLOWLITE_ROOT_DIR}/ios_arm64")
+            set(TENSORFLOWLITE_PLATFORM_NAME "iOS Device")
+            message(STATUS "✅ Using TensorFlow Lite for iOS Device (ARM64)")
+            set(TENSORFLOWLITE_FOUND TRUE)
+        endif()
+    else()
+        # macOS - ARM64 only (x86_64 not supported)
+        set(TENSORFLOWLITE_PLATFORM_DIR "${TENSORFLOWLITE_ROOT_DIR}/macos_arm64")
+        set(TENSORFLOWLITE_PLATFORM_NAME "macOS")
+        
+        # Check if we're building for ARM64
+        if(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+            message(WARNING "⚠️  TensorFlow Lite: x86_64 macOS not supported in custom build")
+            message(STATUS "   Supported architectures:")
+            message(STATUS "   - ARM64 macOS ✅")
+            message(STATUS "   - x86_64 macOS ❌ (not included in custom build)")
+            message(STATUS "💡 Building macOS without TensorFlow Lite for x86_64 architecture")
+            set(TENSORFLOWLITE_FOUND FALSE)
+        else()
+            message(STATUS "✅ Using TensorFlow Lite for macOS (ARM64)")
+            set(TENSORFLOWLITE_FOUND TRUE)
+        endif()
+    endif()
+    
+    if(TENSORFLOWLITE_FOUND)
+        # Define framework paths for the selected platform
+        set(TENSORFLOWLITE_C_FRAMEWORK "${TENSORFLOWLITE_PLATFORM_DIR}/TensorFlowLiteC.framework")
+        set(TENSORFLOWLITE_COREML_FRAMEWORK "${TENSORFLOWLITE_PLATFORM_DIR}/TensorFlowLiteCCoreML.framework")
+        set(TENSORFLOWLITE_METAL_FRAMEWORK "${TENSORFLOWLITE_PLATFORM_DIR}/TensorFlowLiteCMetal.framework")
+        set(TENSORFLOWLITE_SELECT_TF_OPS_FRAMEWORK "${TENSORFLOWLITE_PLATFORM_DIR}/TensorFlowLiteSelectTfOps.framework")
+        
+        # Check if frameworks exist
+        set(TENSORFLOWLITE_FRAMEWORKS_FOUND TRUE)
+        foreach(FRAMEWORK_PATH 
+            "${TENSORFLOWLITE_C_FRAMEWORK}"
+            "${TENSORFLOWLITE_COREML_FRAMEWORK}" 
+            "${TENSORFLOWLITE_METAL_FRAMEWORK}"
+            "${TENSORFLOWLITE_SELECT_TF_OPS_FRAMEWORK}")
+            
+            get_filename_component(FRAMEWORK_NAME "${FRAMEWORK_PATH}" NAME_WE)
+            if(NOT EXISTS "${FRAMEWORK_PATH}")
+                message(WARNING "❌ ${FRAMEWORK_NAME} framework not found at: ${FRAMEWORK_PATH}")
+                set(TENSORFLOWLITE_FRAMEWORKS_FOUND FALSE)
+            endif()
+        endforeach()
+        
+        if(TENSORFLOWLITE_FRAMEWORKS_FOUND)
+            # Create imported targets for each framework
+            add_library(TensorFlowLite::Core SHARED IMPORTED)
+            set_target_properties(TensorFlowLite::Core PROPERTIES
+                IMPORTED_LOCATION "${TENSORFLOWLITE_C_FRAMEWORK}/TensorFlowLiteC"
+                INTERFACE_INCLUDE_DIRECTORIES "${TENSORFLOWLITE_C_FRAMEWORK}/Headers"
+            )
+            
+            add_library(TensorFlowLite::CoreML SHARED IMPORTED)
+            set_target_properties(TensorFlowLite::CoreML PROPERTIES
+                IMPORTED_LOCATION "${TENSORFLOWLITE_COREML_FRAMEWORK}/TensorFlowLiteCCoreML"
+                INTERFACE_INCLUDE_DIRECTORIES "${TENSORFLOWLITE_COREML_FRAMEWORK}/Headers"
+                INTERFACE_LINK_LIBRARIES TensorFlowLite::Core
+            )
+            
+            add_library(TensorFlowLite::Metal SHARED IMPORTED)
+            set_target_properties(TensorFlowLite::Metal PROPERTIES
+                IMPORTED_LOCATION "${TENSORFLOWLITE_METAL_FRAMEWORK}/TensorFlowLiteCMetal"
+                INTERFACE_INCLUDE_DIRECTORIES "${TENSORFLOWLITE_METAL_FRAMEWORK}/Headers"
+                INTERFACE_LINK_LIBRARIES TensorFlowLite::Core
+            )
+            
+            add_library(TensorFlowLite::SelectTfOps SHARED IMPORTED)
+            set_target_properties(TensorFlowLite::SelectTfOps PROPERTIES
+                IMPORTED_LOCATION "${TENSORFLOWLITE_SELECT_TF_OPS_FRAMEWORK}/TensorFlowLiteSelectTfOps"
+                INTERFACE_LINK_LIBRARIES TensorFlowLite::Core
+            )
+            
+            # Create a combined target with core components (excluding SelectTfOps to avoid protobuf conflicts)
+            add_library(TensorFlowLite::TensorFlowLite INTERFACE IMPORTED)
+            set_target_properties(TensorFlowLite::TensorFlowLite PROPERTIES
+                INTERFACE_LINK_LIBRARIES "TensorFlowLite::Core;TensorFlowLite::CoreML;TensorFlowLite::Metal"
+            )
+            
+            message(STATUS "✅ TensorFlow Lite integration enabled for ${TENSORFLOWLITE_PLATFORM_NAME}")
+            message(STATUS "  - Core: ${TENSORFLOWLITE_C_FRAMEWORK}")
+            message(STATUS "  - CoreML: ${TENSORFLOWLITE_COREML_FRAMEWORK}")
+            message(STATUS "  - Metal: ${TENSORFLOWLITE_METAL_FRAMEWORK}")
+            message(STATUS "  - SelectTfOps: ${TENSORFLOWLITE_SELECT_TF_OPS_FRAMEWORK} (excluded to avoid protobuf conflicts)")
+            message(STATUS "  - Core delegates included ✅")
+        else()
+            message(WARNING "❌ Some TensorFlow Lite frameworks missing for ${TENSORFLOWLITE_PLATFORM_NAME}")
+            set(TENSORFLOWLITE_FOUND FALSE)
+        endif()
+    endif()
+else()
+    message(STATUS "⚠️  TensorFlow Lite only supported on Apple platforms")
+    set(TENSORFLOWLITE_FOUND FALSE)
+endif()
+
 # Add subdirectories
 add_subdirectory(corecpp)
 
@@ -717,4 +843,4 @@ configure_package_config_file(
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LeafraSDKConfig.cmake"
     DESTINATION lib/cmake/LeafraSDK
-) 
+)

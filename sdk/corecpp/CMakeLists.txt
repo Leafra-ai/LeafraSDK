@@ -118,6 +118,28 @@ else()
     message(STATUS "⚠️  Building LeafraCore without ICU")
 endif()
 
+# Link TensorFlow Lite if available (defined in parent CMakeLists.txt)
+if(TARGET TensorFlowLite::TensorFlowLite)
+    target_link_libraries(LeafraCore PRIVATE TensorFlowLite::TensorFlowLite)
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_TENSORFLOWLITE=1)
+    
+    # Link required Apple system frameworks for TensorFlow Lite delegates
+    if(APPLE)
+        target_link_libraries(LeafraCore PRIVATE 
+            "-framework Metal"
+            "-framework MetalKit"
+            "-framework CoreML"
+            "-framework Accelerate"
+        )
+        message(STATUS "✅ Linked Apple system frameworks for TensorFlow Lite")
+    endif()
+    
+    message(STATUS "✅ LeafraCore linked with TensorFlow Lite")
+    message(STATUS "  - Core functionality only (delegates in future update)")
+else()
+    message(STATUS "⚠️  Building LeafraCore without TensorFlow Lite")
+endif()
+
 # Platform-specific libraries for logging
 if(APPLE)
     # iOS/macOS - os_log is part of the system, link Foundation framework

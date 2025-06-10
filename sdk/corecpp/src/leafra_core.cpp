@@ -8,11 +8,22 @@
 #include "leafra/leafra_sentencepiece.h"
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 #ifdef LEAFRA_HAS_PDFIUM
 #include "fpdfview.h"
 #include "fpdf_text.h"
 #include "fpdf_doc.h"
+#endif
+
+#ifdef LEAFRA_HAS_TENSORFLOWLITE
+// TensorFlow Lite C API headers - start with core functionality only
+#include "c_api.h"
+#include "c_api_types.h"
+#include "builtin_ops.h"
+
+// Note: Starting with core TensorFlow Lite functionality only
+// Delegates will be added in a future update
 #endif
 
 namespace leafra {
@@ -42,12 +53,29 @@ public:
     std::unique_ptr<LeafraChunker> chunker_;
     std::unique_ptr<SentencePieceTokenizer> tokenizer_;
     
+#ifdef LEAFRA_HAS_TENSORFLOWLITE
+    // TensorFlow Lite inference components
+    TfLiteModel* tf_model_;
+    TfLiteInterpreter* tf_interpreter_;
+    TfLiteInterpreterOptions* tf_options_;
+    std::vector<TfLiteDelegate*> tf_delegates_;
+    bool tf_initialized_;
+#endif
+    
     Impl() : initialized_(false), event_callback_(nullptr) {
         data_processor_ = std::make_unique<DataProcessor>();
         math_utils_ = std::make_unique<MathUtils>();
         file_parser_ = std::make_unique<FileParsingWrapper>();
         chunker_ = std::make_unique<LeafraChunker>();
         tokenizer_ = std::make_unique<SentencePieceTokenizer>();
+        
+#ifdef LEAFRA_HAS_TENSORFLOWLITE
+        // Initialize TensorFlow Lite variables
+        tf_model_ = nullptr;
+        tf_interpreter_ = nullptr;
+        tf_options_ = nullptr;
+        tf_initialized_ = false;
+#endif
     }
     
     void send_event(const std::string& message) {
@@ -141,7 +169,6 @@ ResultCode LeafraCore::initialize(const Config& config) {
                 if (loaded) {
                     LEAFRA_INFO() << "✅ SentencePiece model loaded from: " << config.tokenizer.sentencepiece_model_path;
                     LEAFRA_INFO() << "  - Vocabulary size: " << pImpl->tokenizer_->get_vocab_size();
-                    //here
                 } else {
                     LEAFRA_WARNING() << "⚠️  Failed to load SentencePiece model from: " << config.tokenizer.sentencepiece_model_path;                    
                 }
@@ -151,6 +178,81 @@ ResultCode LeafraCore::initialize(const Config& config) {
         } else if (config.tokenizer.enable_sentencepiece) {
             LEAFRA_WARNING() << "⚠️  SentencePiece requested but tokenizer not available";
         }
+
+#ifdef LEAFRA_HAS_TENSORFLOWLITE
+        // Initialize TensorFlow Lite embedding model if enabled
+        if (config.embedding_inference.is_valid()) {
+            LEAFRA_INFO() << "Initializing TensorFlow Lite embedding model";
+            LEAFRA_INFO() << "  - Framework: " << config.embedding_inference.framework;
+            LEAFRA_INFO() << "  - Model path: " << config.embedding_inference.model_path;
+            
+            // Check if model file exists
+            std::ifstream model_file(config.embedding_inference.model_path, std::ios::binary);
+            if (!model_file.good()) {
+                LEAFRA_ERROR() << "❌ TensorFlow Lite model file not found: " << config.embedding_inference.model_path;
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            model_file.close();
+            
+            // Load the model
+            pImpl->tf_model_ = TfLiteModelCreateFromFile(config.embedding_inference.model_path.c_str());
+            if (!pImpl->tf_model_) {
+                LEAFRA_ERROR() << "❌ Failed to load TensorFlow Lite model from: " << config.embedding_inference.model_path;
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            
+            // Create interpreter options
+            pImpl->tf_options_ = TfLiteInterpreterOptionsCreate();
+            
+            // Set number of threads
+            if (config.embedding_inference.num_threads > 0) {
+                TfLiteInterpreterOptionsSetNumThreads(pImpl->tf_options_, config.embedding_inference.num_threads);
+                LEAFRA_DEBUG() << "  - Threads: " << config.embedding_inference.num_threads;
+            } else {
+                // Use SDK-level thread configuration or default
+                int threads = config.max_threads > 0 ? config.max_threads : 4;
+                TfLiteInterpreterOptionsSetNumThreads(pImpl->tf_options_, threads);
+                LEAFRA_DEBUG() << "  - Threads: " << threads << " (auto)";
+            }
+            
+            // Note: Delegates are disabled for now to simplify initial integration
+            // They will be added in a future update once basic functionality is working
+            LEAFRA_INFO() << "  - Delegates: DISABLED (will be added in future update)";
+            
+            // Create interpreter
+            pImpl->tf_interpreter_ = TfLiteInterpreterCreate(pImpl->tf_model_, pImpl->tf_options_);
+            if (!pImpl->tf_interpreter_) {
+                LEAFRA_ERROR() << "❌ Failed to create TensorFlow Lite interpreter";
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            
+            // Allocate tensors
+            TfLiteStatus allocate_status = TfLiteInterpreterAllocateTensors(pImpl->tf_interpreter_);
+            if (allocate_status != kTfLiteOk) {
+                LEAFRA_ERROR() << "❌ Failed to allocate tensors for TensorFlow Lite interpreter";
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            
+            // Log model information
+            int32_t input_count = TfLiteInterpreterGetInputTensorCount(pImpl->tf_interpreter_);
+            int32_t output_count = TfLiteInterpreterGetOutputTensorCount(pImpl->tf_interpreter_);
+            
+            LEAFRA_INFO() << "✅ TensorFlow Lite model initialized successfully";
+            LEAFRA_INFO() << "  - Input tensors: " << input_count;
+            LEAFRA_INFO() << "  - Output tensors: " << output_count;
+            LEAFRA_INFO() << "  - Delegates: " << pImpl->tf_delegates_.size();
+            
+            pImpl->tf_initialized_ = true;
+        } else if (config.embedding_inference.enabled) {
+            LEAFRA_WARNING() << "⚠️  Embedding model inference enabled but configuration is invalid";
+            LEAFRA_WARNING() << "    Framework: '" << config.embedding_inference.framework << "'";
+            LEAFRA_WARNING() << "    Model path: '" << config.embedding_inference.model_path << "'";
+        }
+#else
+        if (config.embedding_inference.enabled) {
+            LEAFRA_WARNING() << "⚠️  TensorFlow Lite embedding model requested but not available (library not linked)";
+        }
+#endif
         
         pImpl->initialized_ = true;
         LEAFRA_INFO() << "LeafraSDK initialized successfully";
@@ -159,6 +261,12 @@ ResultCode LeafraCore::initialize(const Config& config) {
         LEAFRA_INFO() << "✅ PDFium integration: ENABLED";
 #else
         LEAFRA_WARNING() << "⚠️  PDFium integration: DISABLED (library not found)";
+#endif
+
+#ifdef LEAFRA_HAS_TENSORFLOWLITE
+        LEAFRA_INFO() << "✅ TensorFlow Lite integration: ENABLED";
+#else
+        LEAFRA_WARNING() << "⚠️  TensorFlow Lite integration: DISABLED (library not found)";
 #endif
         
         pImpl->send_event("LeafraSDK initialized successfully");
@@ -177,6 +285,46 @@ ResultCode LeafraCore::shutdown() {
     }
     
     try {
+#ifdef LEAFRA_HAS_TENSORFLOWLITE
+        // Cleanup TensorFlow Lite resources
+        if (pImpl->tf_initialized_) {
+            LEAFRA_DEBUG() << "Shutting down TensorFlow Lite";
+            
+            // Clean up interpreter
+            if (pImpl->tf_interpreter_) {
+                TfLiteInterpreterDelete(pImpl->tf_interpreter_);
+                pImpl->tf_interpreter_ = nullptr;
+            }
+            
+            // Clean up delegates
+            for (TfLiteDelegate* delegate : pImpl->tf_delegates_) {
+                if (delegate) {
+                    // Note: Delegates are automatically cleaned up when interpreter is deleted,
+                    // but we can explicitly delete them if needed for specific delegate types
+#if defined(__APPLE__)
+                    // For CoreML and Metal delegates, they are automatically cleaned up
+#endif
+                }
+            }
+            pImpl->tf_delegates_.clear();
+            
+            // Clean up options
+            if (pImpl->tf_options_) {
+                TfLiteInterpreterOptionsDelete(pImpl->tf_options_);
+                pImpl->tf_options_ = nullptr;
+            }
+            
+            // Clean up model
+            if (pImpl->tf_model_) {
+                TfLiteModelDelete(pImpl->tf_model_);
+                pImpl->tf_model_ = nullptr;
+            }
+            
+            pImpl->tf_initialized_ = false;
+            LEAFRA_DEBUG() << "TensorFlow Lite shutdown completed";
+        }
+#endif
+        
         // Shutdown chunker
         if (pImpl->chunker_) {
             // Note: If LeafraChunker doesn't have a shutdown method, the destructor will handle cleanup
@@ -334,6 +482,9 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                 //AD TODO: pad the token_ids to 512 exactly 
                                 //load the executorch model and run it on the token_ids
                                 // Store both the token count and the actual token IDs
+
+
+                                
                                 chunk.estimated_tokens = token_ids.size(); // Replace estimate with actual count
                                 chunk.token_ids = std::move(token_ids);    // Store the actual token IDs
                                 total_actual_tokens += chunk.estimated_tokens;
