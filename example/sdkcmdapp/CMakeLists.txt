@@ -14,16 +14,16 @@ set(LEAFRA_BUILD_RN_BINDINGS OFF)
 # This assumes the SDK is built and installed, or we're building from the parent directory
 if(NOT TARGET LeafraCore)
     # Try to find LeafraCore in parent directories
-    find_path(LEAFRA_SDK_ROOT 
+    find_path(LEAFRA_REPO_ROOT 
         NAMES sdk/corecpp/include/leafra/leafra_core.h
         PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../..
         NO_DEFAULT_PATH
     )
     
-    if(LEAFRA_SDK_ROOT)
-        message(STATUS "Found LeafraSDK at: ${LEAFRA_SDK_ROOT}")
+    if(LEAFRA_REPO_ROOT)
+        message(STATUS "Found LeafraSDK repository at: ${LEAFRA_REPO_ROOT}")
         # Include the full SDK directory to get PDFium configuration
-        add_subdirectory(${LEAFRA_SDK_ROOT}/sdk leafra-sdk)
+        add_subdirectory(${LEAFRA_REPO_ROOT}/sdk leafra-sdk)
     else()
         message(FATAL_ERROR "Could not find LeafraSDK. Please ensure this example is in the correct directory structure.")
     endif()
@@ -36,11 +36,20 @@ add_executable(sdkcmdline sdkcmdline.cpp)
 target_link_libraries(sdkcmdline PRIVATE LeafraCore)
 
 # Include directories - point to the SDK headers
-if(LEAFRA_SDK_ROOT)
-    target_include_directories(sdkcmdline PRIVATE ${LEAFRA_SDK_ROOT}/sdk/corecpp/include)
+if(LEAFRA_REPO_ROOT)
+    target_include_directories(sdkcmdline PRIVATE ${LEAFRA_REPO_ROOT}/sdk/corecpp/include)
+    # Add SDK root macros for use in C++ code
+    target_compile_definitions(sdkcmdline PRIVATE
+        LEAFRA_SDK_ROOT="${LEAFRA_REPO_ROOT}/sdk"
+        LEAFRA_SDK_MODELS_ROOT="${LEAFRA_REPO_ROOT}/sdk/corecpp/third_party/models"
+    )
 else()
     # Fallback - assume we're building as part of the main project
     target_include_directories(sdkcmdline PRIVATE ../../sdk/corecpp/include)
+    target_compile_definitions(sdkcmdline PRIVATE
+        LEAFRA_SDK_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../../sdk"
+        LEAFRA_SDK_MODELS_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/corecpp/third_party/models"
+    )
 endif()
 
 # Platform-specific settings

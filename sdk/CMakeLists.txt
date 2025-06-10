@@ -5,6 +5,27 @@ project(LeafraSDK VERSION 1.0.0 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ==============================================================================
+# SDK Root Path Configuration
+# ==============================================================================
+
+# Define SDK root paths for use throughout the build system
+set(LEAFRA_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+set(LEAFRA_SDK_CORECPP_ROOT "${LEAFRA_SDK_ROOT}/corecpp")
+set(LEAFRA_SDK_THIRD_PARTY_ROOT "${LEAFRA_SDK_CORECPP_ROOT}/third_party")
+set(LEAFRA_SDK_MODELS_ROOT "${LEAFRA_SDK_THIRD_PARTY_ROOT}/models")
+set(LEAFRA_SDK_PREBUILT_ROOT "${LEAFRA_SDK_THIRD_PARTY_ROOT}/prebuilt")
+
+# Define paths as preprocessor macros for C++ code
+add_compile_definitions(
+    LEAFRA_SDK_ROOT="${LEAFRA_SDK_ROOT}"
+    LEAFRA_SDK_MODELS_ROOT="${LEAFRA_SDK_MODELS_ROOT}"
+)
+
+message(STATUS "📁 LeafraSDK Root: ${LEAFRA_SDK_ROOT}")
+message(STATUS "📁 Models Directory: ${LEAFRA_SDK_MODELS_ROOT}")
+message(STATUS "📁 Prebuilt Libraries: ${LEAFRA_SDK_PREBUILT_ROOT}")
+
 # Platform detection
 if(APPLE)
     set(LEAFRA_PLATFORM "apple")
@@ -31,7 +52,7 @@ option(LEAFRA_BUILD_EXAMPLES "Build examples" OFF)
 option(LEAFRA_BUILD_RN_BINDINGS "Build React Native bindings" ON)
 
 # PDFium Integration
-set(PDFIUM_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/pdfium/paulocoutinhox")
+set(PDFIUM_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/pdfium/paulocoutinhox")
 
 # Platform-specific PDFium configuration
 if(APPLE)
@@ -102,7 +123,7 @@ endif()
 # SQLite Integration
 # ==============================================================================
 
-set(SQLITE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/sqlite")
+set(SQLITE_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/sqlite")
 
 # Platform-specific SQLite configuration
 if(APPLE)
@@ -234,7 +255,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/corecpp/include)
 # SentencePiece Integration
 # ==============================================================================
 
-set(SENTENCEPIECE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/sentencepiece")
+set(SENTENCEPIECE_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/sentencepiece")
 
 # Platform-specific SentencePiece configuration
 if(APPLE)
@@ -682,13 +703,75 @@ else()
 endif()
 
 # ==============================================================================
+# Embedding Framework Selection
+# ==============================================================================
+
+# Get selected embedding framework from command line
+if(DEFINED LEAFRA_EMBEDDING_FRAMEWORK)
+    set(SELECTED_EMBEDDING_FW "${LEAFRA_EMBEDDING_FRAMEWORK}")
+    message(STATUS "🎯 Embedding framework selected: ${SELECTED_EMBEDDING_FW}")
+else()
+    message(FATAL_ERROR "❌ Embedding framework is required! Use build.sh --embedding-fw=<framework>")
+endif()
+
+# ==============================================================================
+# Apple CoreML Integration
+# ==============================================================================
+
+if(APPLE AND SELECTED_EMBEDDING_FW STREQUAL "coreml")
+    # Find CoreML framework on Apple platforms
+    find_library(COREML_FRAMEWORK CoreML)
+    
+    if(COREML_FRAMEWORK)
+        message(STATUS "✅ Found CoreML framework: ${COREML_FRAMEWORK}")
+        
+        # Create CoreML imported target
+        add_library(Apple::CoreML SHARED IMPORTED)
+        set_target_properties(Apple::CoreML PROPERTIES
+            IMPORTED_LOCATION "${COREML_FRAMEWORK}"
+        )
+        
+        set(COREML_FOUND TRUE)
+        message(STATUS "✅ CoreML integration enabled")
+    else()
+        message(WARNING "❌ CoreML framework not found")
+        set(COREML_FOUND FALSE)
+    endif()
+elseif(SELECTED_EMBEDDING_FW STREQUAL "coreml")
+    if(APPLE)
+        message(FATAL_ERROR "❌ CoreML framework not found on this Apple platform")
+    else()
+        message(FATAL_ERROR "❌ CoreML only supported on iOS and macOS platforms (current: ${CMAKE_SYSTEM_NAME})")
+    endif()
+else()
+    message(STATUS "⚠️  CoreML skipped (${SELECTED_EMBEDDING_FW} framework selected)")
+    set(COREML_FOUND FALSE)
+endif()
+
+# ==============================================================================
+# TensorFlow Integration (Full TensorFlow)
+# ==============================================================================
+
+if(SELECTED_EMBEDDING_FW STREQUAL "tf")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        # TensorFlow integration not yet implemented
+        message(FATAL_ERROR "❌ TensorFlow framework requested but not yet implemented\n    Please install TensorFlow v2.17 and implement integration")
+    else()
+        message(FATAL_ERROR "❌ TensorFlow only supported on macOS and Windows platforms (current: ${CMAKE_SYSTEM_NAME})")
+    endif()
+else()
+    message(STATUS "⚠️  TensorFlow skipped (${SELECTED_EMBEDDING_FW} framework selected)")
+    set(TENSORFLOW_FOUND FALSE)
+endif()
+
+# ==============================================================================
 # TensorFlow Lite Integration
 # ==============================================================================
 
-set(TENSORFLOWLITE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/corecpp/third_party/prebuilt/tensorflowlite_mybuild")
+set(TENSORFLOWLITE_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/tensorflowlite_mybuild")
 
 # TensorFlow Lite supported on Apple platforms with custom builds
-if(APPLE)
+if(APPLE AND SELECTED_EMBEDDING_FW STREQUAL "tflite")
     # Determine platform-specific library directory
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
@@ -716,22 +799,11 @@ if(APPLE)
             set(TENSORFLOWLITE_FOUND TRUE)
         endif()
     else()
-        # macOS - ARM64 only (x86_64 not supported)
-        set(TENSORFLOWLITE_PLATFORM_DIR "${TENSORFLOWLITE_ROOT_DIR}/macos_arm64")
-        set(TENSORFLOWLITE_PLATFORM_NAME "macOS")
-        
-        # Check if we're building for ARM64
-        if(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
-            message(WARNING "⚠️  TensorFlow Lite: x86_64 macOS not supported in custom build")
-            message(STATUS "   Supported architectures:")
-            message(STATUS "   - ARM64 macOS ✅")
-            message(STATUS "   - x86_64 macOS ❌ (not included in custom build)")
-            message(STATUS "💡 Building macOS without TensorFlow Lite for x86_64 architecture")
-            set(TENSORFLOWLITE_FOUND FALSE)
-        else()
-            message(STATUS "✅ Using TensorFlow Lite for macOS (ARM64)")
-            set(TENSORFLOWLITE_FOUND TRUE)
-        endif()
+        # macOS - TensorFlow Lite not supported (no prebuilt frameworks)
+        message(STATUS "⚠️  TensorFlow Lite not supported on macOS")
+        message(STATUS "   Reason: No macOS frameworks available")
+        message(STATUS "💡 Building macOS without TensorFlow Lite")
+        set(TENSORFLOWLITE_FOUND FALSE)
     endif()
     
     if(TENSORFLOWLITE_FOUND)
@@ -784,6 +856,7 @@ if(APPLE)
                 INTERFACE_LINK_LIBRARIES TensorFlowLite::Core
             )
             
+            #TODO AD: SelectTfOps has conflicts - also I am not sure if we really need to now - look into this later 
             # Create a combined target with core components (excluding SelectTfOps to avoid protobuf conflicts)
             add_library(TensorFlowLite::TensorFlowLite INTERFACE IMPORTED)
             set_target_properties(TensorFlowLite::TensorFlowLite PROPERTIES
@@ -794,15 +867,21 @@ if(APPLE)
             message(STATUS "  - Core: ${TENSORFLOWLITE_C_FRAMEWORK}")
             message(STATUS "  - CoreML: ${TENSORFLOWLITE_COREML_FRAMEWORK}")
             message(STATUS "  - Metal: ${TENSORFLOWLITE_METAL_FRAMEWORK}")
-            message(STATUS "  - SelectTfOps: ${TENSORFLOWLITE_SELECT_TF_OPS_FRAMEWORK} (excluded to avoid protobuf conflicts)")
+            message(STATUS "  - SelectTfOps: ${TENSORFLOWLITE_SELECT_TF_OPS_FRAMEWORK} (excluded for now , also has protobuf conflicts)")
             message(STATUS "  - Core delegates included ✅")
         else()
             message(WARNING "❌ Some TensorFlow Lite frameworks missing for ${TENSORFLOWLITE_PLATFORM_NAME}")
             set(TENSORFLOWLITE_FOUND FALSE)
         endif()
     endif()
+elseif(SELECTED_EMBEDDING_FW STREQUAL "tflite")
+    if(APPLE)
+        message(FATAL_ERROR "❌ TensorFlow Lite requested but no prebuilt frameworks available for this platform")
+    else()
+        message(FATAL_ERROR "❌ TensorFlow Lite only supported on iOS and Android platforms (current: ${CMAKE_SYSTEM_NAME})")
+    endif()
 else()
-    message(STATUS "⚠️  TensorFlow Lite only supported on Apple platforms")
+    message(STATUS "⚠️  TensorFlow Lite skipped (${SELECTED_EMBEDDING_FW} framework selected)")
     set(TENSORFLOWLITE_FOUND FALSE)
 endif()
 

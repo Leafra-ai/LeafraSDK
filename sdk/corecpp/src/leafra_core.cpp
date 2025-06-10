@@ -16,6 +16,11 @@
 #include "fpdf_doc.h"
 #endif
 
+#ifdef LEAFRA_HAS_COREML
+// CoreML interface header
+#include "leafra/leafra_coreml.h"
+#endif
+
 #ifdef LEAFRA_HAS_TENSORFLOWLITE
 // TensorFlow Lite C API headers - start with core functionality only
 #include "c_api.h"
@@ -53,6 +58,13 @@ public:
     std::unique_ptr<LeafraChunker> chunker_;
     std::unique_ptr<SentencePieceTokenizer> tokenizer_;
     
+#ifdef LEAFRA_HAS_COREML
+    // CoreML inference components
+    void* coreml_model_;                   // MLModel* (opaque pointer for C++)
+    void* coreml_prediction_options_;      // MLPredictionOptions* (opaque pointer for C++)
+    bool coreml_initialized_;
+#endif
+    
 #ifdef LEAFRA_HAS_TENSORFLOWLITE
     // TensorFlow Lite inference components
     TfLiteModel* tf_model_;
@@ -68,6 +80,13 @@ public:
         file_parser_ = std::make_unique<FileParsingWrapper>();
         chunker_ = std::make_unique<LeafraChunker>();
         tokenizer_ = std::make_unique<SentencePieceTokenizer>();
+        
+#ifdef LEAFRA_HAS_COREML
+        // Initialize CoreML variables
+        coreml_model_ = nullptr;
+        coreml_prediction_options_ = nullptr;
+        coreml_initialized_ = false;
+#endif
         
 #ifdef LEAFRA_HAS_TENSORFLOWLITE
         // Initialize TensorFlow Lite variables
@@ -179,6 +198,52 @@ ResultCode LeafraCore::initialize(const Config& config) {
             LEAFRA_WARNING() << "⚠️  SentencePiece requested but tokenizer not available";
         }
 
+#ifdef LEAFRA_HAS_COREML
+        // Initialize CoreML embedding model if enabled
+        if (config.embedding_inference.is_valid() && config.embedding_inference.framework == "coreml") {
+            LEAFRA_INFO() << "Initializing CoreML embedding model";
+            LEAFRA_INFO() << "  - Framework: " << config.embedding_inference.framework;
+            LEAFRA_INFO() << "  - Model path: " << config.embedding_inference.model_path;
+            LEAFRA_INFO() << "  - Compute units: " << config.embedding_inference.coreml_compute_units;
+            
+            // Check if model file exists
+            std::ifstream model_file(config.embedding_inference.model_path, std::ios::binary);
+            if (!model_file.good()) {
+                LEAFRA_ERROR() << "❌ CoreML model file not found: " << config.embedding_inference.model_path;
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            model_file.close();
+            
+            // Load the CoreML model using the C interface
+            pImpl->coreml_model_ = coreml_create_model(
+                config.embedding_inference.model_path.c_str(),
+                config.embedding_inference.coreml_compute_units.c_str()
+            );
+            
+            if (pImpl->coreml_model_) {
+                // Get model description
+                char description[512];
+                if (coreml_get_model_description(pImpl->coreml_model_, description, sizeof(description))) {
+                    LEAFRA_INFO() << "  - Model description: " << description;
+                }
+                
+                pImpl->coreml_initialized_ = true;
+                LEAFRA_INFO() << "✅ CoreML model initialized successfully";
+            } else {
+                LEAFRA_ERROR() << "❌ Failed to initialize CoreML model";
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+        } else if (config.embedding_inference.enabled && config.embedding_inference.framework == "coreml") {
+            LEAFRA_WARNING() << "⚠️  CoreML embedding model enabled but configuration is invalid";
+            LEAFRA_WARNING() << "    Framework: '" << config.embedding_inference.framework << "'";
+            LEAFRA_WARNING() << "    Model path: '" << config.embedding_inference.model_path << "'";
+        }
+#else
+        if (config.embedding_inference.enabled && config.embedding_inference.framework == "coreml") {
+            LEAFRA_WARNING() << "⚠️  CoreML embedding model requested but not available (framework not linked)";
+        }
+#endif
+
 #ifdef LEAFRA_HAS_TENSORFLOWLITE
         // Initialize TensorFlow Lite embedding model if enabled
         if (config.embedding_inference.is_valid()) {
@@ -205,9 +270,9 @@ ResultCode LeafraCore::initialize(const Config& config) {
             pImpl->tf_options_ = TfLiteInterpreterOptionsCreate();
             
             // Set number of threads
-            if (config.embedding_inference.num_threads > 0) {
-                TfLiteInterpreterOptionsSetNumThreads(pImpl->tf_options_, config.embedding_inference.num_threads);
-                LEAFRA_DEBUG() << "  - Threads: " << config.embedding_inference.num_threads;
+            if (config.embedding_inference.tflite_num_threads > 0) {
+                TfLiteInterpreterOptionsSetNumThreads(pImpl->tf_options_, config.embedding_inference.tflite_num_threads);
+                LEAFRA_DEBUG() << "  - Threads: " << config.embedding_inference.tflite_num_threads;
             } else {
                 // Use SDK-level thread configuration or default
                 int threads = config.max_threads > 0 ? config.max_threads : 4;
@@ -263,6 +328,12 @@ ResultCode LeafraCore::initialize(const Config& config) {
         LEAFRA_WARNING() << "⚠️  PDFium integration: DISABLED (library not found)";
 #endif
 
+#ifdef LEAFRA_HAS_COREML
+        LEAFRA_INFO() << "✅ CoreML integration: ENABLED";
+#else
+        LEAFRA_WARNING() << "⚠️  CoreML integration: DISABLED (framework not found)";
+#endif
+
 #ifdef LEAFRA_HAS_TENSORFLOWLITE
         LEAFRA_INFO() << "✅ TensorFlow Lite integration: ENABLED";
 #else
@@ -285,6 +356,24 @@ ResultCode LeafraCore::shutdown() {
     }
     
     try {
+#ifdef LEAFRA_HAS_COREML
+        // Cleanup CoreML resources
+        if (pImpl->coreml_initialized_) {
+            LEAFRA_DEBUG() << "Shutting down CoreML";
+            
+            // Destroy the CoreML model
+            if (pImpl->coreml_model_) {
+                coreml_destroy_model(pImpl->coreml_model_);
+                pImpl->coreml_model_ = nullptr;
+            }
+            
+            pImpl->coreml_prediction_options_ = nullptr;
+            pImpl->coreml_initialized_ = false;
+            
+            LEAFRA_DEBUG() << "CoreML shutdown completed";
+        }
+#endif
+
 #ifdef LEAFRA_HAS_TENSORFLOWLITE
         // Cleanup TensorFlow Lite resources
         if (pImpl->tf_initialized_) {

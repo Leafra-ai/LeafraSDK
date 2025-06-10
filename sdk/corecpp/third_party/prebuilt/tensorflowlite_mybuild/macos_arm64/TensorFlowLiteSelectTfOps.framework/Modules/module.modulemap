@@ -1,9 +1,0 @@
-framework module TensorFlowLiteSelectTfOps {
-  export *
-  module * { export * }
-  link "dl"
-  link "m"
-  link "pthread"
-  link "z"
-  link framework "CoreFoundation"
-}

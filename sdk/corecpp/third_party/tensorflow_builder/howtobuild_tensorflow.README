@@ -64,22 +64,6 @@ This is required to be able to use the C/C++ APIs directly, pod versions only su
   		//tensorflow/lite/ios:TensorFlowLiteSelectTfOps_framework
 
 
-
-
-	MACOS:
-
-	bazel build --config=macos_arm64 -c opt --cxxopt=--std=c++17 \
-  		//tensorflow/lite/ios:TensorFlowLiteC_framework
-
-	bazel build --config=macos_arm64 -c opt --cxxopt=--std=c++17 \
-		//tensorflow/lite/ios:TensorFlowLiteCMetal_framework
-	
-	bazel build --config=macos_arm64 -c opt --cxxopt=--std=c++17 \
-		//tensorflow/lite/ios:TensorFlowLiteCCoreML_framework
-
-	bazel build -c opt --config=macos_arm64  \
-  		//tensorflow/lite/ios:TensorFlowLiteSelectTfOps_framework
-
 	cp bazel-bin/tensorflow/lite/ios/*.zip ...prebuilt/tensorflow/builtfromsource/apple/
 	
 B) Getting the xcframeworks using cocoapods

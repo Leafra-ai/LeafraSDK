@@ -43,6 +43,10 @@ print_usage() {
     echo "  --macos             Build for macOS"
     echo "  --android           Build for Android"
     echo "  --simulator         Build for iOS Simulator (when using --ios)"
+    echo "  --embedding-fw=FW   Set embedding inference framework:"
+    echo "                        tflite  - TensorFlow Lite (iOS/Android only, from prebuilds) [NOT IMPLEMENTED]"
+    echo "                        tf      - TensorFlow (macOS/Windows, must be preinstalled v2.17) [NOT IMPLEMENTED]"
+    echo "                        coreml  - CoreML (iOS/macOS only, from platform SDK)"
     echo ""
     echo "Targets:"
     echo "  core                Build core C++ library only"
@@ -50,10 +54,11 @@ print_usage() {
     echo "  all                 Build everything (default)"
     echo ""
     echo "Examples:"
-    echo "  $0                  # Build everything for current platform"
-    echo "  $0 --ios core       # Build core library for iOS"
-    echo "  $0 --macos bindings # Build RN bindings for macOS"
-    echo "  $0 --clean --debug  # Clean build and build in debug mode"
+    echo "  $0                              # Build everything for current platform"
+    echo "  $0 --ios core                   # Build core library for iOS"
+    echo "  $0 --macos --embedding-fw=tf    # Build for macOS with TensorFlow"
+    echo "  $0 --ios --embedding-fw=coreml  # Build for iOS with CoreML"
+    echo "  $0 --clean --debug              # Clean build and build in debug mode"
 }
 
 print_info() {
@@ -180,6 +185,7 @@ build_ios() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/ios" \
         -DLEAFRA_BUILD_RN_BINDINGS=OFF \
+        ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) $target
@@ -206,6 +212,7 @@ build_macos() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/macos" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \
+        ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) $target
@@ -237,6 +244,7 @@ build_android() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/android" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \
+        ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) $target
@@ -258,6 +266,7 @@ build_current_platform() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/$PLATFORM" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \
+        ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) $target
@@ -273,6 +282,7 @@ MACOS=false
 ANDROID=false
 SIMULATOR=false
 TARGET="all"
+EMBEDDING_FW=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -308,6 +318,19 @@ while [[ $# -gt 0 ]]; do
             SIMULATOR=true
             shift
             ;;
+        --embedding-fw=*)
+            EMBEDDING_FW="${1#*=}"
+            if [[ "$EMBEDDING_FW" != "tflite" && "$EMBEDDING_FW" != "tf" && "$EMBEDDING_FW" != "coreml" ]]; then
+                print_error "Invalid embedding framework: $EMBEDDING_FW"
+                print_error ""
+                print_error "Valid options by platform:"
+                print_error "  tflite  - TensorFlow Lite (iOS/Android only) [NOT IMPLEMENTED]"
+                print_error "  tf      - TensorFlow (macOS/Windows only) [NOT IMPLEMENTED]" 
+                print_error "  coreml  - CoreML (iOS/macOS only)"
+                exit 1
+            fi
+            shift
+            ;;
         core|bindings|all)
             TARGET="$1"
             shift
@@ -325,6 +348,21 @@ print_info "LeafraSDK Build Script"
 print_info "Platform: $PLATFORM-$ARCH"
 print_info "Build Type: $CMAKE_BUILD_TYPE"
 print_info "Target: $TARGET"
+
+# Check if embedding framework is specified (mandatory)
+if [ -z "$EMBEDDING_FW" ]; then
+    print_error "Embedding framework is required. Use --embedding-fw=<framework>"
+    print_error ""
+    print_error "Valid options by platform:"
+    print_error "  tflite  - TensorFlow Lite (iOS/Android only) [NOT IMPLEMENTED]"
+    print_error "  tf      - TensorFlow (macOS/Windows only) [NOT IMPLEMENTED]" 
+    print_error "  coreml  - CoreML (iOS/macOS only)"
+    print_error ""
+    print_usage
+    exit 1
+fi
+
+print_info "Embedding Framework: $EMBEDDING_FW"
 
 if [ "$CLEAN" = true ]; then
     # Determine platform for cleaning

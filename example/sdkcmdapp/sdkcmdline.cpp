@@ -245,6 +245,8 @@ int main(int argc, char* argv[]) {
         
         // Configure SentencePiece tokenization (optional - will fallback if model not found)
         config.tokenizer.enable_sentencepiece = true;
+        
+        //TODO AD: change this to model path like we do for the embedding_inference.model_path
         config.tokenizer.model_name = "multilingual-e5-small"; // Model name corresponds to folder in models/
         
         // Resolve the model path from the model name
@@ -269,6 +271,15 @@ int main(int argc, char* argv[]) {
         config.chunking.print_chunks_brief = print_chunks_brief;
         config.chunking.max_lines = max_lines;
         
+        config.embedding_inference.enabled = true;
+        config.embedding_inference.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/embedding/generated_models/e5_embedding_model_static_input_512_attention_512.tflite";
+        config.embedding_inference.framework = "tensorflow_lite";
+        config.embedding_inference.tflite_enable_coreml_delegate = true;
+        config.embedding_inference.tflite_enable_metal_delegate = true;
+        config.embedding_inference.tflite_enable_xnnpack_delegate = true;
+        config.embedding_inference.tflite_num_threads = 4;
+
+
         print_separator("SDK Configuration");
         std::cout << "Application: " << config.name << std::endl;
         std::cout << "Platform: Desktop (macOS/Linux/Windows)" << std::endl;

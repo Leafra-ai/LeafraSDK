@@ -31,6 +31,11 @@ set(LEAFRA_CORE_SOURCES
     src/leafra_debug.cpp
 )
 
+# Add CoreML source file on Apple platforms
+if(APPLE AND TARGET Apple::CoreML)
+    list(APPEND LEAFRA_CORE_SOURCES src/leafra_coreml.mm)
+endif()
+
 # Core library headers
 set(LEAFRA_CORE_HEADERS
     include/leafra/leafra_core.h
@@ -45,6 +50,11 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/leafra_chunker.h
     include/leafra/leafra_debug.h
 )
+
+# Add CoreML header on Apple platforms
+if(APPLE AND TARGET Apple::CoreML)
+    list(APPEND LEAFRA_CORE_HEADERS include/leafra/leafra_coreml.h)
+endif()
 
 # Create the core library
 if(LEAFRA_BUILD_SHARED)
@@ -116,6 +126,15 @@ if(TARGET ICU::uc AND TARGET ICU::i18n)
     message(STATUS "✅ LeafraCore linked with ICU")
 else()
     message(STATUS "⚠️  Building LeafraCore without ICU")
+endif()
+
+# Link CoreML if available (defined in parent CMakeLists.txt)
+if(TARGET Apple::CoreML)
+    target_link_libraries(LeafraCore PRIVATE Apple::CoreML)
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_COREML=1)
+    message(STATUS "✅ LeafraCore linked with CoreML")
+else()
+    message(STATUS "⚠️  Building LeafraCore without CoreML")
 endif()
 
 # Link TensorFlow Lite if available (defined in parent CMakeLists.txt)

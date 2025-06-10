@@ -90,7 +90,7 @@ enum class ResultCode : int32_t {
 struct LEAFRA_API TokenizerConfig {
     // SentencePiece tokenizer configuration
     bool enable_sentencepiece = false;      // Whether to use SentencePiece for accurate token counting
-    std::string model_name = "multilingual-e5-small";         // Model name (corresponds to folder in sdk/corecpp/third_party/models/)
+    std::string model_name ;         // Model name (corresponds to folder in sdk/corecpp/third_party/models/)
     std::string sentencepiece_model_path;       // Path to SentencePiece model file (.model) - can be set manually or resolved from model_name
     std::string sentencepiece_json_path;        // Path to tokenizer config JSON file (tokenizer_config.json) - resolved from model_name
     // Future tokenizer options can be added here
@@ -145,28 +145,28 @@ struct LEAFRA_API ChunkingConfig {
  */
 struct LEAFRA_API EmbeddingModelConfig {
     bool enabled = false;                   // Whether to enable embedding model inference
-    std::string framework = "";             // Inference framework ("tensorflow_lite" only for now)
-    std::string model_path = "";            // Path to the model file (.tflite for TensorFlow Lite)
+    std::string framework = "";             // Inference framework ("coreml", "tensorflow_lite", or "tensorflow")
+    std::string model_path = "";            // Path to the model file (.mlmodel/.mlpackage for CoreML, .tflite for TensorFlow Lite)
     
-    // Delegate configurations (TensorFlow Lite specific)
-    bool enable_coreml_delegate = true;     // Enable CoreML delegate (iOS/macOS only)
-    bool enable_metal_delegate = true;      // Enable Metal GPU delegate (iOS/macOS only)
-    bool enable_xnnpack_delegate = true;    // Enable XNNPACK CPU delegate (cross-platform)
+    // CoreML specific settings (only used when framework = "coreml")
+    std::string coreml_compute_units = "all";      // CoreML compute units: "all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"
     
-    // Performance settings
-    int32_t num_threads = -1;               // Number of threads (-1 = auto)
-    bool use_nnapi = false;                 // Use Android NNAPI (Android only)
+    // TensorFlow Lite delegate configurations (only used when framework = "tflite")
+    bool tflite_enable_coreml_delegate = true;     // Enable CoreML delegate (iOS/macOS only)
+    bool tflite_enable_metal_delegate = true;      // Enable Metal GPU delegate (iOS/macOS only)
+    bool tflite_enable_xnnpack_delegate = true;    // Enable XNNPACK CPU delegate (cross-platform)
+    
+    // TensorFlow Lite performance settings (only used when framework = "tflite")
+    int32_t tflite_num_threads = -1;               // Number of threads (-1 = auto)
+    bool tflite_use_nnapi = false;                 // Use Android NNAPI (Android only)
     
     // Default constructor
     EmbeddingModelConfig() = default;
     
-    // Constructor with model path
-    EmbeddingModelConfig(const std::string& model_path_param, const std::string& framework_param = "tensorflow_lite") 
-        : enabled(true), framework(framework_param), model_path(model_path_param) {}
-    
     // Check if configuration is valid
     bool is_valid() const {
-        return enabled && framework == "tensorflow_lite" && !model_path.empty();
+        return enabled && !framework.empty() && !model_path.empty() &&
+               (framework == "coreml" || framework == "tensorflow_lite" || framework == "tensorflow");
     }
 };
 
