@@ -57,6 +57,9 @@ CoreMLModel::CoreMLModel(const std::string& model_path, ComputeUnits compute_uni
         NSError* error = nil;
         MLModel* model = [MLModel modelWithContentsOfURL:modelURL configuration:configuration error:&error];
         
+        // Release configuration immediately after use
+        [configuration release];
+        
         if (error || !model) {
             std::string errorMsg = "Failed to load CoreML model: ";
             if (error) {
@@ -74,8 +77,7 @@ CoreMLModel::CoreMLModel(const std::string& model_path, ComputeUnits compute_uni
         std::unique_ptr<CoreMLModelImpl> impl_holder(new CoreMLModelImpl());
         impl_holder->model = model;  // Now this pointer will remain valid!
         impl_holder->predictionOptions = [[MLPredictionOptions alloc] init];
-        impl_holder->modelPath = modelPath;
-        impl_holder->computeUnits = computeUnitsStr;
+        // Note: modelPath and computeUnitsStr are temporary and not stored (not needed after construction)
         
         try {
             // Cache all model metadata once for optimal performance
@@ -192,11 +194,10 @@ CoreMLModel::~CoreMLModel() {
             // Release the retained MLModel object
             [impl->model release];
             
-            // ARC will automatically release the Objective-C objects
+            // Release other Objective-C objects (no ARC in this codebase)
+            [impl->predictionOptions release];
             impl->model = nil;
             impl->predictionOptions = nil;
-            impl->modelPath = nil;
-            impl->computeUnits = nil;
             
             delete impl;
             model_ptr_ = nullptr;
@@ -235,10 +236,10 @@ CoreMLModel& CoreMLModel::operator=(CoreMLModel&& other) noexcept {
                 // Release the retained MLModel object
                 [impl->model release];
                 
+                // Release other Objective-C objects (no ARC in this codebase) 
+                [impl->predictionOptions release];
                 impl->model = nil;
                 impl->predictionOptions = nil;
-                impl->modelPath = nil;
-                impl->computeUnits = nil;
                 delete impl;
             }
         }
