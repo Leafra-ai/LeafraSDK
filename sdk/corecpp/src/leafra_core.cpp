@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <iomanip>
 
 #ifdef LEAFRA_HAS_PDFIUM
 #include "fpdfview.h"
@@ -485,6 +486,7 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
     size_t processed_count = 0;
     size_t error_count = 0;
     
+    
     for (const auto& file_path : file_paths) {
         LEAFRA_INFO() << "Processing file: " << file_path;
         pImpl->send_event("Processing file: " + file_path);
@@ -572,13 +574,6 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                     chunk_text = "passage: " + chunk_text;
                                 }
                                 std::vector<int> token_ids = pImpl->tokenizer_->encode_as_ids(chunk_text, SentencePieceTokenizer::TokenizeOptions());
-                                //AD TODO: DON'T exceed 512 tokens per chunk otherwise retrieval will be less accurate 
-                                //AD TODO trim the token_ids to 512 if it's greater than 512
-                                //AD TODO: pad the token_ids to 512 exactly 
-                                //load the executorch model and run it on the token_ids
-                                // Store both the token count and the actual token IDs
-
-                                
                                 
                                 chunk.estimated_tokens = token_ids.size(); // Replace estimate with actual count
                                 chunk.token_ids = std::move(token_ids);    // Store the actual token IDs
@@ -594,10 +589,117 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                 }
                             }
                             
-                            LEAFRA_INFO() << "✅ SentencePiece tokenization completed";
-                            LEAFRA_INFO() << "  - Total actual tokens: " << total_actual_tokens;
-                            LEAFRA_INFO() << "  - Chunks with token IDs: " << chunks.size();
-                            LEAFRA_DEBUG() << "✅ Token IDs stored for all " << chunks.size() << " chunks";
+                                                    LEAFRA_INFO() << "✅ SentencePiece tokenization completed";
+                        LEAFRA_INFO() << "  - Total actual tokens: " << total_actual_tokens;
+                        LEAFRA_INFO() << "  - Chunks with token IDs: " << chunks.size();
+                        LEAFRA_DEBUG() << "✅ Token IDs stored for all " << chunks.size() << " chunks";
+
+#ifdef LEAFRA_HAS_COREML
+                        // Process chunks through CoreML embedding model if available
+                        if (pImpl->coreml_initialized_ && pImpl->coreml_model_) {
+                            LEAFRA_INFO() << "Starting CoreML embedding inference for " << chunks.size() << " chunks";
+                            pImpl->send_event("🧠 Starting embedding inference for " + std::to_string(chunks.size()) + " chunks");
+                            
+                            try {
+                                // Get model input requirements once (cache for performance)
+                                size_t model_input_count = pImpl->coreml_model_->getInputCount();
+                                if (model_input_count != 2) {
+                                    LEAFRA_ERROR() << "Unexpected model input count: " << model_input_count << " (expected 2 for embedding model)";
+                                    return; // Skip embedding for this file
+                                }
+                                
+                                size_t required_input_size = pImpl->coreml_model_->getInputSize(0);
+                                int pad_token = pImpl->tokenizer_->pad_id();
+                                if (pad_token < 0) {
+                                    pad_token = 0; // Default to 0 if pad_id is disabled (-1)
+                                }
+                                
+                                LEAFRA_DEBUG() << "CoreML model expects " << required_input_size << " tokens per input";
+                                LEAFRA_DEBUG() << "Using pad_token: " << pad_token;
+                                
+                                size_t processed_chunks = 0;
+                                size_t successful_embeddings = 0;
+                                
+                                // Pre-allocate vectors for reuse (performance optimization)
+                                std::vector<int> processed_token_ids;
+                                std::vector<float> input_tokens, attention_mask;
+                                processed_token_ids.reserve(required_input_size);
+                                input_tokens.reserve(required_input_size);
+                                attention_mask.reserve(required_input_size);
+                                
+                                // Process each chunk individually
+                                for (auto& chunk : chunks) {
+                                        if (chunk.has_token_ids() && !chunk.token_ids.empty()) {
+                                            try {
+                                                // Reuse pre-allocated vectors (clear and prepare)
+                                                processed_token_ids.clear();
+                                                input_tokens.clear();
+                                                attention_mask.clear();
+                                                
+                                                // Prepare padded/trimmed token sequence
+                                                size_t original_size = chunk.token_ids.size();
+                                                size_t real_token_count = std::min(original_size, required_input_size);
+                                                
+                                                // Copy and resize in one operation
+                                                processed_token_ids.assign(chunk.token_ids.begin(), 
+                                                                          chunk.token_ids.begin() + real_token_count);
+                                                if (processed_token_ids.size() < required_input_size) {
+                                                    processed_token_ids.resize(required_input_size, pad_token);
+                                                }
+                                                
+                                                // Convert int tokens to float and create attention mask in single pass
+                                                input_tokens.resize(required_input_size);
+                                                attention_mask.resize(required_input_size);
+                                                
+                                                for (size_t i = 0; i < required_input_size; ++i) {
+                                                    input_tokens[i] = static_cast<float>(processed_token_ids[i]);
+                                                    attention_mask[i] = (i < real_token_count) ? 1.0f : 0.0f;
+                                                }
+                                                
+                                                // Prepare inputs for CoreML model (fixed order, no validation needed)
+                                                // Note: Input order determined from model.mil function signature:
+                                                // func main(tensor<int32, [1, 512]> attention_mask, tensor<int32, [1, 512]> input_ids)
+                                                std::vector<std::vector<float>> model_inputs = {attention_mask, input_tokens};
+                                                
+                                                // Run embedding inference
+                                                LEAFRA_DEBUG() << "Running CoreML embedding inference for chunk " << (processed_chunks + 1);
+                                                auto embeddings = pImpl->coreml_model_->predict(model_inputs);
+                                                
+                                                if (!embeddings.empty() && !embeddings[0].empty()) {
+                                                    // Store the embedding vector in the chunk
+                                                    chunk.embedding = std::move(embeddings[0]);
+                                                    successful_embeddings++;
+                                                    LEAFRA_DEBUG() << "Generated embedding with " << chunk.embedding.size() << " dimensions for chunk " << (processed_chunks + 1);
+                                                } else {
+                                                    LEAFRA_WARNING() << "CoreML model produced empty embedding for chunk " << (processed_chunks + 1);
+                                                }
+                                                
+                                            } catch (const std::exception& e) {
+                                                LEAFRA_ERROR() << "CoreML embedding inference failed for chunk " << (processed_chunks + 1) << ": " << e.what();
+                                            }
+                                        } else {
+                                            LEAFRA_DEBUG() << "Skipping chunk " << (processed_chunks + 1) << " - no token IDs available";
+                                        }
+                                        
+                                        processed_chunks++;
+                                    }
+                                    
+                                    LEAFRA_INFO() << "✅ CoreML embedding inference completed for file: " << file_path;
+                                    LEAFRA_INFO() << "  - Total chunks processed: " << processed_chunks;
+                                    LEAFRA_INFO() << "  - Successful embeddings: " << successful_embeddings;
+                                    LEAFRA_INFO() << "  - Failed embeddings: " << (processed_chunks - successful_embeddings);
+                                    
+                                } else {
+                                    LEAFRA_WARNING() << "CoreML model has no inputs, cannot process tokens";
+                                }
+                            } catch (const std::exception& e) {
+                                LEAFRA_ERROR() << "CoreML embedding inference failed for file " << file_path << ": " << e.what();
+                            }
+                            
+                        } else if (pImpl->config_.embedding_inference.enabled && pImpl->config_.embedding_inference.framework == "coreml") {
+                            LEAFRA_WARNING() << "CoreML embedding model requested but not initialized";
+                        }
+#endif
                             
                         } else if (pImpl->config_.tokenizer.enable_sentencepiece) {
                             LEAFRA_WARNING() << "SentencePiece requested but not available, using estimates";
@@ -646,6 +748,9 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                 if (chunk.has_token_ids()) {
                                     LEAFRA_INFO() << "  🔢 Token IDs: " << chunk.token_ids.size() << " stored";
                                 }
+                                if (chunk.has_embedding()) {
+                                    LEAFRA_INFO() << "  🧠 Embedding: " << chunk.embedding.size() << " dimensions";
+                                }
                                 LEAFRA_INFO() << "  📄 Page: " << (chunk.page_number + 1);
                                 LEAFRA_INFO() << "  📍 Position: " << chunk.start_index << "-" << chunk.end_index;
                                 if (using_sentencepiece && chunk.estimated_tokens > 0) {
@@ -667,6 +772,20 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                             if (k < chunk.token_ids.size() - 1) token_stream << " ";
                                         }
                                         LEAFRA_INFO() << token_stream.str();
+                                    }
+                                    
+                                    // Print full sentence embedding if available
+                                    if (chunk.has_embedding() && !chunk.embedding.empty()) {
+                                        LEAFRA_INFO() << "🧠 Sentence Embedding (" << chunk.embedding.size() << " dimensions):";
+                                        std::ostringstream embedding_stream;
+                                        embedding_stream << std::fixed << std::setprecision(8);
+                                        embedding_stream << "[";
+                                        for (size_t k = 0; k < chunk.embedding.size(); ++k) {
+                                            embedding_stream << chunk.embedding[k];
+                                            if (k < chunk.embedding.size() - 1) embedding_stream << " ";
+                                        }
+                                        embedding_stream << "]";
+                                        LEAFRA_INFO() << embedding_stream.str();
                                     }
                                 } else if (pImpl->config_.chunking.print_chunks_brief) {
                                     // Print first N lines
@@ -702,6 +821,28 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                         }
                                         
                                         LEAFRA_INFO() << token_stream.str();
+                                    }
+                                    
+                                    // Print brief sentence embedding if available
+                                    if (chunk.has_embedding() && !chunk.embedding.empty()) {
+                                        const size_t max_dims_to_show = 10; // Show first 10 dimensions
+                                        LEAFRA_INFO() << "🧠 Sentence Embedding (" << chunk.embedding.size() << " dimensions):";
+                                        std::ostringstream embedding_stream;
+                                        embedding_stream << std::fixed << std::setprecision(8);
+                                        embedding_stream << "[";
+                                        
+                                        size_t dims_to_display = std::min(max_dims_to_show, chunk.embedding.size());
+                                        for (size_t k = 0; k < dims_to_display; ++k) {
+                                            embedding_stream << chunk.embedding[k];
+                                            if (k < dims_to_display - 1) embedding_stream << " ";
+                                        }
+                                        
+                                        if (chunk.embedding.size() > max_dims_to_show) {
+                                            embedding_stream << " ... (showing first " << max_dims_to_show << " of " << chunk.embedding.size() << " dimensions)";
+                                        }
+                                        embedding_stream << "]";
+                                        
+                                        LEAFRA_INFO() << embedding_stream.str();
                                     }
                                 }
                                 
@@ -749,9 +890,8 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
         }
     }
     
-    
-
-
+    //Push the chunk data to the embedding model 
+    // Note: Embedding inference now happens immediately after tokenization for each file
 
     // Summary
     LEAFRA_INFO() << "File processing completed - Processed: " << processed_count 
