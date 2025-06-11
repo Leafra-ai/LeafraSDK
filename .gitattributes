@@ -4,4 +4,4 @@
 *.xcframework filter=lfs diff=lfs merge=lfs -text
 *.tflite filter=lfs diff=lfs merge=lfs -text
 TensorFlowLiteSelectTfOps filter=lfs diff=lfs merge=lfs -text
-*.mlpackage filter=lfs diff=lfs merge=lfs -text
+*.mlpackage/** filter=lfs diff=lfs merge=lfs -text
