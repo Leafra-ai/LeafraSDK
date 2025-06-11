@@ -1,0 +1,89 @@
+[
+  {
+    "metadataOutputVersion" : "3.0",
+    "storagePrecision" : "Float32",
+    "outputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float32",
+        "formattedType" : "MultiArray (Float32 1 × 384)",
+        "shortDescription" : "",
+        "shape" : "[1, 384]",
+        "name" : "sentence_embedding",
+        "type" : "MultiArray"
+      }
+    ],
+    "modelParameters" : [
+
+    ],
+    "specificationVersion" : 6,
+    "mlProgramOperationTypeHistogram" : {
+      "Transpose" : 48,
+      "Gather" : 1,
+      "Sub" : 1,
+      "Reshape" : 48,
+      "Matmul" : 24,
+      "Cast" : 3,
+      "LayerNorm" : 25,
+      "Select" : 1,
+      "Softmax" : 12,
+      "Add" : 38,
+      "Tile" : 3,
+      "RealDiv" : 2,
+      "Linear" : 72,
+      "ExpandDims" : 3,
+      "ReduceL2Norm" : 1,
+      "Maximum" : 1,
+      "Clip" : 1,
+      "ReduceSum" : 2,
+      "Mul" : 13,
+      "Gelu" : 12
+    },
+    "computePrecision" : "Mixed (Float32, Int32)",
+    "isUpdatable" : "0",
+    "stateSchema" : [
+
+    ],
+    "availability" : {
+      "macOS" : "12.0",
+      "tvOS" : "15.0",
+      "visionOS" : "1.0",
+      "watchOS" : "8.0",
+      "iOS" : "15.0",
+      "macCatalyst" : "15.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_mlProgram"
+    },
+    "userDefinedMetadata" : {
+      "com.github.apple.coremltools.version" : "8.2",
+      "com.github.apple.coremltools.source" : "torch==2.7.0",
+      "com.github.apple.coremltools.source_dialect" : "TorchScript"
+    },
+    "inputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Int32",
+        "formattedType" : "MultiArray (Int32 1 × 512)",
+        "shortDescription" : "",
+        "shape" : "[1, 512]",
+        "name" : "input_ids",
+        "type" : "MultiArray"
+      },
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Int32",
+        "formattedType" : "MultiArray (Int32 1 × 512)",
+        "shortDescription" : "",
+        "shape" : "[1, 512]",
+        "name" : "attention_mask",
+        "type" : "MultiArray"
+      }
+    ],
+    "generatedClassName" : "model",
+    "method" : "predict"
+  }
+]

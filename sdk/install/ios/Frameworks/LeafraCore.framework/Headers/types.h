@@ -148,24 +148,20 @@ struct LEAFRA_API EmbeddingModelConfig {
     std::string framework = "";             // Inference framework ("coreml", "tensorflow_lite", or "tensorflow")
     std::string model_path = "";            // Path to the model file (.mlmodel/.mlpackage for CoreML, .tflite for TensorFlow Lite)
     
-    // CoreML specific settings (iOS/macOS only)
-    std::string compute_units = "all";      // CoreML compute units: "all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"
+    // CoreML specific settings (only used when framework = "coreml")
+    std::string coreml_compute_units = "all";      // CoreML compute units: "all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"
     
-    // Delegate configurations (TensorFlow Lite specific)
-    bool enable_coreml_delegate = true;     // Enable CoreML delegate (iOS/macOS only)
-    bool enable_metal_delegate = true;      // Enable Metal GPU delegate (iOS/macOS only)
-    bool enable_xnnpack_delegate = true;    // Enable XNNPACK CPU delegate (cross-platform)
+    // TensorFlow Lite delegate configurations (only used when framework = "tflite")
+    bool tflite_enable_coreml_delegate = true;     // Enable CoreML delegate (iOS/macOS only)
+    bool tflite_enable_metal_delegate = true;      // Enable Metal GPU delegate (iOS/macOS only)
+    bool tflite_enable_xnnpack_delegate = true;    // Enable XNNPACK CPU delegate (cross-platform)
     
-    // Performance settings
-    int32_t num_threads = -1;               // Number of threads (-1 = auto)
-    bool use_nnapi = false;                 // Use Android NNAPI (Android only)
+    // TensorFlow Lite performance settings (only used when framework = "tflite")
+    int32_t tflite_num_threads = -1;               // Number of threads (-1 = auto)
+    bool tflite_use_nnapi = false;                 // Use Android NNAPI (Android only)
     
     // Default constructor
     EmbeddingModelConfig() = default;
-    
-    // Constructor with model path
-    EmbeddingModelConfig(const std::string& model_path_param, const std::string& framework_param = "coreml") 
-        : enabled(true), framework(framework_param), model_path(model_path_param) {}
     
     // Check if configuration is valid
     bool is_valid() const {

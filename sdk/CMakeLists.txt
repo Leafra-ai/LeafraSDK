@@ -922,4 +922,4 @@ configure_package_config_file(
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LeafraSDKConfig.cmake"
     DESTINATION lib/cmake/LeafraSDK
-)
+) 

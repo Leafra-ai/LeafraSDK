@@ -60,8 +60,7 @@ public:
     
 #ifdef LEAFRA_HAS_COREML
     // CoreML inference components
-    void* coreml_model_;                   // MLModel* (opaque pointer for C++)
-    void* coreml_prediction_options_;      // MLPredictionOptions* (opaque pointer for C++)
+    std::unique_ptr<leafra::CoreMLModel> coreml_model_;
     bool coreml_initialized_;
 #endif
     
@@ -84,7 +83,6 @@ public:
 #ifdef LEAFRA_HAS_COREML
         // Initialize CoreML variables
         coreml_model_ = nullptr;
-        coreml_prediction_options_ = nullptr;
         coreml_initialized_ = false;
 #endif
         
@@ -206,31 +204,41 @@ ResultCode LeafraCore::initialize(const Config& config) {
             LEAFRA_INFO() << "  - Model path: " << config.embedding_inference.model_path;
             LEAFRA_INFO() << "  - Compute units: " << config.embedding_inference.coreml_compute_units;
             
-            // Check if model file exists
-            std::ifstream model_file(config.embedding_inference.model_path, std::ios::binary);
-            if (!model_file.good()) {
-                LEAFRA_ERROR() << "❌ CoreML model file not found: " << config.embedding_inference.model_path;
-                return ResultCode::ERROR_INITIALIZATION_FAILED;
-            }
-            model_file.close();
-            
-            // Load the CoreML model using the C interface
-            pImpl->coreml_model_ = coreml_create_model(
-                config.embedding_inference.model_path.c_str(),
-                config.embedding_inference.coreml_compute_units.c_str()
-            );
-            
-            if (pImpl->coreml_model_) {
-                // Get model description
-                char description[512];
-                if (coreml_get_model_description(pImpl->coreml_model_, description, sizeof(description))) {
-                    LEAFRA_INFO() << "  - Model description: " << description;
+            // Load the CoreML model using the C++ class
+            try {
+                // Convert compute units string to enum
+                leafra::CoreMLModel::ComputeUnits compute_units = leafra::CoreMLModel::ComputeUnits::All;
+                if (config.embedding_inference.coreml_compute_units == "cpu") {
+                    compute_units = leafra::CoreMLModel::ComputeUnits::CPUOnly;
+                } else if (config.embedding_inference.coreml_compute_units == "cpu_and_gpu") {
+                    compute_units = leafra::CoreMLModel::ComputeUnits::CPUAndGPU;
+                } else if (config.embedding_inference.coreml_compute_units == "cpu_and_neural_engine") {
+                    compute_units = leafra::CoreMLModel::ComputeUnits::CPUAndNeuralEngine;
                 }
                 
-                pImpl->coreml_initialized_ = true;
-                LEAFRA_INFO() << "✅ CoreML model initialized successfully";
-            } else {
-                LEAFRA_ERROR() << "❌ Failed to initialize CoreML model";
+                pImpl->coreml_model_ = std::make_unique<leafra::CoreMLModel>(
+                    config.embedding_inference.model_path,
+                    compute_units
+                );
+                
+                if (pImpl->coreml_model_->isValid()) {
+                    // Get model description
+                    std::string description = pImpl->coreml_model_->getDescription();
+                    if (!description.empty()) {
+                        LEAFRA_INFO() << "  - Model description: " << description;
+                    }
+                    
+                    LEAFRA_INFO() << "  - Input count: " << pImpl->coreml_model_->getInputCount();
+                    LEAFRA_INFO() << "  - Output count: " << pImpl->coreml_model_->getOutputCount();
+                    
+                    pImpl->coreml_initialized_ = true;
+                    LEAFRA_INFO() << "✅ CoreML model initialized successfully";
+                } else {
+                    LEAFRA_ERROR() << "❌ CoreML model is not valid";
+                    return ResultCode::ERROR_INITIALIZATION_FAILED;
+                }
+            } catch (const std::exception& e) {
+                LEAFRA_ERROR() << "❌ Failed to initialize CoreML model: " << e.what();
                 return ResultCode::ERROR_INITIALIZATION_FAILED;
             }
         } else if (config.embedding_inference.enabled && config.embedding_inference.framework == "coreml") {
@@ -363,11 +371,9 @@ ResultCode LeafraCore::shutdown() {
             
             // Destroy the CoreML model
             if (pImpl->coreml_model_) {
-                coreml_destroy_model(pImpl->coreml_model_);
-                pImpl->coreml_model_ = nullptr;
+                pImpl->coreml_model_.reset();
             }
             
-            pImpl->coreml_prediction_options_ = nullptr;
             pImpl->coreml_initialized_ = false;
             
             LEAFRA_DEBUG() << "CoreML shutdown completed";
@@ -572,7 +578,7 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                 //load the executorch model and run it on the token_ids
                                 // Store both the token count and the actual token IDs
 
-
+                                
                                 
                                 chunk.estimated_tokens = token_ids.size(); // Replace estimate with actual count
                                 chunk.token_ids = std::move(token_ids);    // Store the actual token IDs
