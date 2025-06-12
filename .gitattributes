@@ -5,3 +5,4 @@
 *.tflite filter=lfs diff=lfs merge=lfs -text
 TensorFlowLiteSelectTfOps filter=lfs diff=lfs merge=lfs -text
 weight.bin filter=lfs diff=lfs merge=lfs -text
+libfaiss.a filter=lfs diff=lfs merge=lfs -text
