@@ -44,4 +44,6 @@ yarn-error.*
 **/.venv/
 **/*_venv/
 
+#sentencepiece prebuilts 
+**/prebuilt/sentencepiece/
 
