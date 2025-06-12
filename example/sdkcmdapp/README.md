@@ -120,6 +120,11 @@ The application includes powerful chunk visualization features for debugging and
 ### Basic Usage Examples
 
 #### Demo Mode (Internal Sample)
+
+mkdir build && cd build 
+
+cmake .. -DLEAFRA_EMBEDDING_FRAMEWORK=coreml 
+
 ```bash
 # Build the application
 make sdkcmdline
@@ -271,7 +276,7 @@ cd example/sdkcmdapp
 mkdir -p build && cd build
 
 # Configure (works on macOS, Linux, Windows)
-cmake ..
+cmake .. -DLEAFRA_EMBEDDING_FRAMEWORK=coreml 
 
 # Build the example
 make  # On macOS/Linux
@@ -299,13 +304,13 @@ cmake --build .
 # From the LeafraSDK root directory
 cd example/sdkcmdapp
 mkdir build && cd build
-cmake ..
+cmake .. -DLEAFRA_EMBEDDING_FRAMEWORK=coreml 
 make
 
 # From the example directory  
 cd sdkcmdapp
 mkdir build && cd build
-cmake ..
+cmake .. -DLEAFRA_EMBEDDING_FRAMEWORK=coreml 
 make
 ```
 

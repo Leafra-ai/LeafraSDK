@@ -41,7 +41,7 @@ User Files → Parse Documents → Extract Pages → Chunk Pages → Process Chu
 
 1. **ChunkingConfig** - Configuration structure for chunking parameters
 2. **LeafraChunker** - Advanced chunking engine with token support
-3. **ConfigLoader** - JSON configuration file loader (upcoming)
+3. **Configuration** - Programmatic configuration via Config struct
 4. **Event System** - Real-time progress notifications
 
 ## Configuration
@@ -164,34 +164,34 @@ class LeafraCore::Impl {
 5. **Statistics Logging**: Report chunk counts, sizes, and token estimates
 6. **Event Notification**: Send progress updates via event callback
 
-## Configuration File Support
+## Configuration Support
 
-### JSON Configuration (Planned)
+### Programmatic Configuration
 
-```json
-{
-  "chunking": {
-    "enabled": true,
-    "chunk_size": 500,
-    "overlap_percentage": 0.15,
-    "preserve_word_boundaries": true,
-    "include_metadata": true,
-    "size_unit": "tokens",
-    "token_approximation_method": "word_based"
-  }
-}
+All configuration is currently done programmatically through the Config struct:
+
+```cpp
+Config config;
+config.chunking.enabled = true;
+config.chunking.chunk_size = 500;
+config.chunking.overlap_percentage = 0.15;
+config.chunking.preserve_word_boundaries = true;
+config.chunking.include_metadata = true;
+config.chunking.size_unit = ChunkSizeUnit::TOKENS;
+config.chunking.token_method = TokenApproximationMethod::WORD_BASED;
 ```
 
 ### Loading Configuration
 
 ```cpp
-#include "leafra/config_loader.h"
-
+// Configuration is currently done programmatically
 Config config;
-ResultCode result = ConfigLoader::load_from_file("config.json", config);
-if (result == ResultCode::SUCCESS) {
-    sdk->initialize(config);
-}
+config.chunking.enabled = true;
+config.chunking.chunk_size = 500;
+config.chunking.overlap_percentage = 0.15;
+// ... other settings
+
+sdk->initialize(config);
 ```
 
 ## Performance Characteristics
@@ -257,7 +257,6 @@ This will log the first few chunks with their content for inspection.
 
 ## Future Enhancements
 
-- **JSON Configuration Loader**: External configuration file support
 - **Custom Token Models**: Support for specific tokenizer models
 - **Parallel Chunking**: Multi-threaded chunking for large documents
 - **Chunk Storage**: Direct integration with vector databases

@@ -6,6 +6,7 @@
 #include "leafra/leafra_parsing.h"
 #include "leafra/leafra_chunker.h"
 #include "leafra/leafra_sentencepiece.h"
+#include "leafra/leafra_debug.h"
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -589,116 +590,129 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                                 }
                             }
                             
-                                                    LEAFRA_INFO() << "✅ SentencePiece tokenization completed";
-                        LEAFRA_INFO() << "  - Total actual tokens: " << total_actual_tokens;
-                        LEAFRA_INFO() << "  - Chunks with token IDs: " << chunks.size();
-                        LEAFRA_DEBUG() << "✅ Token IDs stored for all " << chunks.size() << " chunks";
+                            LEAFRA_INFO() << "✅ SentencePiece tokenization completed";
+                            LEAFRA_INFO() << "  - Total actual tokens: " << total_actual_tokens;
+                            LEAFRA_INFO() << "  - Chunks with token IDs: " << chunks.size();
+                            LEAFRA_DEBUG() << "✅ Token IDs stored for all " << chunks.size() << " chunks";
 
 #ifdef LEAFRA_HAS_COREML
-                        // Process chunks through CoreML embedding model if available
-                        if (pImpl->coreml_initialized_ && pImpl->coreml_model_) {
-                            LEAFRA_INFO() << "Starting CoreML embedding inference for " << chunks.size() << " chunks";
-                            pImpl->send_event("🧠 Starting embedding inference for " + std::to_string(chunks.size()) + " chunks");
-                            
-                            try {
-                                // Get model input requirements once (cache for performance)
-                                size_t model_input_count = pImpl->coreml_model_->getInputCount();
-                                if (model_input_count != 2) {
-                                    LEAFRA_ERROR() << "Unexpected model input count: " << model_input_count << " (expected 2 for embedding model)";
-                                    return; // Skip embedding for this file
-                                }
+                            // Process chunks through CoreML embedding model if available
+                            if (pImpl->coreml_initialized_ && pImpl->coreml_model_) {
+                                LEAFRA_DEBUG_TIMER("coreml_embedding_inference");
+                                auto start_time = debug::timer::now();
                                 
-                                size_t required_input_size = pImpl->coreml_model_->getInputSize(0);
-                                int pad_token = pImpl->tokenizer_->pad_id();
-                                if (pad_token < 0) {
-                                    pad_token = 0; // Default to 0 if pad_id is disabled (-1)
-                                }
+                                LEAFRA_INFO() << "Starting CoreML embedding inference for " << chunks.size() << " chunks";
+                                pImpl->send_event("🧠 Starting embedding inference for " + std::to_string(chunks.size()) + " chunks");
                                 
-                                LEAFRA_DEBUG() << "CoreML model expects " << required_input_size << " tokens per input";
-                                LEAFRA_DEBUG() << "Using pad_token: " << pad_token;
-                                
-                                size_t processed_chunks = 0;
-                                size_t successful_embeddings = 0;
-                                
-                                // Pre-allocate vectors for reuse (performance optimization)
-                                std::vector<int> processed_token_ids;
-                                std::vector<float> input_tokens, attention_mask;
-                                processed_token_ids.reserve(required_input_size);
-                                input_tokens.reserve(required_input_size);
-                                attention_mask.reserve(required_input_size);
-                                
-                                // Process each chunk individually
-                                for (auto& chunk : chunks) {
-                                        if (chunk.has_token_ids() && !chunk.token_ids.empty()) {
-                                            try {
-                                                // Reuse pre-allocated vectors (clear and prepare)
-                                                processed_token_ids.clear();
-                                                input_tokens.clear();
-                                                attention_mask.clear();
-                                                
-                                                // Prepare padded/trimmed token sequence
-                                                size_t original_size = chunk.token_ids.size();
-                                                size_t real_token_count = std::min(original_size, required_input_size);
-                                                
-                                                // Copy and resize in one operation
-                                                processed_token_ids.assign(chunk.token_ids.begin(), 
-                                                                          chunk.token_ids.begin() + real_token_count);
-                                                if (processed_token_ids.size() < required_input_size) {
-                                                    processed_token_ids.resize(required_input_size, pad_token);
-                                                }
-                                                
-                                                // Convert int tokens to float and create attention mask in single pass
-                                                input_tokens.resize(required_input_size);
-                                                attention_mask.resize(required_input_size);
-                                                
-                                                for (size_t i = 0; i < required_input_size; ++i) {
-                                                    input_tokens[i] = static_cast<float>(processed_token_ids[i]);
-                                                    attention_mask[i] = (i < real_token_count) ? 1.0f : 0.0f;
-                                                }
-                                                
-                                                // Prepare inputs for CoreML model (fixed order, no validation needed)
-                                                // Note: Input order determined from model.mil function signature:
-                                                // func main(tensor<int32, [1, 512]> attention_mask, tensor<int32, [1, 512]> input_ids)
-                                                std::vector<std::vector<float>> model_inputs = {attention_mask, input_tokens};
-                                                
-                                                // Run embedding inference
-                                                LEAFRA_DEBUG() << "Running CoreML embedding inference for chunk " << (processed_chunks + 1);
-                                                auto embeddings = pImpl->coreml_model_->predict(model_inputs);
-                                                
-                                                if (!embeddings.empty() && !embeddings[0].empty()) {
-                                                    // Store the embedding vector in the chunk
-                                                    chunk.embedding = std::move(embeddings[0]);
-                                                    successful_embeddings++;
-                                                    LEAFRA_DEBUG() << "Generated embedding with " << chunk.embedding.size() << " dimensions for chunk " << (processed_chunks + 1);
-                                                } else {
-                                                    LEAFRA_WARNING() << "CoreML model produced empty embedding for chunk " << (processed_chunks + 1);
-                                                }
-                                                
-                                            } catch (const std::exception& e) {
-                                                LEAFRA_ERROR() << "CoreML embedding inference failed for chunk " << (processed_chunks + 1) << ": " << e.what();
-                                            }
-                                        } else {
-                                            LEAFRA_DEBUG() << "Skipping chunk " << (processed_chunks + 1) << " - no token IDs available";
+                                try {
+                                    // Get model input requirements once (cache for performance)
+                                    size_t model_input_count = pImpl->coreml_model_->getInputCount();
+                                    if (model_input_count != 2) {
+                                        LEAFRA_ERROR() << "Unexpected model input count: " << model_input_count << " (expected 2 for embedding model)";
+                                        // Skip embedding processing but continue with rest
+                                    } else {
+                                        size_t required_input_size = pImpl->coreml_model_->getInputSize(0);
+                                        int pad_token = pImpl->tokenizer_->pad_id();
+                                        if (pad_token < 0) {
+                                            pad_token = 0; // Default to 0 if pad_id is disabled (-1)
                                         }
                                         
-                                        processed_chunks++;
+                                        LEAFRA_DEBUG() << "CoreML model expects " << required_input_size << " tokens per input";
+                                        LEAFRA_DEBUG() << "Using pad_token: " << pad_token;
+                                        
+                                        size_t processed_chunks = 0;
+                                        size_t successful_embeddings = 0;
+                                        
+                                        // Pre-allocate vectors for reuse (performance optimization)
+                                        std::vector<int> processed_token_ids;
+                                        std::vector<float> input_tokens, attention_mask;
+                                        processed_token_ids.reserve(required_input_size);
+                                        input_tokens.reserve(required_input_size);
+                                        attention_mask.reserve(required_input_size);
+                                        
+                                        // Process each chunk individually
+                                        for (auto& chunk : chunks) {
+                                            if (chunk.has_token_ids() && !chunk.token_ids.empty()) {
+                                                try {
+                                                    // Reuse pre-allocated vectors (clear and prepare)
+                                                    processed_token_ids.clear();
+                                                    input_tokens.clear();
+                                                    attention_mask.clear();
+                                                    
+                                                    // Prepare padded/trimmed token sequence
+                                                    size_t original_size = chunk.token_ids.size();
+                                                    size_t real_token_count = std::min(original_size, required_input_size);
+                                                    
+                                                    // Copy and resize in one operation
+                                                    processed_token_ids.assign(chunk.token_ids.begin(), 
+                                                                              chunk.token_ids.begin() + real_token_count);
+                                                    if (processed_token_ids.size() < required_input_size) {
+                                                        processed_token_ids.resize(required_input_size, pad_token);
+                                                    }
+                                                    
+                                                    // Convert int tokens to float and create attention mask in single pass
+                                                    input_tokens.resize(required_input_size);
+                                                    attention_mask.resize(required_input_size);
+                                                    
+                                                    for (size_t i = 0; i < required_input_size; ++i) {
+                                                        input_tokens[i] = static_cast<float>(processed_token_ids[i]);
+                                                        attention_mask[i] = (i < real_token_count) ? 1.0f : 0.0f;
+                                                    }
+                                                    
+                                                    // Prepare inputs for CoreML model (fixed order, no validation needed)
+                                                    // Note: Input order determined from model.mil function signature:
+                                                    // func main(tensor<int32, [1, 512]> attention_mask, tensor<int32, [1, 512]> input_ids)
+                                                    std::vector<std::vector<float>> model_inputs = {attention_mask, input_tokens};
+                                                    
+                                                    // Run embedding inference
+                                                    LEAFRA_DEBUG() << "Running CoreML embedding inference for chunk " << (processed_chunks + 1);
+                                                    auto inference_start = debug::timer::now();
+                                                    auto embeddings = pImpl->coreml_model_->predict(model_inputs);
+                                                    auto inference_end = debug::timer::now();
+                                                    double inference_ms = debug::timer::elapsed_milliseconds(inference_start, inference_end);
+                                                    LEAFRA_DEBUG_LOG("TIMING", "Chunk " + std::to_string(processed_chunks + 1) + " inference: " + std::to_string(inference_ms) + "ms");
+                                                    
+                                                    if (!embeddings.empty() && !embeddings[0].empty()) {
+                                                        // Store the embedding vector in the chunk
+                                                        chunk.embedding = std::move(embeddings[0]);
+                                                        successful_embeddings++;
+                                                        LEAFRA_DEBUG() << "Generated embedding with " << chunk.embedding.size() << " dimensions for chunk " << (processed_chunks + 1);
+                                                    } else {
+                                                        LEAFRA_WARNING() << "CoreML model produced empty embedding for chunk " << (processed_chunks + 1);
+                                                    }
+                                                    
+                                                } catch (const std::exception& e) {
+                                                    LEAFRA_ERROR() << "CoreML embedding inference failed for chunk " << (processed_chunks + 1) << ": " << e.what();
+                                                }
+                                            } else {
+                                                LEAFRA_DEBUG() << "Skipping chunk " << (processed_chunks + 1) << " - no token IDs available";
+                                            }
+                                            
+                                            processed_chunks++;
+                                        }
+                                        
+                                        LEAFRA_INFO() << "✅ CoreML embedding inference completed for file: " << file_path;
+                                        LEAFRA_INFO() << "  - Total chunks processed: " << processed_chunks;
+                                        LEAFRA_INFO() << "  - Successful embeddings: " << successful_embeddings;
+                                        LEAFRA_INFO() << "  - Failed embeddings: " << (processed_chunks - successful_embeddings);
+                                        
+                                        // Log performance metrics
+                                        auto end_time = debug::timer::now();
+                                        double total_duration_ms = debug::timer::elapsed_milliseconds(start_time, end_time);
+                                        LEAFRA_DEBUG_LOG("PERFORMANCE", "CoreML embedding inference completed in " + std::to_string(total_duration_ms) + "ms");
+                                        if (successful_embeddings > 0) {
+                                            double avg_ms_per_chunk = total_duration_ms / successful_embeddings;
+                                            LEAFRA_DEBUG_LOG("PERFORMANCE", "Average inference time per chunk: " + std::to_string(avg_ms_per_chunk) + "ms");
+                                            debug::debug_log_performance("coreml_embedding", processed_chunks, successful_embeddings, total_duration_ms);
+                                        }
                                     }
-                                    
-                                    LEAFRA_INFO() << "✅ CoreML embedding inference completed for file: " << file_path;
-                                    LEAFRA_INFO() << "  - Total chunks processed: " << processed_chunks;
-                                    LEAFRA_INFO() << "  - Successful embeddings: " << successful_embeddings;
-                                    LEAFRA_INFO() << "  - Failed embeddings: " << (processed_chunks - successful_embeddings);
-                                    
-                                } else {
-                                    LEAFRA_WARNING() << "CoreML model has no inputs, cannot process tokens";
+                                } catch (const std::exception& e) {
+                                    LEAFRA_ERROR() << "CoreML embedding inference failed for file " << file_path << ": " << e.what();
                                 }
-                            } catch (const std::exception& e) {
-                                LEAFRA_ERROR() << "CoreML embedding inference failed for file " << file_path << ": " << e.what();
+                                
+                            } else if (pImpl->config_.embedding_inference.enabled && pImpl->config_.embedding_inference.framework == "coreml") {
+                                LEAFRA_WARNING() << "CoreML embedding model requested but not initialized";
                             }
-                            
-                        } else if (pImpl->config_.embedding_inference.enabled && pImpl->config_.embedding_inference.framework == "coreml") {
-                            LEAFRA_WARNING() << "CoreML embedding model requested but not initialized";
-                        }
 #endif
                             
                         } else if (pImpl->config_.tokenizer.enable_sentencepiece) {
@@ -889,9 +903,6 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
             pImpl->send_event("❌ Failed to parse: " + file_path + " - " + result.errorMessage);
         }
     }
-    
-    //Push the chunk data to the embedding model 
-    // Note: Embedding inference now happens immediately after tokenization for each file
 
     // Summary
     LEAFRA_INFO() << "File processing completed - Processed: " << processed_count 
