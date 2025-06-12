@@ -15,3 +15,6 @@
 	path = sdk/corecpp/third_party/tensorflow
 	url = https://github.com/tensorflow/tensorflow.git
 	branch = r2.17
+[submodule "sdk/corecpp/third_party/faiss-mobile"]
+	path = sdk/corecpp/third_party/faiss-mobile
+	url = https://github.com/DeveloperMindset-com/faiss-mobile.git
