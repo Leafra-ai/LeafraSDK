@@ -36,6 +36,11 @@ if(APPLE AND TARGET Apple::CoreML)
     list(APPEND LEAFRA_CORE_SOURCES src/leafra_coreml.mm)
 endif()
 
+# Add FAISS source file if available
+if(TARGET FAISS::FAISS)
+    list(APPEND LEAFRA_CORE_SOURCES src/leafra_faiss.cpp)
+endif()
+
 # Core library headers
 set(LEAFRA_CORE_HEADERS
     include/leafra/leafra_core.h
@@ -54,6 +59,11 @@ set(LEAFRA_CORE_HEADERS
 # Add CoreML header on Apple platforms
 if(APPLE AND TARGET Apple::CoreML)
     list(APPEND LEAFRA_CORE_HEADERS include/leafra/leafra_coreml.h)
+endif()
+
+# Add FAISS header if available
+if(TARGET FAISS::FAISS)
+    list(APPEND LEAFRA_CORE_HEADERS include/leafra/leafra_faiss.h)
 endif()
 
 # Create the core library
@@ -157,6 +167,15 @@ if(TARGET TensorFlowLite::TensorFlowLite)
     message(STATUS "  - Core functionality only (delegates in future update)")
 else()
     message(STATUS "⚠️  Building LeafraCore without TensorFlow Lite")
+endif()
+
+# Link FAISS if available (defined in parent CMakeLists.txt)
+if(TARGET FAISS::FAISS)
+    target_link_libraries(LeafraCore PRIVATE FAISS::FAISS)
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_FAISS=1)
+    message(STATUS "✅ LeafraCore linked with FAISS")
+else()
+    message(STATUS "⚠️  Building LeafraCore without FAISS")
 endif()
 
 # Platform-specific libraries for logging

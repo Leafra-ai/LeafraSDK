@@ -885,6 +885,108 @@ else()
     set(TENSORFLOWLITE_FOUND FALSE)
 endif()
 
+# ==============================================================================
+# FAISS Integration (Vector Search Library) with OpenMP
+# ==============================================================================
+
+set(FAISS_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/faiss-mobile")
+
+# FAISS supported on Apple platforms with xcframework
+if(APPLE)
+    # Determine platform-specific library directory from xcframework
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
+            # iOS Simulator - Universal (ARM64 + x86_64)
+            set(FAISS_PLATFORM_DIR "${FAISS_ROOT_DIR}/faiss.xcframework/ios-arm64_arm64e_x86_64-simulator")
+            set(OPENMP_PLATFORM_DIR "${FAISS_ROOT_DIR}/openmp.xcframework/ios-arm64_arm64e_x86_64-simulator")
+            set(FAISS_PLATFORM_NAME "iOS Simulator")
+        else()
+            # iOS Device - ARM64
+            set(FAISS_PLATFORM_DIR "${FAISS_ROOT_DIR}/faiss.xcframework/ios-arm64_arm64e")
+            set(OPENMP_PLATFORM_DIR "${FAISS_ROOT_DIR}/openmp.xcframework/ios-arm64_arm64e")
+            set(FAISS_PLATFORM_NAME "iOS Device")
+        endif()
+    else()
+        # macOS - Universal (ARM64 + x86_64)
+        set(FAISS_PLATFORM_DIR "${FAISS_ROOT_DIR}/faiss.xcframework/macos-arm64_arm64e_x86_64")
+        set(OPENMP_PLATFORM_DIR "${FAISS_ROOT_DIR}/openmp.xcframework/macos-arm64_arm64e_x86_64")
+        set(FAISS_PLATFORM_NAME "macOS")
+    endif()
+    
+    # Define library and header paths
+    set(FAISS_LIBRARY "${FAISS_PLATFORM_DIR}/libfaiss.a")
+    set(FAISS_INCLUDE_DIR "${FAISS_PLATFORM_DIR}/Headers")
+    set(OPENMP_LIBRARY "${OPENMP_PLATFORM_DIR}/libomp.a")
+    set(OPENMP_INCLUDE_DIR "${OPENMP_PLATFORM_DIR}/Headers")
+    
+    # Check if both FAISS and OpenMP libraries exist
+    if(EXISTS "${FAISS_LIBRARY}" AND EXISTS "${FAISS_INCLUDE_DIR}" AND EXISTS "${OPENMP_LIBRARY}" AND EXISTS "${OPENMP_INCLUDE_DIR}")
+        message(STATUS "✅ Found FAISS library for ${FAISS_PLATFORM_NAME}:")
+        message(STATUS "  - FAISS Library: ${FAISS_LIBRARY}")
+        message(STATUS "  - FAISS Headers: ${FAISS_INCLUDE_DIR}")
+        message(STATUS "  - OpenMP Library: ${OPENMP_LIBRARY}")
+        message(STATUS "  - OpenMP Headers: ${OPENMP_INCLUDE_DIR}")
+        
+        # Create OpenMP imported target
+        add_library(OpenMP::OpenMP_CXX STATIC IMPORTED)
+        set_target_properties(OpenMP::OpenMP_CXX PROPERTIES
+            IMPORTED_LOCATION "${OPENMP_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${OPENMP_INCLUDE_DIR}"
+            INTERFACE_COMPILE_DEFINITIONS "_OPENMP"
+        )
+        
+        # Create FAISS imported target
+        add_library(FAISS::FAISS STATIC IMPORTED)
+        set_target_properties(FAISS::FAISS PROPERTIES
+            IMPORTED_LOCATION "${FAISS_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${FAISS_INCLUDE_DIR}"
+        )
+        
+        # Link FAISS with Accelerate framework and OpenMP
+        find_library(ACCELERATE_FRAMEWORK Accelerate)
+        if(ACCELERATE_FRAMEWORK)
+            set_target_properties(FAISS::FAISS PROPERTIES
+                INTERFACE_LINK_LIBRARIES "${ACCELERATE_FRAMEWORK};OpenMP::OpenMP_CXX"
+            )
+            message(STATUS "  - Accelerate framework linked ✅")
+        else()
+            set_target_properties(FAISS::FAISS PROPERTIES
+                INTERFACE_LINK_LIBRARIES "OpenMP::OpenMP_CXX"
+            )
+        endif()
+        
+        set(FAISS_FOUND TRUE)
+        set(OPENMP_FOUND TRUE)
+        message(STATUS "✅ FAISS integration enabled for ${FAISS_PLATFORM_NAME}")
+        message(STATUS "  - FAISS static library: ${FAISS_LIBRARY}")
+        message(STATUS "  - FAISS headers: ${FAISS_INCLUDE_DIR}/faiss")
+        message(STATUS "  - OpenMP static library: ${OPENMP_LIBRARY}")
+        message(STATUS "  - OpenMP headers: ${OPENMP_INCLUDE_DIR}")
+        message(STATUS "  - OpenMP support enabled ✅")
+    else()
+        message(WARNING "❌ FAISS library, headers, or OpenMP not found for ${FAISS_PLATFORM_NAME}")
+        message(STATUS "  - FAISS library: ${FAISS_LIBRARY} (exists: ${EXISTS ${FAISS_LIBRARY}})")
+        message(STATUS "  - FAISS headers: ${FAISS_INCLUDE_DIR} (exists: ${EXISTS ${FAISS_INCLUDE_DIR}})")
+        message(STATUS "  - OpenMP library: ${OPENMP_LIBRARY} (exists: ${EXISTS ${OPENMP_LIBRARY}})")
+        message(STATUS "  - OpenMP headers: ${OPENMP_INCLUDE_DIR} (exists: ${EXISTS ${OPENMP_INCLUDE_DIR}})")
+        message(STATUS "Run: Place faiss.xcframework and openmp.xcframework in ${FAISS_ROOT_DIR}/")
+        set(FAISS_FOUND FALSE)
+        set(OPENMP_FOUND FALSE)
+    endif()
+elseif(ANDROID)
+    # Android - FAISS not yet supported
+    message(STATUS "⚠️  FAISS not yet supported on Android")
+    set(FAISS_FOUND FALSE)
+elseif(WIN32)
+    # Windows - FAISS not yet supported
+    message(STATUS "⚠️  FAISS not yet supported on Windows")
+    set(FAISS_FOUND FALSE)
+else()
+    # Linux - FAISS not yet supported
+    message(STATUS "⚠️  FAISS not yet supported on Linux")
+    set(FAISS_FOUND FALSE)
+endif()
+
 # Add subdirectories
 add_subdirectory(corecpp)
 

@@ -66,6 +66,9 @@ struct TextChunk {
     // SentencePiece token IDs (empty if SentencePiece not used)
     std::vector<int> token_ids;   // Actual token IDs from SentencePiece encoding
     
+    // Embedding vector (empty if embedding inference not used)
+    std::vector<float> embedding; // Dense embedding vector from neural model
+    
     TextChunk() = default;
     TextChunk(std::string_view text, size_t start, size_t end, size_t page = 0)
         : content(text), start_index(start), end_index(end), page_number(page), estimated_tokens(0) {}
@@ -78,6 +81,11 @@ struct TextChunk {
     // Helper method to check if chunk has actual token IDs
     bool has_token_ids() const {
         return !token_ids.empty();
+    }
+    
+    // Helper method to check if chunk has embedding vector
+    bool has_embedding() const {
+        return !embedding.empty();
     }
 };
 
