@@ -127,24 +127,16 @@ set(SQLITE_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/sqlite")
 
 # Platform-specific SQLite configuration
 if(APPLE)
-    # iOS/macOS - Use system SQLite with system headers
-    find_library(SQLITE_LIBRARY sqlite3)
-    if(SQLITE_LIBRARY)
-        message(STATUS "✅ Found system SQLite library: ${SQLITE_LIBRARY}")
-        
-        # Use system headers - no custom include directory needed
-        add_library(SQLite::SQLite3 SHARED IMPORTED)
-        set_target_properties(SQLite::SQLite3 PROPERTIES
-            IMPORTED_LOCATION "${SQLITE_LIBRARY}"
-        )
-        
-        set(SQLITE_FOUND TRUE)
-        set(SQLITE_USE_SYSTEM_HEADERS TRUE)
-        message(STATUS "✅ SQLite integration enabled (system library with system headers)")
-    else()
-        message(WARNING "❌ System SQLite library not found")
-        set(SQLITE_FOUND FALSE)
-    endif()
+    # iOS/macOS - Use system SQLite with direct linking (avoids .tbd stub file issues)
+    # Direct linking with -lsqlite3 works reliably across macOS/iOS SDK versions
+    add_library(SQLite::SQLite3 INTERFACE IMPORTED)
+    set_target_properties(SQLite::SQLite3 PROPERTIES
+        INTERFACE_LINK_LIBRARIES "-lsqlite3"
+    )
+    
+    set(SQLITE_FOUND TRUE)
+    set(SQLITE_USE_SYSTEM_HEADERS TRUE)
+    message(STATUS "✅ SQLite integration enabled (system library with direct linking)")
     
 elseif(ANDROID)
     # Android - Use bundled AAR with our custom headers

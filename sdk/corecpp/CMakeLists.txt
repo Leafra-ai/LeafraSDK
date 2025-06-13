@@ -185,6 +185,11 @@ if(APPLE)
     # iOS/macOS - os_log is part of the system, link Foundation framework
     target_link_libraries(LeafraCore PRIVATE "-framework Foundation")
     
+    # Configure FileManager to compile as Objective-C++ on Apple platforms
+    set_source_files_properties(src/leafra_filemanager.cpp PROPERTIES
+        COMPILE_FLAGS "-x objective-c++"
+    )
+    
     # Add Core Graphics and other frameworks required by PDFium
     if(TARGET PDFium::PDFium)
         target_link_libraries(LeafraCore PRIVATE 
