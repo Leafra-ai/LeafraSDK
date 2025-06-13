@@ -605,6 +605,7 @@ bool SQLiteDatabase::createRAGTables() {
         CREATE TABLE IF NOT EXISTS chunks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_id INTEGER NOT NULL,
+            chunk_page_number INTEGER NOT NULL,
             chunk_no INTEGER NOT NULL,
             chunk_size INTEGER NOT NULL,
             chunk_text TEXT NOT NULL,
