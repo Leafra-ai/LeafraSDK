@@ -66,6 +66,9 @@
     if (dict[@"bufferSize"]) {
         config.buffer_size = [dict[@"bufferSize"] unsignedIntegerValue];
     }
+    if (dict[@"leafraDocumentDatabaseName"]) {
+        config.leafra_document_database_name = [dict[@"leafraDocumentDatabaseName"] UTF8String];
+    }
     
     return config;
 }

@@ -177,6 +177,7 @@ struct LEAFRA_API Config {
     bool debug_mode = false;
     int32_t max_threads = 4;
     size_t buffer_size = 1024;
+    std::string leafra_document_database_name = "leafra.db"; // Document database filename
     ChunkingConfig chunking;               // Chunking configuration
     TokenizerConfig tokenizer;             // Tokenization configuration
     EmbeddingModelConfig embedding_inference; // Embedding model inference configuration

@@ -9,6 +9,7 @@ export interface LeafraConfig {
   debugMode?: boolean;
   maxThreads?: number;
   bufferSize?: number;
+  leafraDocumentDatabaseName?: string;
 }
 
 export interface Point2D {

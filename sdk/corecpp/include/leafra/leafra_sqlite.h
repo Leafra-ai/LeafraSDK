@@ -188,12 +188,14 @@ public:
     // Utility functions
     static std::string escapeString(const std::string& str);
     static bool fileExists(const std::string& path);
+    static bool createdb(const std::string& path);
     
 private:
     sqlite3* db_;
     bool isOpen_;
     
     void cleanup();
+    bool createRAGTables();
 };
 
 /**

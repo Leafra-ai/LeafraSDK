@@ -431,9 +431,141 @@ bool SQLiteDatabase::fileExists(const std::string& path) {
     return std::filesystem::exists(path);
 }
 
+bool SQLiteDatabase::createdb(const std::string& path) {
+    LEAFRA_DEBUG() << "Creating database: " << path;
+    
+    // Check if file already exists
+    if (fileExists(path)) {
+        LEAFRA_WARNING() << "Database file already exists: " << path;
+        return true; // Consider existing file as success
+    }
+    
+    // Create the database by opening it with CREATE flag
+    sqlite3* db = nullptr;
+    int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
+    int result = sqlite3_open_v2(path.c_str(), &db, flags, nullptr);
+    
+    if (result == SQLITE_OK) {
+        LEAFRA_DEBUG() << "Database created successfully: " << path;
+        
+        // Use the already opened database handle to create RAG tables
+        SQLiteDatabase newDb;
+        newDb.db_ = db;
+        newDb.isOpen_ = true;
+        
+        bool tablesCreated = newDb.createRAGTables();
+        
+        // Clean up - the newDb destructor will close the database
+        newDb.db_ = nullptr;
+        newDb.isOpen_ = false;
+        sqlite3_close(db);
+        
+        if (tablesCreated) {
+            LEAFRA_DEBUG() << "Database and RAG tables created successfully: " << path;
+            return true;
+        } else {
+            LEAFRA_ERROR() << "Database created but failed to create RAG tables: " << path;
+            // Clean up by deleting the partially created database file
+            if (std::filesystem::remove(path)) {
+                LEAFRA_DEBUG() << "Cleaned up partially created database file: " << path;
+            } else {
+                LEAFRA_WARNING() << "Failed to clean up partially created database file: " << path;
+            }
+            return false;
+        }
+    } else {
+        LEAFRA_ERROR() << "Failed to create database: " << path 
+                      << " Error: " << sqlite3_errmsg(db);
+        if (db) {
+            sqlite3_close(db);
+        }
+        // Clean up any partially created file
+        if (fileExists(path)) {
+            if (std::filesystem::remove(path)) {
+                LEAFRA_DEBUG() << "Cleaned up partially created database file: " << path;
+            } else {
+                LEAFRA_WARNING() << "Failed to clean up partially created database file: " << path;
+            }
+        }
+        return false;
+    }
+}
+
+
+
+
+
+
 void SQLiteDatabase::cleanup() {
     db_ = nullptr;
     isOpen_ = false;
+}
+
+bool SQLiteDatabase::createRAGTables() {
+    if (!isOpen_) {
+        LEAFRA_ERROR() << "Database not open";
+        return false;
+    }
+    
+    LEAFRA_DEBUG() << "Creating RAG tables (docs and chunks)";
+    
+    // Start a transaction for atomic table creation
+    SQLiteTransaction transaction(*this);
+    
+    // Create docs table
+    const std::string createDocsTable = R"(
+        CREATE TABLE IF NOT EXISTS docs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            url TEXT,
+            creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            size INTEGER NOT NULL
+        )
+    )";
+    
+    if (!execute(createDocsTable)) {
+        LEAFRA_ERROR() << "Failed to create docs table";
+        return false;
+    }
+    
+    // Create chunks table with foreign key to docs table
+    const std::string createChunksTable = R"(
+        CREATE TABLE IF NOT EXISTS chunks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_id INTEGER NOT NULL,
+            chunk_no INTEGER NOT NULL,
+            chunk_size INTEGER NOT NULL,
+            chunk_text TEXT NOT NULL,
+            chunk_embedding BLOB,
+            FOREIGN KEY (doc_id) REFERENCES docs(id) ON DELETE CASCADE
+        )
+    )";
+    
+    if (!execute(createChunksTable)) {
+        LEAFRA_ERROR() << "Failed to create chunks table";
+        return false;
+    }
+    
+    // Create indexes for better performance
+    const std::string createDocsFilenameIndex = "CREATE INDEX IF NOT EXISTS idx_docs_filename ON docs(filename)";
+    const std::string createChunksDocIdIndex = "CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON chunks(doc_id)";
+    const std::string createChunksChunkNoIndex = "CREATE INDEX IF NOT EXISTS idx_chunks_chunk_no ON chunks(doc_id, chunk_no)";
+    
+    if (!execute(createDocsFilenameIndex) || 
+        !execute(createChunksDocIdIndex) || 
+        !execute(createChunksChunkNoIndex)) {
+        LEAFRA_ERROR() << "Failed to create indexes";
+        return false;
+    }
+    
+    // Commit the transaction to ensure tables are written to disk
+    if (!transaction.commit()) {
+        LEAFRA_ERROR() << "Failed to commit RAG tables creation transaction";
+        return false;
+    }
+    
+    LEAFRA_DEBUG() << "RAG tables created successfully";
+    return true;
 }
 
 // ==============================================================================
@@ -562,6 +694,14 @@ int SQLiteDatabase::getLastErrorCode() const { return -1; }
 std::string SQLiteDatabase::getLastErrorMessage() const { return "SQLite not available"; }
 std::string SQLiteDatabase::escapeString(const std::string& str) { return str; }
 bool SQLiteDatabase::fileExists(const std::string& path) { return std::filesystem::exists(path); }
+bool SQLiteDatabase::createdb(const std::string& path) { 
+    LEAFRA_ERROR() << "SQLite not available - cannot create database";
+    return false; 
+}
+bool SQLiteDatabase::createRAGTables() { 
+    LEAFRA_ERROR() << "SQLite not available - cannot create RAG tables";
+    return false; 
+}
 void SQLiteDatabase::cleanup() {}
 
 SQLiteTransaction::SQLiteTransaction(SQLiteDatabase& db) : db_(db), committed_(false), active_(false) {}

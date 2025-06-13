@@ -29,6 +29,7 @@ set(LEAFRA_CORE_SOURCES
     src/leafra_unicode.cpp
     src/leafra_unicode_cacher.cpp
     src/leafra_debug.cpp
+    src/leafra_filemanager.cpp
 )
 
 # Add CoreML source file on Apple platforms
@@ -54,6 +55,7 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/leafra_sentencepiece.h
     include/leafra/leafra_chunker.h
     include/leafra/leafra_debug.h
+    include/leafra/leafra_filemanager.h
 )
 
 # Add CoreML header on Apple platforms
