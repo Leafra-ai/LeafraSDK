@@ -1,5 +1,6 @@
 #include "leafra/leafra_sqlite.h"
 #include "leafra/logger.h"
+#include "leafra/leafra_filemanager.h"
 
 #ifdef LEAFRA_HAS_SQLITE
     #ifdef LEAFRA_USE_SYSTEM_SQLITE_HEADERS
@@ -224,7 +225,7 @@ bool SQLiteDatabase::Statement::bindNull(const std::string& paramName) {
 bool SQLiteDatabase::Statement::step() {
     if (!valid_) return false;
     int result = sqlite3_step(stmt_);
-    return result == SQLITE_ROW || result == SQLITE_DONE;
+    return result == SQLITE_ROW;  // Only return true if there's actual row data
 }
 
 bool SQLiteDatabase::Statement::reset() {
@@ -280,22 +281,51 @@ SQLiteDatabase& SQLiteDatabase::operator=(SQLiteDatabase&& other) noexcept {
     return *this;
 }
 
-bool SQLiteDatabase::open(const std::string& path, int flags) {
+bool SQLiteDatabase::open(const std::string& relative_path, int flags) {
     if (isOpen_) {
         LEAFRA_WARNING() << "Database already open";
         return true;
     }
     
-    LEAFRA_INFO() << "Opening SQLite database: " << path;
+    LEAFRA_INFO() << "Opening SQLite database: " << relative_path;
     
-    int result = sqlite3_open_v2(path.c_str(), &db_, flags, nullptr);
+    // Validate that the path is relative (not absolute)
+    if (relative_path.empty()) {
+        LEAFRA_ERROR() << "Database path cannot be empty";
+        return false;
+    }
+    
+    // Check for absolute path indicators
+    if (relative_path[0] == '/' || relative_path[0] == '\\' || 
+        (relative_path.length() > 1 && relative_path[1] == ':')) { // Windows drive letter
+        LEAFRA_ERROR() << "Database path must be relative, not absolute: " << relative_path;
+        return false;
+    }
+    
+    // Check for path traversal attempts
+    if (relative_path.find("..") != std::string::npos) {
+        LEAFRA_ERROR() << "Database path cannot contain path traversal sequences (..): " << relative_path;
+        return false;
+    }
+    
+    // Convert relative path to absolute path using file manager
+    std::string absolutePath = FileManager::getAbsolutePath(StorageType::AppStorage, relative_path);
+    if (absolutePath.empty()) {
+        LEAFRA_ERROR() << "Failed to convert relative path to absolute path: " << relative_path;
+        return false;
+    }
+    
+    LEAFRA_DEBUG() << "Converted relative path '" << relative_path << "' to absolute path: " << absolutePath;
+    
+    int result = sqlite3_open_v2(absolutePath.c_str(), &db_, flags, nullptr);
     
     if (result == SQLITE_OK) {
         isOpen_ = true;
-        LEAFRA_INFO() << "SQLite database opened successfully";
+        LEAFRA_INFO() << "SQLite database opened successfully: " << absolutePath;
         return true;
     } else {
-        LEAFRA_ERROR() << "Failed to open SQLite database: " << sqlite3_errmsg(db_);
+        LEAFRA_ERROR() << "Failed to open SQLite database: " << absolutePath 
+                      << " Error: " << sqlite3_errmsg(db_);
         cleanup();
         return false;
     }
@@ -431,22 +461,64 @@ bool SQLiteDatabase::fileExists(const std::string& path) {
     return std::filesystem::exists(path);
 }
 
-bool SQLiteDatabase::createdb(const std::string& path) {
-    LEAFRA_DEBUG() << "Creating database: " << path;
+bool SQLiteDatabase::createdb(const std::string& relative_path) {
+    LEAFRA_DEBUG() << "Creating database: " << relative_path;
+    
+    // Validate that the path is relative (not absolute)
+    if (relative_path.empty()) {
+        LEAFRA_ERROR() << "Database path cannot be empty";
+        return false;
+    }
+    
+    // Check for absolute path indicators
+    if (relative_path[0] == '/' || relative_path[0] == '\\' || 
+        (relative_path.length() > 1 && relative_path[1] == ':')) { // Windows drive letter
+        LEAFRA_ERROR() << "Database path must be relative, not absolute: " << relative_path;
+        return false;
+    }
+    
+    // Check for path traversal attempts
+    if (relative_path.find("..") != std::string::npos) {
+        LEAFRA_ERROR() << "Database path cannot contain path traversal sequences (..): " << relative_path;
+        return false;
+    }
+    
+    // Convert relative path to absolute path using file manager
+    std::string absolutePath = FileManager::getAbsolutePath(StorageType::AppStorage, relative_path);
+    if (absolutePath.empty()) {
+        LEAFRA_ERROR() << "Failed to convert relative path to absolute path: " << relative_path;
+        return false;
+    }
+    
+    LEAFRA_DEBUG() << "Converted relative path '" << relative_path << "' to absolute path: " << absolutePath;
+    
+    // Create parent directories if they don't exist
+    std::filesystem::path dbPath(absolutePath);
+    std::filesystem::path parentDir = dbPath.parent_path();
+    if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+        std::error_code ec;
+        if (!std::filesystem::create_directories(parentDir, ec)) {
+            LEAFRA_ERROR() << "Failed to create parent directories for: " << absolutePath 
+                          << " Error: " << ec.message();
+            return false;
+        }
+        LEAFRA_DEBUG() << "Created parent directories: " << parentDir;
+    }
     
     // Check if file already exists
-    if (fileExists(path)) {
-        LEAFRA_WARNING() << "Database file already exists: " << path;
+    if (fileExists(absolutePath)) {
+        LEAFRA_WARNING() << "Database file already exists: " << absolutePath;
         return true; // Consider existing file as success
     }
     
     // Create the database by opening it with CREATE flag
     sqlite3* db = nullptr;
+    
     int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
-    int result = sqlite3_open_v2(path.c_str(), &db, flags, nullptr);
+    int result = sqlite3_open_v2(absolutePath.c_str(), &db, flags, nullptr);
     
     if (result == SQLITE_OK) {
-        LEAFRA_DEBUG() << "Database created successfully: " << path;
+        LEAFRA_DEBUG() << "Database created successfully: " << absolutePath;
         
         // Use the already opened database handle to create RAG tables
         SQLiteDatabase newDb;
@@ -461,30 +533,30 @@ bool SQLiteDatabase::createdb(const std::string& path) {
         sqlite3_close(db);
         
         if (tablesCreated) {
-            LEAFRA_DEBUG() << "Database and RAG tables created successfully: " << path;
+            LEAFRA_DEBUG() << "Database and RAG tables created successfully: " << absolutePath;
             return true;
         } else {
-            LEAFRA_ERROR() << "Database created but failed to create RAG tables: " << path;
+            LEAFRA_ERROR() << "Database created but failed to create RAG tables: " << absolutePath;
             // Clean up by deleting the partially created database file
-            if (std::filesystem::remove(path)) {
-                LEAFRA_DEBUG() << "Cleaned up partially created database file: " << path;
+            if (std::filesystem::remove(absolutePath)) {
+                LEAFRA_DEBUG() << "Cleaned up partially created database file: " << absolutePath;
             } else {
-                LEAFRA_WARNING() << "Failed to clean up partially created database file: " << path;
+                LEAFRA_WARNING() << "Failed to clean up partially created database file: " << absolutePath;
             }
             return false;
         }
     } else {
-        LEAFRA_ERROR() << "Failed to create database: " << path 
+        LEAFRA_ERROR() << "Failed to create database: " << absolutePath 
                       << " Error: " << sqlite3_errmsg(db);
         if (db) {
             sqlite3_close(db);
         }
         // Clean up any partially created file
-        if (fileExists(path)) {
-            if (std::filesystem::remove(path)) {
-                LEAFRA_DEBUG() << "Cleaned up partially created database file: " << path;
+        if (fileExists(absolutePath)) {
+            if (std::filesystem::remove(absolutePath)) {
+                LEAFRA_DEBUG() << "Cleaned up partially created database file: " << absolutePath;
             } else {
-                LEAFRA_WARNING() << "Failed to clean up partially created database file: " << path;
+                LEAFRA_WARNING() << "Failed to clean up partially created database file: " << absolutePath;
             }
         }
         return false;
