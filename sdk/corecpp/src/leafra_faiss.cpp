@@ -347,6 +347,67 @@ ResultCode FaissIndex::save_to_db(SQLiteDatabase& db, const std::string& definit
     }
     
     try {
+        // Handle existing entries by creating backups
+        std::string backup_definition = definition + "_backup";
+        
+        // Check if an entry with the same definition already exists
+        auto check_stmt = db.prepare("SELECT COUNT(*) FROM faissindextable WHERE definition = ?");
+        if (!check_stmt || !check_stmt->isValid()) {
+            LEAFRA_ERROR() << "Failed to prepare check statement for FAISS index save";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        if (!check_stmt->bindText(1, definition)) {
+            LEAFRA_ERROR() << "Failed to bind parameter for existence check";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        bool entry_exists = false;
+        if (check_stmt->step()) {
+            auto row = check_stmt->getCurrentRow();
+            entry_exists = (row.getInt(0) > 0);
+        }
+        
+        if (entry_exists) {
+            LEAFRA_INFO() << "Existing FAISS index found with definition: " << definition << ", creating backup";
+            
+            // First, delete any existing backup
+            auto delete_backup_stmt = db.prepare("DELETE FROM faissindextable WHERE definition = ?");
+            if (!delete_backup_stmt || !delete_backup_stmt->isValid()) {
+                LEAFRA_ERROR() << "Failed to prepare delete backup statement";
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+            
+            if (!delete_backup_stmt->bindText(1, backup_definition)) {
+                LEAFRA_ERROR() << "Failed to bind parameter for backup deletion";
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+            
+            if (!delete_backup_stmt->execute()) {
+                LEAFRA_ERROR() << "Failed to delete existing backup: " << db.getLastErrorMessage();
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+            
+            // Rename existing entry to backup
+            auto rename_stmt = db.prepare("UPDATE faissindextable SET definition = ? WHERE definition = ?");
+            if (!rename_stmt || !rename_stmt->isValid()) {
+                LEAFRA_ERROR() << "Failed to prepare rename statement";
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+            
+            if (!rename_stmt->bindText(1, backup_definition) || !rename_stmt->bindText(2, definition)) {
+                LEAFRA_ERROR() << "Failed to bind parameters for rename";
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+            
+            if (!rename_stmt->execute()) {
+                LEAFRA_ERROR() << "Failed to rename existing entry to backup: " << db.getLastErrorMessage();
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+            
+            LEAFRA_INFO() << "Existing entry renamed to backup: " << backup_definition;
+        }
+        
         // Serialize FAISS index to memory buffer
         faiss::VectorIOWriter writer;
         faiss::write_index(pImpl->get_index(), &writer);
@@ -354,8 +415,8 @@ ResultCode FaissIndex::save_to_db(SQLiteDatabase& db, const std::string& definit
         // Convert to blob for SQLite storage
         std::vector<uint8_t> blob_data = std::move(writer.data);
         
-        // Prepare SQL statement to insert/update the blob
-        std::string sql = "INSERT OR REPLACE INTO faissindextable (definition, faissdata) VALUES (?, ?)";
+        // Insert the new entry (now we know there's no conflict)
+        std::string sql = "INSERT INTO faissindextable (definition, faissdata) VALUES (?, ?)";
         auto stmt = db.prepare(sql);
         
         if (!stmt || !stmt->isValid()) {

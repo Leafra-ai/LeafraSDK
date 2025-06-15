@@ -604,15 +604,26 @@ public:
             attention_mask[i] = (i < real_token_count) ? 1.0f : 0.0f;
         }
         
-        // Prepare inputs for CoreML model (fixed order, no validation needed)
-        // Note: Input order determined from model.mil function signature:
-        // func main(tensor<int32, [1, 512]> attention_mask, tensor<int32, [1, 512]> input_ids)
+        //Our coreml implementation expects inputs in alphabetical order of their names
+        //I've added an explicit check by passing input names to the predict function to make
+        //sure that the user is not confused when using the model. This of course requires naming
+        //the inputs and outputs in the model; which should be our best practice regardless of inference framework
         std::vector<std::vector<float>> model_inputs = {attention_mask, input_tokens};
         
         // Run embedding inference
         LEAFRA_DEBUG() << "Running CoreML embedding inference for chunk " << chunk_number;
         auto inference_start = debug::timer::now();
-        auto embeddings = coreml_model_->predict(model_inputs);
+        
+        // Use explicit input names as best practice (works fore5_embedding_model_i512a512_FP32.mlmodelc)
+        std::vector<std::vector<float>> embeddings;
+        
+        if (config_.tokenizer.model_name == "multilingual-e5-small") {
+            std::vector<std::string> input_names = {"attention_mask", "input_ids"};
+            embeddings = coreml_model_->predict(model_inputs, input_names);
+        } else {
+            embeddings = coreml_model_->predict(model_inputs);
+        }
+        
         auto inference_end = debug::timer::now();
         double inference_ms = debug::timer::elapsed_milliseconds(inference_start, inference_end);
         LEAFRA_DEBUG_LOG("TIMING", "Chunk " + std::to_string(chunk_number) + " inference: " + std::to_string(inference_ms) + "ms");
@@ -634,7 +645,7 @@ public:
      * @param chunks Vector of text chunks to process (modified in-place with token IDs)
      * @return Pair of (total_actual_tokens, using_sentencepiece_flag)
      */
-    std::pair<size_t, bool> processChunksWithSentencePieceTokenization(std::vector<TextChunk>& chunks) {
+    std::pair<size_t, bool> processChunksWithSentencePieceTokenization(std::vector<TextChunk>& chunks, const std::string& prefix) {
         size_t total_actual_tokens = 0;
         bool using_sentencepiece = false;
         
@@ -652,13 +663,12 @@ public:
             
             // Note: chunk.content is a string_view, so we need to convert it to a string
             // This can be prevented for other models which don't require changing the text by overloading the encode_as_ids with string_view
+             
             std::string chunk_text = std::string(chunk.content);
             
-            // Add "passage: " prefix for multilingual-e5-small model per 
-            // https://huggingface.co/intfloat/multilingual-e5-small 
-            if (config_.tokenizer.model_name == "multilingual-e5-small") {
-                chunk_text = "passage: " + chunk_text;
-            }
+            // Add "passage: or queary" prefix for multilingual-e5-small model per 
+            // https://huggingface.co/intfloat/multilingual-e5-small             
+            chunk_text = prefix + chunk_text;
             
             std::vector<int> token_ids = tokenizer_->encode_as_ids(chunk_text, SentencePieceTokenizer::TokenizeOptions());
             
@@ -1438,9 +1448,12 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                     if (chunk_result == ResultCode::SUCCESS) {
                         LEAFRA_INFO() << "✅ Successfully created " << chunks.size() << " chunks";
                         pImpl->send_event("🧩 Created " + std::to_string(chunks.size()) + " chunks");
-                        
+                        std::string prefix;
+                        if (pImpl->config_.tokenizer.model_name == "multilingual-e5-small") {
+                            prefix = "passage: ";
+                        }
                         // Use SentencePiece for accurate token counting if available
-                        auto [total_actual_tokens, using_sentencepiece] = pImpl->processChunksWithSentencePieceTokenization(chunks);
+                        auto [total_actual_tokens, using_sentencepiece] = pImpl->processChunksWithSentencePieceTokenization(chunks, prefix);
 
 #ifdef LEAFRA_HAS_COREML
                         // Process chunks through CoreML embedding model if available (only if SentencePiece was successful)
@@ -1604,9 +1617,12 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
             LEAFRA_ERROR() << "Failed to create chunks from query";
             return ResultCode::ERROR_PROCESSING_FAILED;
         }
-        
+        std::string prefix; 
+        if (pImpl->config_.tokenizer.model_name == "multilingual-e5-small") {
+            prefix = "query: ";
+        }
         // Use SentencePiece for tokenization (reusing existing pipeline)
-        auto [total_actual_tokens, using_sentencepiece] = pImpl->processChunksWithSentencePieceTokenization(chunks);
+        auto [total_actual_tokens, using_sentencepiece] = pImpl->processChunksWithSentencePieceTokenization(chunks, prefix);
         
         if (!using_sentencepiece) {
             LEAFRA_ERROR() << "SentencePiece tokenization failed for query";

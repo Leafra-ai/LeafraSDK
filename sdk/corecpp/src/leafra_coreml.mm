@@ -280,7 +280,9 @@ std::string CoreMLModel::getDescription() const {
 // All introspection methods now use cached data (implemented as inline functions in header)
 
 // Optimized prediction using cached metadata
-std::vector<std::vector<float> > CoreMLModel::predict(const std::vector<std::vector<float> >& inputs) {
+// !! Expects inputs and outpus in alphabetical order of their names !!
+std::vector<std::vector<float> > CoreMLModel::predict(const std::vector<std::vector<float> >& inputs,
+                                                     const std::vector<std::string>& input_names) {
     if (!model_ptr_) {
         throw std::runtime_error("Invalid CoreML model");
     }
@@ -290,6 +292,22 @@ std::vector<std::vector<float> > CoreMLModel::predict(const std::vector<std::vec
     
     if (num_inputs != input_names_.size()) {
         throw std::runtime_error("Input count mismatch: expected " + std::to_string(input_names_.size()) + ", got " + std::to_string(num_inputs));
+    }
+    
+    // Validate input names if provided
+    if (!input_names.empty()) {
+        if (input_names.size() != inputs.size()) {
+            throw std::runtime_error("Input names count (" + std::to_string(input_names.size()) + ") doesn't match inputs count (" + std::to_string(inputs.size()) + ")");
+        }
+        
+        // Check if provided input names match model's expected input names in order
+        for (size_t i = 0; i < input_names.size(); ++i) {
+            if (input_names[i] != input_names_[i]) {
+                std::string error_msg = "Input name mismatch at index " + std::to_string(i) + 
+                                      ": expected '" + input_names_[i] + "', got '" + input_names[i] + "'";
+                throw std::runtime_error(error_msg);
+            }
+        }
     }
     
     // Prepare output arrays using cached sizes
@@ -307,9 +325,13 @@ std::vector<std::vector<float> > CoreMLModel::predict(const std::vector<std::vec
     return outputs;
 }
 
+
 // Pre-allocated multiple inputs/outputs prediction
+// !! Expects inputs and outpus in alphabetical order of their names !!
 bool CoreMLModel::predict(const std::vector<std::vector<float> >& inputs, 
-                         std::vector<std::vector<float> >& outputs) {
+                         std::vector<std::vector<float> >& outputs,
+                         const std::vector<std::string>& input_names,
+                         const std::vector<std::string>& output_names) {
     if (!model_ptr_) return false;
     
     @autoreleasepool {
@@ -327,6 +349,38 @@ bool CoreMLModel::predict(const std::vector<std::vector<float> >& inputs,
         if (num_inputs != input_names_.size()) {
             LEAFRA_ERROR() << "Input count mismatch: model expects " << input_names_.size() << ", got " << num_inputs;
             return false;
+        }
+        
+        // Validate input names if provided
+        if (!input_names.empty()) {
+            if (input_names.size() != inputs.size()) {
+                LEAFRA_ERROR() << "Input names count (" << input_names.size() << ") doesn't match inputs count (" << inputs.size() << ")";
+                return false;
+            }
+            
+            // Check if provided input names match model's expected input names in order
+            for (size_t i = 0; i < input_names.size(); ++i) {
+                if (input_names[i] != input_names_[i]) {
+                    LEAFRA_ERROR() << "Input name mismatch at index " << i << ": expected '" << input_names_[i] << "', got '" << input_names[i] << "'";
+                    return false;
+                }
+            }
+        }
+        
+        // Validate output names if provided
+        if (!output_names.empty()) {
+            if (output_names.size() != outputs.size()) {
+                LEAFRA_ERROR() << "Output names count (" << output_names.size() << ") doesn't match outputs count (" << outputs.size() << ")";
+                return false;
+            }
+            
+            // Check if provided output names match model's expected output names in order
+            for (size_t i = 0; i < output_names.size(); ++i) {
+                if (output_names[i] != output_names_[i]) {
+                    LEAFRA_ERROR() << "Output name mismatch at index " << i << ": expected '" << output_names_[i] << "', got '" << output_names[i] << "'";
+                    return false;
+                }
+            }
         }
         
         // Create input features using cached NSString objects (no conversions!)

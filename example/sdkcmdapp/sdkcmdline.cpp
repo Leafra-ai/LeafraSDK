@@ -280,7 +280,7 @@ int main(int argc, char* argv[]) {
         
         // Configure chunking settings for testing
         config.chunking.enabled = true;
-        config.chunking.chunk_size = 500;  // 500 tokens per chunk
+        config.chunking.chunk_size = 400;  // 500 tokens per chunk
         config.chunking.overlap_percentage = 0.2;  // 20% overlap
         config.chunking.size_unit = ChunkSizeUnit::TOKENS;
         config.chunking.token_method = TokenApproximationMethod::SIMPLE;
@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
         
         config.embedding_inference.enabled = true;
         config.embedding_inference.framework = "coreml";
-        config.embedding_inference.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/embedding/generated_models/coreml/model.mlmodelc";
+        config.embedding_inference.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/embedding/generated_models/coreml/e5_embedding_model_i512a512_FP32.mlmodelc";
         config.vector_search.enabled = true;
         //AD TEMP
         //config.vector_search.index_type = "HNSW";
@@ -388,8 +388,8 @@ int main(int argc, char* argv[]) {
                     
                     // Print content with proper formatting
                     std::string content = result.content;
-                    if (content.length() > 200) {
-                        content = content.substr(0, 200) + "...";
+                    if (content.length() > 2000) {
+                        content = content.substr(0, 2000) + "...";
                     }
                     std::cout << "      " << content << std::endl;
                 }

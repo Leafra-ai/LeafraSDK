@@ -102,11 +102,14 @@ public:
     const std::vector<size_t>& getOutputSizes() const { return output_sizes_; }
 
     // Prediction methods (handles both single and multiple inputs/outputs)
-    std::vector<std::vector<float> > predict(const std::vector<std::vector<float> >& inputs);
+    std::vector<std::vector<float> > predict(const std::vector<std::vector<float> >& inputs,
+                                            const std::vector<std::string>& input_names = {});
 
     // Advanced prediction with pre-allocated outputs
     bool predict(const std::vector<std::vector<float> >& inputs, 
-                std::vector<std::vector<float> >& outputs);
+                std::vector<std::vector<float> >& outputs,
+                const std::vector<std::string>& input_names = {},
+                const std::vector<std::string>& output_names = {});
 
 private:
     void* model_ptr_;  // Opaque pointer to implementation
