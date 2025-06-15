@@ -81,7 +81,8 @@ enum class ResultCode : int32_t {
     ERROR_INITIALIZATION_FAILED = -2,
     ERROR_PROCESSING_FAILED = -3,
     ERROR_NOT_IMPLEMENTED = -4,
-    ERROR_OUT_OF_MEMORY = -5
+    ERROR_OUT_OF_MEMORY = -5,
+    ERROR_NOT_FOUND = -6
 };
 
 /**
@@ -120,7 +121,7 @@ struct LEAFRA_API TokenizerConfig {
  * @brief Chunking configuration for the SDK
  */
 struct LEAFRA_API ChunkingConfig {
-    bool enabled = true;                    // Whether to enable chunking during file processing
+    bool enabled = false;                    // Whether to enable chunking during file processing
     size_t chunk_size = 500;               // Size of each chunk (UTF-8 characters or tokens, depending on size_unit)
     double overlap_percentage = 0.15;       // Overlap percentage (0.0 to 1.0)
     bool preserve_word_boundaries = true;   // Whether to avoid breaking words
@@ -170,6 +171,52 @@ struct LEAFRA_API EmbeddingModelConfig {
     }
 };
 
+#ifdef LEAFRA_HAS_FAISS
+// Forward declarations for FAISS types
+class FaissIndex;
+#endif
+
+/**
+ * @brief Vector search configuration for the SDK
+ */
+struct LEAFRA_API VectorSearchConfig {
+    bool enabled = false;                   // Whether to enable vector search functionality
+    int32_t dimension = 384;                // Vector dimension (default for many embedding models)
+    std::string index_type = "HNSW";        // FAISS index type: "FLAT", "IVF_FLAT", "IVF_PQ", "HNSW", "LSH"
+    std::string metric = "COSINE";          // Distance metric: "L2", "INNER_PRODUCT", "COSINE"
+    
+    // Advanced FAISS configuration
+    int32_t nlist = 100;                    // Number of clusters for IVF indexes (auto-calculated if 0)
+    int32_t nprobe = 10;                    // Number of clusters to search in IVF indexes
+    int32_t m = 8;                          // Number of subquantizers for PQ indexes
+    int32_t nbits = 8;                      // Bits per subquantizer for PQ indexes
+    int32_t hnsw_m = 16;                    // Number of bi-directional links for HNSW
+    int32_t lsh_nbits = 64;                 // Number of hash bits for LSH
+    
+    // Database storage configuration
+    std::string index_definition = "default"; // Definition string for database storage
+    bool auto_save = true;                  // Automatically save index to database after building
+    bool auto_load = true;                  // Automatically load index from database on initialization
+    
+    // Default constructor
+    VectorSearchConfig() = default;
+    
+    // Constructor with basic parameters
+    VectorSearchConfig(int32_t dim, const std::string& idx_type = "FLAT", const std::string& metric_type = "COSINE")
+        : enabled(true), dimension(dim), index_type(idx_type), metric(metric_type) {}
+    
+    // Check if configuration is valid
+    bool is_valid() const {
+        return dimension > 0 && 
+               (index_type == "FLAT" || index_type == "IVF_FLAT" || index_type == "IVF_PQ" || 
+                index_type == "HNSW" || index_type == "LSH") &&
+               (metric == "L2" || metric == "INNER_PRODUCT" || metric == "COSINE");
+    }
+    
+    // Note: FAISS enum conversion methods are implemented in leafra_core.cpp
+    // when LEAFRA_HAS_FAISS is defined and leafra_faiss.h is included
+};
+
 // Configuration structure
 struct LEAFRA_API Config {
     std::string name;
@@ -181,6 +228,7 @@ struct LEAFRA_API Config {
     ChunkingConfig chunking;               // Chunking configuration
     TokenizerConfig tokenizer;             // Tokenization configuration
     EmbeddingModelConfig embedding_inference; // Embedding model inference configuration
+    VectorSearchConfig vector_search;       // Vector search configuration
 };
 
 // Data structures

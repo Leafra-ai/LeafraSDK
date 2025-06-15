@@ -10,6 +10,9 @@
 
 namespace leafra {
 
+// Forward declaration
+class SQLiteDatabase;
+
 /**
  * @brief FAISS vector search wrapper for efficient similarity search
  * 
@@ -40,11 +43,18 @@ public:
     };
 
     /**
-     * @brief Search result containing vector ID and distance
+     * @brief Search result containing vector ID and distance, with optional chunk metadata
      */
     struct SearchResult {
-        int64_t id;         // Vector ID
+        int64_t id;         // Vector ID (FAISS ID)
         float distance;     // Distance/similarity score
+        
+        // Optional chunk metadata (populated by semantic search)
+        int64_t doc_id = -1;        // Document ID from database
+        int chunk_index = -1;       // Chunk index within document
+        int page_number = -1;       // Page number where chunk appears
+        std::string content;        // Chunk text content
+        std::string filename;       // Source document filename
         
         SearchResult(int64_t id = -1, float distance = 0.0f) 
             : id(id), distance(distance) {}
@@ -159,6 +169,31 @@ public:
      * @return String representation of metric type
      */
     std::string get_metric_type_string() const;
+
+    /**
+     * @brief Save FAISS index to SQLite database as blob
+     * @param db SQLite database reference
+     * @param definition Table/field definition string for storage identification
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode save_to_db(SQLiteDatabase& db, const std::string& definition);
+    
+    /**
+     * @brief Restore FAISS index from SQLite database blob
+     * @param db SQLite database reference  
+     * @param definition Table/field definition string for storage identification
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode restore_from_db(SQLiteDatabase& db, const std::string& definition);
+
+    /**
+     * @brief Remove vectors from the index by their IDs
+     * @param ids Vector IDs to remove
+     * @param count Number of IDs to remove
+     * @return ResultCode indicating success or failure
+     * @note Not all index types support efficient removal. This method requires ID mapping to be enabled.
+     */
+    ResultCode remove_vectors(const int64_t* ids, int count);
 
 private:
     class Impl;

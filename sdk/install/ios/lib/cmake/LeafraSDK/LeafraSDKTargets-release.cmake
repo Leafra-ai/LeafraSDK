@@ -8,7 +8,7 @@ set(CMAKE_IMPORT_FILE_VERSION 1)
 # Import target "LeafraCore" for configuration "Release"
 set_property(TARGET LeafraCore APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(LeafraCore PROPERTIES
-  IMPORTED_LINK_DEPENDENT_LIBRARIES_RELEASE "SQLite::SQLite3;ICU::core;Apple::CoreML"
+  IMPORTED_LINK_DEPENDENT_LIBRARIES_RELEASE "ICU::core;Apple::CoreML"
   IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/Frameworks/LeafraCore.framework/LeafraCore"
   IMPORTED_SONAME_RELEASE "@rpath/LeafraCore.framework/LeafraCore"
   )

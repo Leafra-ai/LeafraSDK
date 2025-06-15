@@ -9,7 +9,7 @@ export interface LeafraConfig {
   debugMode?: boolean;
   maxThreads?: number;
   bufferSize?: number;
-  leafraDocumentDatabaseName?: string;
+  //TODO AD: Add other SDK config options here if needed later to expose to the app
 }
 
 export interface Point2D {

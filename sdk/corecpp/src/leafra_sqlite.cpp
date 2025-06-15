@@ -225,7 +225,16 @@ bool SQLiteDatabase::Statement::bindNull(const std::string& paramName) {
 bool SQLiteDatabase::Statement::step() {
     if (!valid_) return false;
     int result = sqlite3_step(stmt_);
-    return result == SQLITE_ROW;  // Only return true if there's actual row data
+    // For SELECT statements: return true only if there's row data
+    // For INSERT/UPDATE/DELETE: this will be handled by execute() method
+    return result == SQLITE_ROW;
+}
+
+bool SQLiteDatabase::Statement::execute() {
+    if (!valid_) return false;
+    int result = sqlite3_step(stmt_);
+    // For INSERT/UPDATE/DELETE: return true for successful execution
+    return result == SQLITE_DONE || result == SQLITE_ROW;
 }
 
 bool SQLiteDatabase::Statement::reset() {
@@ -606,7 +615,9 @@ bool SQLiteDatabase::createRAGTables() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_id INTEGER NOT NULL,
             chunk_page_number INTEGER NOT NULL,
+            chunk_faiss_id INTEGER,
             chunk_no INTEGER NOT NULL,
+            chunk_token_size INTEGER NOT NULL,
             chunk_size INTEGER NOT NULL,
             chunk_text TEXT NOT NULL,
             chunk_embedding BLOB,
@@ -619,14 +630,31 @@ bool SQLiteDatabase::createRAGTables() {
         return false;
     }
     
+    // Create FAISS index table for vector index storage
+    const std::string createFaissIndexTable = R"(
+        CREATE TABLE IF NOT EXISTS faissindextable (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            definition TEXT NOT NULL,
+            creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            faissdata BLOB NOT NULL
+        )
+    )";
+    
+    if (!execute(createFaissIndexTable)) {
+        LEAFRA_ERROR() << "Failed to create faissindextable";
+        return false;
+    }
+    
     // Create indexes for better performance
     const std::string createDocsFilenameIndex = "CREATE INDEX IF NOT EXISTS idx_docs_filename ON docs(filename)";
     const std::string createChunksDocIdIndex = "CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON chunks(doc_id)";
     const std::string createChunksChunkNoIndex = "CREATE INDEX IF NOT EXISTS idx_chunks_chunk_no ON chunks(doc_id, chunk_no)";
+    const std::string createFaissDefinitionIndex = "CREATE INDEX IF NOT EXISTS idx_faiss_definition ON faissindextable(definition)";
     
     if (!execute(createDocsFilenameIndex) || 
         !execute(createChunksDocIdIndex) || 
-        !execute(createChunksChunkNoIndex)) {
+        !execute(createChunksChunkNoIndex) ||
+        !execute(createFaissDefinitionIndex)) {
         LEAFRA_ERROR() << "Failed to create indexes";
         return false;
     }

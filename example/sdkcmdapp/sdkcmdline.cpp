@@ -39,6 +39,7 @@ void print_usage(const char* program_name) {
     std::cout << "  -h, --help                - Show this help message" << std::endl;
     std::cout << "  --print_chunks_full       - Print full content of all chunks" << std::endl;
     std::cout << "  --print_chunks_brief N    - Print first N lines of each chunk" << std::endl;
+    std::cout << "  --semantic_search \"query\" [max_results] - Perform semantic search (default: 5 results)" << std::endl;
     std::cout << "\nSupported file types:" << std::endl;
     std::cout << "  • Text files (.txt)" << std::endl;
     std::cout << "  • PDF files (.pdf)" << std::endl;
@@ -50,6 +51,8 @@ void print_usage(const char* program_name) {
     std::cout << "  " << program_name << " file1.txt file2.pdf          # Process multiple files" << std::endl;
     std::cout << "  " << program_name << " --print_chunks_full doc.txt  # Process and show full chunks" << std::endl;
     std::cout << "  " << program_name << " --print_chunks_brief 3 doc.txt # Process and show first 3 lines of each chunk" << std::endl;
+    std::cout << "  " << program_name << " --semantic_search \"machine learning\"     # Search indexed content (5 results)" << std::endl;
+    std::cout << "  " << program_name << " --semantic_search \"AI technology\" 10  # Search with 10 results" << std::endl;
 }
 
 void create_sample_text_file(const std::string& filename) {
@@ -162,6 +165,9 @@ int main(int argc, char* argv[]) {
     bool print_chunks_full = false;
     bool print_chunks_brief = false;
     int max_lines = 0;
+    bool semantic_search_mode = false;
+    std::string search_query;
+    int max_results = 5;
     
     // Parse arguments
     for (int i = 1; i < argc; i++) {
@@ -191,6 +197,39 @@ int main(int argc, char* argv[]) {
                 std::cerr << "❌ Error: --print_chunks_brief requires a number argument" << std::endl;
                 return 1;
             }
+        } else if (arg == "--semantic_search") {
+            semantic_search_mode = true;
+            demo_mode = false;
+            // Next argument should be the search query
+            if (i + 1 < argc) {
+                i++; // Move to next argument
+                search_query = argv[i];
+                if (search_query.empty()) {
+                    std::cerr << "❌ Error: Search query cannot be empty" << std::endl;
+                    return 1;
+                }
+                // Check if there's an optional max_results parameter
+                if (i + 1 < argc) {
+                    std::string next_arg = argv[i + 1];
+                    // Check if next argument is a number (not starting with -)
+                    if (!next_arg.empty() && next_arg[0] != '-' && std::isdigit(next_arg[0])) {
+                        i++; // Move to next argument
+                        try {
+                            max_results = std::stoi(next_arg);
+                            if (max_results <= 0) {
+                                std::cerr << "❌ Error: max_results must be a positive number" << std::endl;
+                                return 1;
+                            }
+                        } catch (const std::exception& e) {
+                            std::cerr << "❌ Error: Invalid number for max_results: " << next_arg << std::endl;
+                            return 1;
+                        }
+                    }
+                }
+            } else {
+                std::cerr << "❌ Error: --semantic_search requires a query string argument" << std::endl;
+                return 1;
+            }
         } else {
             // It's a file argument
             if (file_exists(arg)) {
@@ -202,7 +241,7 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    if (input_files.empty() && !demo_mode) {
+    if (input_files.empty() && !demo_mode && !semantic_search_mode) {
         std::cerr << "❌ Error: No valid files found!" << std::endl;
         print_usage(argv[0]);
         return 1;
@@ -217,6 +256,11 @@ int main(int argc, char* argv[]) {
             create_sample_text_file(sample_file);
             input_files.push_back(sample_file);
             std::cout << "📄 Demo Mode: Created sample document: " << sample_file << std::endl;
+        } else if (semantic_search_mode) {
+            // Semantic search mode - no files needed, searches indexed content
+            std::cout << "🔍 Semantic Search Mode: Searching indexed content" << std::endl;
+            std::cout << "🔎 Query: \"" << search_query << "\"" << std::endl;
+            std::cout << "📊 Max Results: " << max_results << std::endl;
         } else {
             // User provided files
             std::cout << "📁 User Files Mode: Processing " << input_files.size() << " file(s)" << std::endl;
@@ -274,6 +318,13 @@ int main(int argc, char* argv[]) {
         config.embedding_inference.enabled = true;
         config.embedding_inference.framework = "coreml";
         config.embedding_inference.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/embedding/generated_models/coreml/model.mlmodelc";
+        config.vector_search.enabled = true;
+        //AD TEMP
+        //config.vector_search.index_type = "HNSW";
+        config.vector_search.index_type = "FLAT";
+        config.vector_search.metric = "COSINE";
+        config.vector_search.dimension = 384;
+
         print_separator("SDK Configuration");
         std::cout << "Application: " << config.name << std::endl;
         std::cout << "Platform: Desktop (macOS/Linux/Windows)" << std::endl;
@@ -310,6 +361,56 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "✅ SDK initialized successfully!" << std::endl;
         std::cout << "🔧 Development mode: " << (config.debug_mode ? "Enabled" : "Disabled") << std::endl;
+        
+        // Handle semantic search mode
+        if (semantic_search_mode) {
+            print_separator("Semantic Search");
+            std::cout << "🔍 Performing semantic search..." << std::endl;
+            std::cout << "Query: \"" << search_query << "\"" << std::endl;
+            std::cout << "Max Results: " << max_results << std::endl;
+            
+#ifdef LEAFRA_HAS_FAISS
+            std::vector<FaissIndex::SearchResult> search_results;
+            ResultCode search_result = sdk->semantic_search(search_query, max_results, search_results);
+            
+            if (search_result == ResultCode::SUCCESS) {
+                std::cout << "\n✅ Semantic search completed successfully!" << std::endl;
+                std::cout << "📊 Found " << search_results.size() << " results:" << std::endl;
+                
+                for (size_t i = 0; i < search_results.size(); i++) {
+                    const auto& result = search_results[i];
+                    std::cout << "\n🔍 Result " << (i + 1) << ":" << std::endl;
+                    std::cout << "   📄 File: " << result.filename << std::endl;
+                    std::cout << "   📖 Page: " << result.page_number << std::endl;
+                    std::cout << "   🧩 Chunk: " << result.chunk_index << std::endl;
+                    std::cout << "   📏 Distance: " << result.distance << std::endl;
+                    std::cout << "   📝 Content: " << std::endl;
+                    
+                    // Print content with proper formatting
+                    std::string content = result.content;
+                    if (content.length() > 200) {
+                        content = content.substr(0, 200) + "...";
+                    }
+                    std::cout << "      " << content << std::endl;
+                }
+            } else {
+                std::cout << "\n❌ Semantic search failed!" << std::endl;
+                std::cout << "   Make sure you have processed some documents first." << std::endl;
+            }
+#else
+            std::cout << "❌ FAISS support not compiled - semantic search unavailable" << std::endl;
+#endif
+            
+            // Skip normal processing for semantic search mode
+            print_separator("SDK Shutdown");
+            std::cout << "Cleaning up resources..." << std::endl;
+            sdk->shutdown();
+            std::cout << "✅ Cleanup completed" << std::endl;
+            
+            print_separator("Search Summary");
+            std::cout << "✅ Semantic search completed!" << std::endl;
+            return 0;
+        }
         
         // Process the files (end-to-end testing)
         print_separator("End-to-End Document Processing");

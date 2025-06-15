@@ -36,6 +36,11 @@
 // Delegates will be added in a future update
 #endif
 
+#ifdef LEAFRA_HAS_FAISS
+// FAISS interface header for enum conversion methods
+#include "leafra/leafra_faiss.h"
+#endif
+
 namespace leafra {
 
 // Implementation of ChunkingConfig constructors
@@ -50,6 +55,25 @@ ChunkingConfig::ChunkingConfig(size_t size, double overlap, bool use_tokens)
     size_unit = use_tokens ? ChunkSizeUnit::TOKENS : ChunkSizeUnit::CHARACTERS;
     token_method = TokenApproximationMethod::SIMPLE;
 }
+
+#ifdef LEAFRA_HAS_FAISS
+// Helper functions to convert from config strings to FAISS enum types
+static FaissIndex::IndexType get_faiss_index_type_from_string(const std::string& index_type) {
+    if (index_type == "FLAT") return FaissIndex::IndexType::FLAT;
+    if (index_type == "IVF_FLAT") return FaissIndex::IndexType::IVF_FLAT;
+    if (index_type == "IVF_PQ") return FaissIndex::IndexType::IVF_PQ;
+    if (index_type == "HNSW") return FaissIndex::IndexType::HNSW;
+    if (index_type == "LSH") return FaissIndex::IndexType::LSH;
+    return FaissIndex::IndexType::FLAT; // Default fallback
+}
+
+static FaissIndex::MetricType get_faiss_metric_type_from_string(const std::string& metric) {
+    if (metric == "L2") return FaissIndex::MetricType::L2;
+    if (metric == "INNER_PRODUCT") return FaissIndex::MetricType::INNER_PRODUCT;
+    if (metric == "COSINE") return FaissIndex::MetricType::COSINE;
+    return FaissIndex::MetricType::COSINE; // Default fallback
+}
+#endif
 
 // Private implementation class (PIMPL pattern)
 class LeafraCore::Impl {
@@ -66,6 +90,11 @@ public:
 #ifdef LEAFRA_HAS_SQLITE
     // SQLite database for document storage
     std::unique_ptr<SQLiteDatabase> database_;
+#endif
+
+#ifdef LEAFRA_HAS_FAISS
+    // FAISS index for vector search
+    std::unique_ptr<FaissIndex> faiss_index_;
 #endif
     
 #ifdef LEAFRA_HAS_COREML
@@ -145,24 +174,43 @@ public:
                 return false;
             }
             
-            // Extract filename from file path
+            // Get canonical path (resolves .., ., symlinks) and extract filename
             std::filesystem::path path(file_path);
+            std::string absolute_path;
+            try {
+                // First try canonical (requires file to exist and resolves all components)
+                absolute_path = std::filesystem::canonical(path).string();
+            } catch (const std::filesystem::filesystem_error& e) {
+                LEAFRA_DEBUG() << "Failed to get canonical path for: " << file_path << " - " << e.what();
+                return false;
+            }
             std::string filename = path.filename().string();
-            
+            LEAFRA_DEBUG() << "Filename: " << filename;
+            LEAFRA_DEBUG() << "Absolute path: " << absolute_path;
+
             // Calculate total document size (sum of all page text lengths)
             size_t total_size = 0;
             for (const auto& page : result.pages) {
                 total_size += page.length();
             }
             
+            // Check if document already exists and delete it if found
+            if (!handleExistingDocument(filename, absolute_path)) {
+                LEAFRA_ERROR() << "Failed to handle existing document: " << filename;
+                return false;
+            }
+
             // Bind parameters for document
             insertDocStmt->bindText(1, filename);
-            insertDocStmt->bindText(2, file_path);  // Use full path as URL
+            insertDocStmt->bindText(2, absolute_path);  // Use absolute path as URL
             insertDocStmt->bindInt64(3, static_cast<long long>(total_size));
             
             // Execute document insert
-            if (!insertDocStmt->step()) {
+            if (!insertDocStmt->execute()) {
                 LEAFRA_ERROR() << "Failed to insert document: " << filename;
+                LEAFRA_ERROR() << "SQLite error code: " << database_->getLastErrorCode();
+                LEAFRA_ERROR() << "SQLite error message: " << database_->getLastErrorMessage();
+                LEAFRA_DEBUG() << "Attempted to insert - filename: '" << filename << "', url: '" << absolute_path << "', size: " << total_size;
                 return false;
             }
             
@@ -172,7 +220,7 @@ public:
             
             // Prepare chunk insert statement
             auto insertChunkStmt = database_->prepare(
-                "INSERT INTO chunks (doc_id, chunk_page_number, chunk_no, chunk_size, chunk_text, chunk_embedding) VALUES (?, ?, ?, ?, ?, ?)"
+                "INSERT INTO chunks (doc_id, chunk_page_number, chunk_faiss_id, chunk_no, chunk_token_size, chunk_size, chunk_text, chunk_embedding) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
             );
             
             if (!insertChunkStmt || !insertChunkStmt->isValid()) {
@@ -197,21 +245,30 @@ public:
                     embedding_blob.assign(byte_data, byte_data + byte_size);
                 }
                 
+                // Calculate FAISS ID for this chunk (same as used in FAISS insertion)
+                int64_t chunk_faiss_id = doc_id * 1000000 + static_cast<int64_t>(i);
+                
                 // Bind parameters for chunk
                 insertChunkStmt->bindInt64(1, doc_id);
-                insertChunkStmt->bindInt64(2, static_cast<long long>(chunk.page_number)); // chunk_page_number (1-based)
-                insertChunkStmt->bindInt64(3, static_cast<long long>(i + 1)); // chunk_no (1-based)
-                insertChunkStmt->bindInt64(4, static_cast<long long>(chunk.content.length()));
-                insertChunkStmt->bindText(5, std::string(chunk.content)); // Convert string_view to string
+                insertChunkStmt->bindInt64(2, static_cast<long long>(chunk.page_number)); //0-based page number
+                if (chunk.has_embedding() && !chunk.embedding.empty()) {
+                    insertChunkStmt->bindInt64(3, chunk_faiss_id); // chunk_faiss_id - for chunks with embeddings
+                } else {
+                    insertChunkStmt->bindNull(3); // chunk_faiss_id - NULL for chunks without embeddings
+                }
+                insertChunkStmt->bindInt64(4, static_cast<long long>(i)); // chunk_no (0-based)
+                insertChunkStmt->bindInt64(5, static_cast<long long>(chunk.estimated_tokens)); // chunk_token_size
+                insertChunkStmt->bindInt64(6, static_cast<long long>(chunk.content.length())); // chunk_size
+                insertChunkStmt->bindText(7, std::string(chunk.content)); // Convert string_view to string
                 
                 if (!embedding_blob.empty()) {
-                    insertChunkStmt->bindBlob(6, embedding_blob);
+                    insertChunkStmt->bindBlob(8, embedding_blob);
                 } else {
-                    insertChunkStmt->bindNull(6);
+                    insertChunkStmt->bindNull(8);
                 }
                 
                 // Execute chunk insert
-                if (!insertChunkStmt->step()) {
+                if (!insertChunkStmt->execute()) {
                     LEAFRA_ERROR() << "Failed to insert chunk " << (i + 1) << " for document: " << filename;
                     return false;
                 }
@@ -222,10 +279,14 @@ public:
                 LEAFRA_ERROR() << "Failed to commit document and chunks transaction";
                 return false;
             }
-            
+    #ifdef LEAFRA_HAS_FAISS
+            // Insert chunk embeddings into FAISS index
+            // TODO AD: if something goes wrong here, we need to delete the document and chunks from the database as well
+            insertChunkEmbeddingsIntoFaiss(chunks, doc_id);
+    #endif // LEAFRA_HAS_FAISS
             LEAFRA_INFO() << "✅ Successfully inserted document '" << filename << "' with " << chunks.size() << " chunks";
             send_event("💾 Stored document: " + filename + " (" + std::to_string(chunks.size()) + " chunks)");
-            
+                        
             return true;
             
         } catch (const std::exception& e) {
@@ -233,7 +294,7 @@ public:
             return false;
         }
     } //insertDocumentAndChunksIntoDatabase
-#endif
+#endif // LEAFRA_HAS_SQLITE
 
     /**
      * @brief Print detailed chunk content analysis for debugging/development
@@ -655,8 +716,182 @@ public:
                   ", Avg size: " + std::to_string(chunks.size() > 0 ? total_chunk_chars / chunks.size() : 0) + " chars, " +
                   std::to_string(chunks.size() > 0 ? total_tokens / chunks.size() : 0) + " " + token_type + " tokens");
     } //calculateAndLogChunkStatistics
+
+#ifdef LEAFRA_HAS_SQLITE
+    /**
+     * @brief Check if document exists and delete it if found
+     * @param filename Document filename
+     * @param absolute_path Absolute path to the document
+     * @return true if successful (document didn't exist or was successfully deleted), false on error
+     */
+    bool handleExistingDocument(const std::string& filename, const std::string& absolute_path) {
+        if (!database_ || !database_->isOpen()) {
+            return false;
+        }
+        
+        auto checkStmt = database_->prepare("SELECT id FROM docs WHERE filename = ? AND url = ?");
+        if (!checkStmt || !checkStmt->isValid()) {
+            LEAFRA_ERROR() << "Failed to prepare document existence check statement";
+            return false;
+        }
+        
+        checkStmt->bindText(1, filename);
+        checkStmt->bindText(2, absolute_path);
+        
+        if (checkStmt->step()) {
+            long long existing_doc_id = checkStmt->getCurrentRow().getInt64(0);
+            LEAFRA_INFO() << "Document already exists in database: " << filename << " (ID: " << existing_doc_id << ")";
+            
+#ifdef LEAFRA_HAS_FAISS
+            // TODO AD: index types other than flat does not support vector removal, simply return for now for duplicate documents
+            // for these other index types we need to reindex or insert document hashes and mark older doc & its chunks invalid in the chunk table
+            // need to think this a bit more later, for now we'll simply return if index type is not flat
+            // Check if index type is not flat (only flat index supports vector removal)
+            if (faiss_index_ && config_.vector_search.index_type != "FLAT") {
+                LEAFRA_INFO() << "Skipping document deletion - vector removal only supported for FLAT index type, current: " << config_.vector_search.index_type;
+                return true; // Allow document re-insertion without deletion
+            }
+            // First, collect FAISS IDs of chunks that will be deleted (for FAISS cleanup)
+            std::vector<int64_t> faiss_ids_to_remove;
+            if (faiss_index_) {
+                auto collectFaissIdsStmt = database_->prepare("SELECT chunk_faiss_id FROM chunks WHERE doc_id = ? AND chunk_faiss_id IS NOT NULL");
+                if (collectFaissIdsStmt && collectFaissIdsStmt->isValid()) {
+                    collectFaissIdsStmt->bindInt64(1, existing_doc_id);
+                    while (collectFaissIdsStmt->step()) {
+                        int64_t faiss_id = collectFaissIdsStmt->getCurrentRow().getInt64(0);
+                        faiss_ids_to_remove.push_back(faiss_id);
+                    }
+                    LEAFRA_INFO() << "Found " << faiss_ids_to_remove.size() << " FAISS vectors to remove for document: " << filename;
+                }
+            }
+#endif
+            
+            // Delete existing chunks first (due to foreign key constraint)
+            auto deleteChunksStmt = database_->prepare("DELETE FROM chunks WHERE doc_id = ?");
+            if (!deleteChunksStmt || !deleteChunksStmt->isValid()) {
+                LEAFRA_ERROR() << "Failed to prepare chunk deletion statement";
+                return false;
+            }
+            
+            deleteChunksStmt->bindInt64(1, existing_doc_id);
+            if (deleteChunksStmt->execute()) {
+                int deleted_chunks = database_->getChanges();
+                LEAFRA_INFO() << "Deleted " << deleted_chunks << " existing chunks for document: " << filename;
+                
+#ifdef LEAFRA_HAS_FAISS
+                // Remove vectors from FAISS index
+                if (faiss_index_ && !faiss_ids_to_remove.empty()) {
+                    ResultCode result = faiss_index_->remove_vectors(faiss_ids_to_remove.data(), faiss_ids_to_remove.size());
+                    if (result == ResultCode::SUCCESS) {
+                        LEAFRA_INFO() << "Removed " << faiss_ids_to_remove.size() << " vectors from FAISS index for document: " << filename;
+                    } else {
+                        LEAFRA_ERROR() << "Failed to remove vectors from FAISS index for document: " << filename;
+                        // Don't return false here - database cleanup succeeded, FAISS cleanup failed but we can continue
+                    }
+                }
+#endif
+            } else {
+                LEAFRA_ERROR() << "Failed to delete existing chunks for document: " << filename;
+                return false;
+            }
+            
+            // Delete the document record
+            auto deleteDocStmt = database_->prepare("DELETE FROM docs WHERE id = ?");
+            if (!deleteDocStmt || !deleteDocStmt->isValid()) {
+                LEAFRA_ERROR() << "Failed to prepare document deletion statement";
+                return false;
+            }
+            
+            deleteDocStmt->bindInt64(1, existing_doc_id);
+            if (deleteDocStmt->execute()) {
+                LEAFRA_INFO() << "Deleted existing document: " << filename << " (ID: " << existing_doc_id << ")";
+                send_event("🗑️ Replaced existing document: " + filename);
+            } else {
+                LEAFRA_ERROR() << "Failed to delete existing document: " << filename;
+                return false;
+            }
+        }
+        
+        return true; // Success: either document didn't exist or was successfully deleted
+    } //handleExistingDocument
+#endif // LEAFRA_HAS_SQLITE
+
+#ifdef LEAFRA_HAS_FAISS
+    /**
+     * @brief Insert chunk embeddings into FAISS index
+     * @param chunks Vector of text chunks with embeddings
+     * @param doc_id Document ID for generating unique FAISS IDs
+     */
+    void insertChunkEmbeddingsIntoFaiss(const std::vector<TextChunk>& chunks, int64_t doc_id) {
+        if (!faiss_index_ || !config_.vector_search.enabled) {
+            return;
+        }
+        
+        // Reserve space to avoid reallocations
+        std::vector<float> embeddings_to_add;
+        std::vector<int64_t> chunk_ids;
+        
+        // Count embeddings first to reserve space
+        size_t embedding_count = 0;
+        size_t embedding_dim = 0;
+        for (const auto& chunk : chunks) {
+            if (chunk.has_embedding() && !chunk.embedding.empty()) {
+                embedding_count++;
+                if (embedding_dim == 0) {
+                    embedding_dim = chunk.embedding.size();
+                }
+            }
+        }
+        
+        if (embedding_count == 0) {
+            return; // No embeddings to add
+        }
+        
+        // Reserve space for efficiency
+        embeddings_to_add.reserve(embedding_count * embedding_dim);
+        chunk_ids.reserve(embedding_count);
+        
+        // Collect embeddings and IDs
+        for (size_t i = 0; i < chunks.size(); ++i) {
+            const auto& chunk = chunks[i];
+            if (chunk.has_embedding() && !chunk.embedding.empty()) {
+                // Add embedding data (avoid copy by using insert with iterators)
+                embeddings_to_add.insert(embeddings_to_add.end(), 
+                                        chunk.embedding.begin(), 
+                                        chunk.embedding.end());
+                // Use a composite ID: doc_id * 1000000 + chunk_index for uniqueness
+                chunk_ids.push_back(doc_id * 1000000 + static_cast<int64_t>(i));
+            }
+        }
+        
+        // Add vectors to FAISS index
+        auto faiss_result = faiss_index_->add_vectors_with_ids(
+            embeddings_to_add.data(), 
+            chunk_ids.data(), 
+            static_cast<int>(embedding_count)
+        );
+        
+        if (faiss_result == ResultCode::SUCCESS) {
+            LEAFRA_INFO() << "✅ Added " << embedding_count << " embeddings to FAISS index";
+            send_event("🔍 Added " + std::to_string(embedding_count) + " embeddings to search index");
+            
+            // Save updated FAISS index to database
+            if (database_ && database_->isOpen()) {
+                auto save_result = faiss_index_->save_to_db(*database_, "PrimaryDocEmbeddings");
+                if (save_result == ResultCode::SUCCESS) {
+                    LEAFRA_DEBUG() << "FAISS index saved to database";
+                } else {
+                    LEAFRA_WARNING() << "Failed to save FAISS index to database";
+                }
+            }
+        } else {
+            LEAFRA_ERROR() << "Failed to add embeddings to FAISS index";
+            send_event("❌ Failed to add embeddings to search index");
+        }
+    } //insertChunkEmbeddingsIntoFaiss
+#endif // LEAFRA_HAS_FAISS
  
-};
+}; // LeafraCore::Impl
 
 LeafraCore::LeafraCore() : pImpl(std::make_unique<Impl>()) {
 }
@@ -924,10 +1159,51 @@ ResultCode LeafraCore::initialize(const Config& config) {
                 return ResultCode::ERROR_INITIALIZATION_FAILED;
             }
         }
+
+        // Initialize FAISS index using the sdk config settings
+    #ifdef LEAFRA_HAS_FAISS
+        if (config.vector_search.enabled) {
+            try {
+                // Create FAISS index with config settings
+                pImpl->faiss_index_ = std::make_unique<FaissIndex>(
+                    config.vector_search.dimension,
+                    get_faiss_index_type_from_string(config.vector_search.index_type),
+                    get_faiss_metric_type_from_string(config.vector_search.metric)
+                );
+                
+                // Restore from database if available
+                if (pImpl->database_ && pImpl->database_->isOpen()) {
+                    auto restore_result = pImpl->faiss_index_->restore_from_db(*pImpl->database_, "PrimaryDocEmbeddings");
+                    if (restore_result == ResultCode::SUCCESS) {
+                        LEAFRA_INFO() << "✅ FAISS index restored from database";
+                        pImpl->send_event("FAISS index restored from database");
+                    } else if (restore_result == ResultCode::ERROR_NOT_FOUND) {
+                        LEAFRA_INFO() << "No existing FAISS index found in database - starting fresh";
+                        pImpl->send_event("Starting with fresh FAISS index");
+                    } else {
+                        LEAFRA_ERROR() << "Failed to restore FAISS index from database";
+                        pImpl->send_event("Failed to restore FAISS index from database");
+                        return ResultCode::ERROR_INITIALIZATION_FAILED;
+                    }
+                }
+            
+                LEAFRA_INFO() << "✅ FAISS index initialized successfully";
+                pImpl->send_event("FAISS index initialized");
+            } catch (const std::exception& e) {
+                LEAFRA_ERROR() << "Failed to initialize FAISS index: " << e.what();
+                pImpl->send_event("Failed to initialize FAISS index: " + std::string(e.what()));
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+        } else {
+            LEAFRA_INFO() << "Vector search disabled in configuration";
+        }
+    #else // LEAFRA_HAS_FAISS
+        LEAFRA_WARNING() << "⚠️  FAISS integration: DISABLED (library not found)";
+    #endif // LEAFRA_HAS_FAISS
         
-#else
+#else // LEAFRA_HAS_SQLITE
         LEAFRA_WARNING() << "⚠️  SQLite integration disabled - database initialization skipped";
-#endif
+#endif // LEAFRA_HAS_SQLITE
     
 
 
@@ -1172,15 +1448,13 @@ ResultCode LeafraCore::process_user_files(const std::vector<std::string>& file_p
                             pImpl->processChunksWithCoreMLEmbeddings(chunks, file_path);
                         }
 #endif
-                        
                         // Calculate and log chunk statistics
                         pImpl->calculateAndLogChunkStatistics(chunks, using_sentencepiece);
-                        
                         // Print detailed chunk content if requested (development/debug feature)
                         pImpl->printChunkContentAnalysis(chunks, file_path, using_sentencepiece);
                         // Optional: Log first few chunks for debugging (only in debug mode)
                         pImpl->printDebugChunkSummary(chunks);
-                        
+                                          
                         // Insert document and chunks into database
 #ifdef LEAFRA_HAS_SQLITE
                         if (pImpl->database_ && pImpl->database_->isOpen()) {
@@ -1269,5 +1543,168 @@ std::vector<ChunkTokenInfo> LeafraCore::extract_chunk_token_info(const std::vect
 shared_ptr<LeafraCore> LeafraCore::create() {
     return std::make_shared<LeafraCore>();
 }
+
+
+
+// Chunk retrieval functions
+
+ResultCode LeafraCore::semantic_search(const std::string& query, int max_results, std::vector<FaissIndex::SearchResult>& results) {
+    if (!pImpl->initialized_) {
+        LEAFRA_ERROR() << "LeafraCore not initialized";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    if (query.empty() || max_results <= 0) {
+        LEAFRA_ERROR() << "Invalid query or max_results";
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+#ifdef LEAFRA_HAS_FAISS
+    if (!pImpl->faiss_index_) {
+        LEAFRA_ERROR() << "FAISS index not available";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+#else
+    LEAFRA_ERROR() << "FAISS support not compiled";
+    return ResultCode::ERROR_NOT_IMPLEMENTED;
+#endif
+
+#ifdef LEAFRA_HAS_COREML
+    if (!pImpl->coreml_initialized_ || !pImpl->coreml_model_) {
+        LEAFRA_ERROR() << "CoreML model not available";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+#else
+    LEAFRA_ERROR() << "CoreML support not compiled";
+    return ResultCode::ERROR_NOT_IMPLEMENTED;
+#endif
+
+    if (!pImpl->tokenizer_) {
+        LEAFRA_ERROR() << "SentencePiece tokenizer not available";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    try {
+        // Trim query to 2000 characters if longer (roughly 512 tokens)
+        std::string trimmed_query = query;
+        if (trimmed_query.length() > 2000) {
+            trimmed_query = trimmed_query.substr(0, 2000);
+            LEAFRA_DEBUG() << "Trimmed query from " << query.length() << " to 2000 characters";
+        }
+        
+        // Create a single page with the query (using same format as existing code)
+        std::vector<std::string> pages;
+        pages.push_back(trimmed_query);
+        
+        // Create chunks using the existing chunker
+        std::vector<TextChunk> chunks;
+        ResultCode chunk_result = pImpl->chunker_->chunk_document(pages, pImpl->chunker_->get_default_options(), chunks);
+        
+        if (chunk_result != ResultCode::SUCCESS || chunks.empty()) {
+            LEAFRA_ERROR() << "Failed to create chunks from query";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Use SentencePiece for tokenization (reusing existing pipeline)
+        auto [total_actual_tokens, using_sentencepiece] = pImpl->processChunksWithSentencePieceTokenization(chunks);
+        
+        if (!using_sentencepiece) {
+            LEAFRA_ERROR() << "SentencePiece tokenization failed for query";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+#ifdef LEAFRA_HAS_COREML
+        // Process through CoreML embedding model (reusing existing pipeline)
+        pImpl->processChunksWithCoreMLEmbeddings(chunks, "semantic_search_query");
+#endif
+        
+        // Use only the first chunk for search
+        if (chunks.empty() || !chunks[0].has_embedding()) {
+            LEAFRA_ERROR() << "No embedding generated for query";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        const auto& query_embedding = chunks[0].embedding;
+        LEAFRA_DEBUG() << "Generated embedding for query (dim: " << query_embedding.size() << ")";
+        
+#ifdef LEAFRA_HAS_FAISS
+        // Perform FAISS search
+        ResultCode search_result = pImpl->faiss_index_->search(
+            query_embedding.data(), 
+            max_results, 
+            results
+        );
+        
+        if (search_result != ResultCode::SUCCESS) {
+            LEAFRA_ERROR() << "FAISS search failed";
+            return search_result;
+        }
+
+        // Get the chunks from the database using FAISS IDs
+#ifdef LEAFRA_HAS_SQLITE
+        if (pImpl->database_ && pImpl->database_->isOpen()) {
+            std::vector<FaissIndex::SearchResult> final_results;
+            final_results.reserve(results.size());
+            
+            for (const auto& faiss_result : results) {
+                // Query database to get chunk information using chunk_faiss_id
+                auto stmt = pImpl->database_->prepare(
+                    "SELECT c.doc_id, c.chunk_no, c.chunk_text, c.chunk_page_number, d.filename "
+                    "FROM chunks c "
+                    "JOIN docs d ON c.doc_id = d.id "
+                    "WHERE c.chunk_faiss_id = ?"
+                );
+                
+                if (stmt && stmt->isValid()) {
+                    stmt->bindInt64(1, faiss_result.id);
+                    
+                    if (stmt->step()) {
+                        auto row = stmt->getCurrentRow();
+                        
+                        // Create a SearchResult with enriched information
+                        FaissIndex::SearchResult enriched_result(faiss_result.id, faiss_result.distance);
+                        enriched_result.doc_id = row.getInt64(0);
+                        enriched_result.chunk_index = row.getInt(1);
+                        enriched_result.content = row.getText(2);
+                        enriched_result.page_number = row.getInt(3);
+                        enriched_result.filename = row.getText(4);
+                        
+                        final_results.push_back(std::move(enriched_result));
+                        
+                        // Log the retrieved chunk information for debugging
+                        LEAFRA_DEBUG() << "Found chunk - Doc: " << enriched_result.filename 
+                                      << ", Page: " << enriched_result.page_number
+                                      << ", Chunk: " << enriched_result.chunk_index
+                                      << ", Distance: " << enriched_result.distance;
+                    } else {
+                        LEAFRA_WARNING() << "FAISS ID " << faiss_result.id << " not found in database";
+                    }
+                } else {
+                    LEAFRA_ERROR() << "Failed to prepare chunk lookup query";
+                }
+            }
+            
+            results = std::move(final_results);
+            LEAFRA_INFO() << "Semantic search found " << results.size() << " valid results for query";
+        } else {
+            LEAFRA_WARNING() << "Database not available for chunk lookup";
+        }
+#else
+        LEAFRA_WARNING() << "SQLite support not compiled, returning FAISS IDs only";
+#endif
+        
+        LEAFRA_INFO() << "Semantic search completed with " << results.size() << " results";
+        return ResultCode::SUCCESS;
+#endif
+        
+    } catch (const std::exception& e) {
+        LEAFRA_ERROR() << "Exception in semantic_search: " << e.what();
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+}
+
+
+
+
 
 } // namespace leafra 

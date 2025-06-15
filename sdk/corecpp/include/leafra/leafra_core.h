@@ -3,10 +3,15 @@
 #include "types.h"
 #include <memory>
 
+#ifdef LEAFRA_HAS_FAISS
+#include "leafra_faiss.h"
+#endif
+
 namespace leafra {
 
 // Forward declarations
 class DataProcessor;
+class FaissIndex;
 struct TextChunk;
 struct ChunkTokenInfo;
 
@@ -92,6 +97,17 @@ public:
      * @return Vector of ChunkTokenInfo for easy access to chunk data and token IDs
      */
     static std::vector<ChunkTokenInfo> extract_chunk_token_info(const std::vector<TextChunk>& chunks);
+    
+#ifdef LEAFRA_HAS_FAISS
+    /**
+     * @brief Perform semantic search on processed document chunks
+     * @param query Search query string
+     * @param max_results Maximum number of results to return
+     * @param results Output vector for search results (ID and distance pairs)
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode semantic_search(const std::string& query, int max_results, std::vector<FaissIndex::SearchResult>& results);
+#endif
     
     /**
      * @brief Create SDK instance

@@ -3,6 +3,7 @@
 #ifdef LEAFRA_HAS_FAISS
 
 #include "leafra/logger.h"
+#include "leafra/leafra_sqlite.h"
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFFlat.h>
 #include <faiss/IndexIVFPQ.h>
@@ -10,7 +11,9 @@
 #include <faiss/IndexLSH.h>
 #include <faiss/IndexIDMap.h>
 #include <faiss/index_io.h>
+#include <faiss/impl/io.h>
 #include <faiss/MetricType.h>
+#include <faiss/utils/utils.h>
 #include <stdexcept>
 #include <algorithm>
 
@@ -89,6 +92,9 @@ public:
         if (!index_) {
             throw std::runtime_error("Failed to create FAISS index");
         }
+        
+        // Enable ID mapping by default
+        enable_id_map();
     }
     
     void enable_id_map() {
@@ -115,7 +121,7 @@ FaissIndex::FaissIndex(int dimension, IndexType index_type, MetricType metric)
     }
     
     LEAFRA_INFO() << "Created FAISS index: " << get_index_type_string() 
-                  << " (dim=" << dimension << ", metric=" << get_metric_type_string() << ")";
+                  << " (dim=" << dimension << ", metric=" << get_metric_type_string() << ", id_map=enabled)";
 }
 
 FaissIndex::~FaissIndex() = default;
@@ -146,9 +152,7 @@ ResultCode FaissIndex::add_vectors_with_ids(const float* vectors, const int64_t*
     }
     
     try {
-        // Enable ID mapping if not already enabled
-        pImpl->enable_id_map();
-        
+        // ID mapping is enabled by default in constructor
         pImpl->id_map_index_->add_with_ids(count, vectors, ids);
         LEAFRA_DEBUG() << "Added " << count << " vectors with IDs to FAISS index";
         return ResultCode::SUCCESS;
@@ -280,10 +284,21 @@ ResultCode FaissIndex::load_index(const std::string& filename) {
             return ResultCode::ERROR_INVALID_PARAMETER;
         }
         
-        // Replace current index
-        pImpl->index_ = std::move(loaded_index);
-        pImpl->id_map_index_.reset();
-        pImpl->use_id_map_ = false;
+        auto* id_map_ptr = dynamic_cast<faiss::IndexIDMap*>(loaded_index.get());
+        if (id_map_ptr) {
+            // Index is already an IndexIDMap
+            pImpl->id_map_index_ = std::unique_ptr<faiss::IndexIDMap>(
+                static_cast<faiss::IndexIDMap*>(loaded_index.release()));
+            pImpl->index_.reset();  // Clear the regular index pointer
+            pImpl->use_id_map_ = true;
+        } else {
+            // Index is not an IndexIDMap, wrap it
+            pImpl->index_ = std::move(loaded_index);
+            pImpl->id_map_index_.reset();
+            pImpl->use_id_map_ = false;
+            // Re-enable ID mapping
+            pImpl->enable_id_map();
+        }
         
         LEAFRA_INFO() << "FAISS index loaded from: " << filename;
         return ResultCode::SUCCESS;
@@ -322,6 +337,157 @@ std::string FaissIndex::get_metric_type_string() const {
         case MetricType::INNER_PRODUCT: return "InnerProduct";
         case MetricType::COSINE: return "Cosine";
         default: return "Unknown";
+    }
+}
+
+ResultCode FaissIndex::save_to_db(SQLiteDatabase& db, const std::string& definition) {
+    if (definition.empty()) {
+        LEAFRA_ERROR() << "Invalid definition string";
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    try {
+        // Serialize FAISS index to memory buffer
+        faiss::VectorIOWriter writer;
+        faiss::write_index(pImpl->get_index(), &writer);
+        
+        // Convert to blob for SQLite storage
+        std::vector<uint8_t> blob_data = std::move(writer.data);
+        
+        // Prepare SQL statement to insert/update the blob
+        std::string sql = "INSERT OR REPLACE INTO faissindextable (definition, faissdata) VALUES (?, ?)";
+        auto stmt = db.prepare(sql);
+        
+        if (!stmt || !stmt->isValid()) {
+            LEAFRA_ERROR() << "Failed to prepare SQL statement for FAISS index save";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Bind parameters
+        if (!stmt->bindText(1, definition) || !stmt->bindBlob(2, blob_data)) {
+            LEAFRA_ERROR() << "Failed to bind parameters for FAISS index save";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Execute the statement
+        if (!stmt->execute()) {
+            LEAFRA_ERROR() << "Failed to save FAISS index to database: " << db.getLastErrorMessage();
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        LEAFRA_INFO() << "FAISS index saved to database with definition: " << definition 
+                      << " (size: " << blob_data.size() << " bytes)";
+        return ResultCode::SUCCESS;
+        
+    } catch (const std::exception& e) {
+        LEAFRA_ERROR() << "Failed to save FAISS index to database: " << e.what();
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+}
+
+ResultCode FaissIndex::restore_from_db(SQLiteDatabase& db, const std::string& definition) {
+    if (definition.empty()) {
+        LEAFRA_ERROR() << "Invalid definition string";
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    try {
+        // Prepare SQL statement to retrieve the blob
+        std::string sql = "SELECT faissdata FROM faissindextable WHERE definition = ?";
+        auto stmt = db.prepare(sql);
+        
+        if (!stmt || !stmt->isValid()) {
+            LEAFRA_ERROR() << "Failed to prepare SQL statement for FAISS index restore";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Bind parameter
+        if (!stmt->bindText(1, definition)) {
+            LEAFRA_ERROR() << "Failed to bind parameter for FAISS index restore";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Execute and get result
+        if (!stmt->step()) {
+            LEAFRA_ERROR() << "FAISS index not found in database with definition: " << definition;
+            return ResultCode::ERROR_NOT_FOUND;
+        }
+        
+        // Get the blob data
+        auto row = stmt->getCurrentRow();
+        std::vector<uint8_t> blob_data = row.getBlob(0);
+        
+        if (blob_data.empty()) {
+            LEAFRA_ERROR() << "Empty FAISS index data in database";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Deserialize FAISS index from memory buffer
+        faiss::VectorIOReader reader;
+        reader.data = std::move(blob_data);
+        
+        auto loaded_index = std::unique_ptr<faiss::Index>(faiss::read_index(&reader));
+        
+        if (!loaded_index) {
+            LEAFRA_ERROR() << "Failed to deserialize FAISS index from database";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Check dimension compatibility
+        if (loaded_index->d != pImpl->dimension_) {
+            LEAFRA_ERROR() << "Dimension mismatch: expected " << pImpl->dimension_ 
+                          << ", got " << loaded_index->d;
+            return ResultCode::ERROR_INVALID_PARAMETER;
+        }
+        
+        auto* id_map_ptr = dynamic_cast<faiss::IndexIDMap*>(loaded_index.get());
+        if (id_map_ptr) {
+            // Index is already an IndexIDMap
+            pImpl->id_map_index_ = std::unique_ptr<faiss::IndexIDMap>(
+                static_cast<faiss::IndexIDMap*>(loaded_index.release()));
+            pImpl->index_.reset();  // Clear the regular index pointer
+            pImpl->use_id_map_ = true;
+        } else {
+            // Index is not an IndexIDMap, wrap it
+            pImpl->index_ = std::move(loaded_index);
+            pImpl->id_map_index_.reset();
+            pImpl->use_id_map_ = false;
+            // Re-enable ID mapping
+            pImpl->enable_id_map();
+        }
+        
+        LEAFRA_INFO() << "FAISS index restored from database with definition: " << definition
+                      << " (vectors: " << pImpl->get_index()->ntotal << ")";
+        return ResultCode::SUCCESS;
+        
+    } catch (const std::exception& e) {
+        LEAFRA_ERROR() << "Failed to restore FAISS index from database: " << e.what();
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+}
+
+ResultCode FaissIndex::remove_vectors(const int64_t* ids, int count) {
+    if (!ids || count <= 0) {
+        LEAFRA_ERROR() << "Invalid IDs or count";
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    try {
+        // ID mapping is enabled by default in constructor
+        if (!pImpl->id_map_index_) {
+            LEAFRA_ERROR() << "ID mapping not available for vector removal";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // FAISS IndexIDMap supports remove_ids with IDSelector
+        faiss::IDSelectorArray selector(count, ids);
+        pImpl->id_map_index_->remove_ids(selector);
+        
+        LEAFRA_DEBUG() << "Removed " << count << " vectors from FAISS index";
+        return ResultCode::SUCCESS;
+    } catch (const std::exception& e) {
+        LEAFRA_ERROR() << "Failed to remove vectors from FAISS index: " << e.what();
+        return ResultCode::ERROR_PROCESSING_FAILED;
     }
 }
 

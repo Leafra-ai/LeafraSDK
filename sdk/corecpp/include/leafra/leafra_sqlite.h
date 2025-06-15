@@ -212,6 +212,7 @@ public:
         
         // Execution
         bool step();
+        bool execute();  // For INSERT/UPDATE/DELETE statements
         bool reset();
         Row getCurrentRow() const;
         

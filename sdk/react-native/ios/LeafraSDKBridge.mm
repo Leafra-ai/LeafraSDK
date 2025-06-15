@@ -66,9 +66,7 @@
     if (dict[@"bufferSize"]) {
         config.buffer_size = [dict[@"bufferSize"] unsignedIntegerValue];
     }
-    if (dict[@"leafraDocumentDatabaseName"]) {
-        config.leafra_document_database_name = [dict[@"leafraDocumentDatabaseName"] UTF8String];
-    }
+    //TODO AD: Add other SDK config options here if needed later to expose to the app
     
     return config;
 }
