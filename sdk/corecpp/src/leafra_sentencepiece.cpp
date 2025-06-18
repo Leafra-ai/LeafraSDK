@@ -1,4 +1,5 @@
 #include "leafra/leafra_sentencepiece.h"
+#include "leafra/types.h"
 #include "leafra/logger.h"
 
 #ifdef LEAFRA_HAS_SENTENCEPIECE
@@ -20,6 +21,7 @@ public:
     sentencepiece::SentencePieceProcessor processor;
     std::string last_error;
     bool loaded = false;
+    TokenizerConfig config;  // Store the tokenizer config
 
     void set_error(const std::string& error) {
         last_error = error;
@@ -65,46 +67,31 @@ SentencePieceTokenizer::SentencePieceTokenizer(SentencePieceTokenizer&&) noexcep
 // Move assignment
 SentencePieceTokenizer& SentencePieceTokenizer::operator=(SentencePieceTokenizer&&) noexcept = default;
 
-bool SentencePieceTokenizer::load_model(const std::string& model_path) {
+bool SentencePieceTokenizer::load_model(const TokenizerConfig& config) {
 #ifdef LEAFRA_HAS_SENTENCEPIECE
-    LEAFRA_INFO() << "Loading SentencePiece model from: " << model_path;
+    LEAFRA_INFO() << "Loading SentencePiece model from config: " << config.sentencepiece_model_path;
     
     pImpl->clear_error();
     
-    const auto status = pImpl->processor.Load(model_path);
+    if (config.sentencepiece_model_path.empty()) {
+        pImpl->set_error("Model path is empty in TokenizerConfig");
+        pImpl->loaded = false;
+        pImpl->config = TokenizerConfig();  // Clear config on failure
+        return false;
+    }
+    
+    const auto status = pImpl->processor.Load(config.sentencepiece_model_path);
     if (!status.ok()) {
         pImpl->set_error("Failed to load model: " + status.ToString());
         pImpl->loaded = false;
+        pImpl->config = TokenizerConfig();  // Clear config on failure
         return false;
     }
     
     pImpl->loaded = true;
+    pImpl->config = config;  // Save the tokenizer config
     LEAFRA_INFO() << "SentencePiece model loaded successfully";
-    LEAFRA_INFO() << "Vocabulary size: " << pImpl->processor.GetPieceSize();
-    
-    return true;
-#else
-    pImpl->set_error("SentencePiece not available");
-    return false;
-#endif
-}
-
-bool SentencePieceTokenizer::load_model_from_memory(const std::vector<uint8_t>& model_data) {
-#ifdef LEAFRA_HAS_SENTENCEPIECE
-    LEAFRA_INFO() << "Loading SentencePiece model from memory (" << model_data.size() << " bytes)";
-    
-    pImpl->clear_error();
-    
-    const std::string model_string(model_data.begin(), model_data.end());
-    const auto status = pImpl->processor.LoadFromSerializedProto(model_string);
-    if (!status.ok()) {
-        pImpl->set_error("Failed to load model from memory: " + status.ToString());
-        pImpl->loaded = false;
-        return false;
-    }
-    
-    pImpl->loaded = true;
-    LEAFRA_INFO() << "SentencePiece model loaded from memory successfully";
+    LEAFRA_INFO() << "Model path: " << config.sentencepiece_model_path;
     LEAFRA_INFO() << "Vocabulary size: " << pImpl->processor.GetPieceSize();
     
     return true;
@@ -188,18 +175,47 @@ std::vector<int> SentencePieceTokenizer::encode_as_ids(const std::string& text, 
         }
     } else {
         const auto status = pImpl->processor.Encode(text, &ids);
+        if (pImpl->config.model_name == "multilingual-e5-small") {
+            LEAFRA_INFO() << "HACK for Huggingface multilingual-e5-small - TODO FIX THIS - incrementing ids by 1 to match huggingface model";
+            for (auto& id : ids) {
+                id = id + 1;
+            }
+        }
         if (!status.ok()) {
             pImpl->set_error("Failed to encode as IDs: " + status.ToString());
             return {};
         }
     }
     
-    // Apply additional options
+    // TODO AD IMPORTANT: It turns out that the sentencepiece model is slightly different than the huggingface model (tokenizer.json)
+    // The special words are different. And the token ids are one greater (likely due to an extra token in the special vocabulary at the beginning)
+    // I am hardcoding the special words here based on this correctly for the multilingual_e5_small
+    // The right way to fix this is likely using the json model directly - or at least for the special words use that file.    
+    // // Apply additional options
+    if (pImpl->config.model_name == "multilingual-e5-small") {
+            LEAFRA_INFO() << "HACK for Huggingface multilingual-e5-small - TODO FIX THIS";
+            LEAFRA_INFO() << "Here's the special characters per sentencepiece model: BOS:\t" << pImpl->processor.bos_id() << " EOS:\t" << pImpl->processor.eos_id() << " UNK:\t" << pImpl->processor.unk_id() << " PAD:\t" << pImpl->processor.pad_id();
+            LEAFRA_INFO() << "Here's the special characters per huggingface model: BOS:\t0 EOS:\t2 UNK:\t3 PAD:\t1";
+    }
     if (options.add_bos) {
-        ids.insert(ids.begin(), pImpl->processor.bos_id());
+        if (pImpl->config.model_name == "multilingual-e5-small") {
+            LEAFRA_INFO() << "HACK: Adding BOS token hardcoded (0) for multilingual_e5_small - this is a hack to fix the token ids";
+            ids.insert(ids.begin(), 0);
+        }
+        else {
+            LEAFRA_INFO() << "Adding BOS token using the sentencepiece model - this is the default behavior";
+            ids.insert(ids.begin(), pImpl->processor.bos_id());
+        }
     }
     if (options.add_eos) {
-        ids.push_back(pImpl->processor.eos_id());
+        if (pImpl->config.model_name == "multilingual-e5-small") {
+            LEAFRA_INFO() << "HACK: Adding EOS token hardcoded (2) for multilingual_e5_small - this is a hack to fix the token ids";
+            ids.push_back(2); // per json model 
+        }
+        else {
+            LEAFRA_INFO() << "Adding EOS token using the sentencepiece model - this is the default behavior";
+            ids.push_back(pImpl->processor.eos_id());
+        }
     }
     if (options.reverse) {
         std::reverse(ids.begin(), ids.end());

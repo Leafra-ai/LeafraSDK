@@ -15,6 +15,9 @@
 
 namespace leafra {
 
+// Forward declaration
+struct TokenizerConfig;
+
 /**
  * @brief SentencePiece tokenizer wrapper for LeafraSDK
  * 
@@ -81,18 +84,12 @@ public:
     SentencePieceTokenizer& operator=(SentencePieceTokenizer&&) noexcept;
 
     /**
-     * @brief Load a trained SentencePiece model from file
-     * @param model_path Path to the .model file
+     * @brief Load a trained SentencePiece model from TokenizerConfig
+     * @param config Tokenizer configuration containing model path and options
      * @return true if successful, false otherwise
      */
-    bool load_model(const std::string& model_path);
+    bool load_model(const TokenizerConfig& config);
 
-    /**
-     * @brief Load a trained SentencePiece model from memory
-     * @param model_data Model data in memory
-     * @return true if successful, false otherwise
-     */
-    bool load_model_from_memory(const std::vector<uint8_t>& model_data);
 
     /**
      * @brief Check if a model is loaded

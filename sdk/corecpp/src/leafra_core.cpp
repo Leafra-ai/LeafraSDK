@@ -56,6 +56,7 @@ ChunkingConfig::ChunkingConfig(size_t size, double overlap, bool use_tokens)
     token_method = TokenApproximationMethod::SIMPLE;
 }
 
+//TODO AD: Move these to leafra_faiss.cpp 
 #ifdef LEAFRA_HAS_FAISS
 // Helper functions to convert from config strings to FAISS enum types
 static FaissIndex::IndexType get_faiss_index_type_from_string(const std::string& index_type) {
@@ -228,50 +229,59 @@ public:
                 return false;
             }
             
-            // Insert each chunk
+            // Insert each chunk (only chunks with embeddings)
+            size_t chunks_inserted = 0;
+            size_t chunks_skipped = 0;
             for (size_t i = 0; i < chunks.size(); ++i) {
                 const auto& chunk = chunks[i];
+                
+                // Skip chunks without embeddings - don't insert them into database
+                if (!chunk.has_embedding() || chunk.embedding.empty()) {
+                    chunks_skipped++;
+                    LEAFRA_WARNING() << "Skipping database insertion for chunk " << (i + 1) << " - no embedding";
+                    continue;
+                }
                 
                 // Reset statement for reuse
                 insertChunkStmt->reset();
                 
-                // Convert embedding to blob if available
+                // Convert embedding to blob
                 std::vector<uint8_t> embedding_blob;
-                if (chunk.has_embedding() && !chunk.embedding.empty()) {
-                    // Convert float vector to byte vector
-                    const float* float_data = chunk.embedding.data();
-                    const uint8_t* byte_data = reinterpret_cast<const uint8_t*>(float_data);
-                    size_t byte_size = chunk.embedding.size() * sizeof(float);
-                    embedding_blob.assign(byte_data, byte_data + byte_size);
-                }
+                // Convert float vector to byte vector
+                const float* float_data = chunk.embedding.data();
+                //TODO AD: We need to handle different endianness'es here per architecture to be portable 
+                const uint8_t* byte_data = reinterpret_cast<const uint8_t*>(float_data);
+                size_t byte_size = chunk.embedding.size() * sizeof(float);
+                embedding_blob.assign(byte_data, byte_data + byte_size);
                 
                 // Calculate FAISS ID for this chunk (same as used in FAISS insertion)
+                
+                // TODO AD: There can be overflow here if doc_id is too large
                 int64_t chunk_faiss_id = doc_id * 1000000 + static_cast<int64_t>(i);
                 
                 // Bind parameters for chunk
                 insertChunkStmt->bindInt64(1, doc_id);
-                insertChunkStmt->bindInt64(2, static_cast<long long>(chunk.page_number)); //0-based page number
-                if (chunk.has_embedding() && !chunk.embedding.empty()) {
-                    insertChunkStmt->bindInt64(3, chunk_faiss_id); // chunk_faiss_id - for chunks with embeddings
-                } else {
-                    insertChunkStmt->bindNull(3); // chunk_faiss_id - NULL for chunks without embeddings
-                }
-                insertChunkStmt->bindInt64(4, static_cast<long long>(i)); // chunk_no (0-based)
+                insertChunkStmt->bindInt64(2, static_cast<long long>(chunk.page_number+1)); //1-based page number
+                insertChunkStmt->bindInt64(3, chunk_faiss_id); // chunk_faiss_id - always present for inserted chunks
+                insertChunkStmt->bindInt64(4, static_cast<long long>(i+1)); // chunk_no (1-based)
                 insertChunkStmt->bindInt64(5, static_cast<long long>(chunk.estimated_tokens)); // chunk_token_size
                 insertChunkStmt->bindInt64(6, static_cast<long long>(chunk.content.length())); // chunk_size
                 insertChunkStmt->bindText(7, std::string(chunk.content)); // Convert string_view to string
-                
-                if (!embedding_blob.empty()) {
-                    insertChunkStmt->bindBlob(8, embedding_blob);
-                } else {
-                    insertChunkStmt->bindNull(8);
-                }
+                insertChunkStmt->bindBlob(8, embedding_blob); // embedding - always present for inserted chunks
                 
                 // Execute chunk insert
                 if (!insertChunkStmt->execute()) {
                     LEAFRA_ERROR() << "Failed to insert chunk " << (i + 1) << " for document: " << filename;
                     return false;
                 }
+                chunks_inserted++;
+            }
+            
+            // Log insertion summary
+            if (chunks_skipped > 0) {
+                LEAFRA_INFO() << "Database insertion: " << chunks_inserted << "/" << chunks.size() << " chunks inserted (" << chunks_skipped << " skipped - no embeddings)";
+            } else {
+                LEAFRA_INFO() << "Database insertion: " << chunks_inserted << "/" << chunks.size() << " chunks inserted";
             }
             
             // Commit transaction
@@ -281,8 +291,11 @@ public:
             }
     #ifdef LEAFRA_HAS_FAISS
             // Insert chunk embeddings into FAISS index
-            // TODO AD: if something goes wrong here, we need to delete the document and chunks from the database as well
-            insertChunkEmbeddingsIntoFaiss(chunks, doc_id);
+            if (!insertChunkEmbeddingsIntoFaiss(chunks, doc_id)) {
+                LEAFRA_ERROR() << "Failed to insert embeddings into FAISS index for document: " << filename;
+                // TODO AD: Consider rolling back the database transaction here
+                return false;
+            }
     #endif // LEAFRA_HAS_FAISS
             LEAFRA_INFO() << "✅ Successfully inserted document '" << filename << "' with " << chunks.size() << " chunks";
             send_event("💾 Stored document: " + filename + " (" + std::to_string(chunks.size()) + " chunks)");
@@ -528,7 +541,7 @@ public:
                 
                 if (chunk.has_token_ids() && !chunk.token_ids.empty()) {
                     try {
-                        successful_embeddings += processChunkEmbedding(chunk, chunk_idx + 1, 
+                        successful_embeddings += processChunkEmbedding(chunk, chunk_idx, 
                                                                      required_input_size, pad_token,
                                                                      processed_token_ids, input_tokens, attention_mask);
                     } catch (const std::exception& e) {
@@ -604,6 +617,29 @@ public:
             attention_mask[i] = (i < real_token_count) ? 1.0f : 0.0f;
         }
         
+        // Debug print input tokens and attention mask as vectors
+        if (config_.debug_mode) {
+            LEAFRA_DEBUG() << "Chunk " << chunk_number << " input_tokens vector (" << input_tokens.size() << " elements):";
+            std::ostringstream tokens_stream;
+            tokens_stream << "[";
+            for (size_t i = 0; i < input_tokens.size(); ++i) {
+                tokens_stream << static_cast<int>(input_tokens[i]);
+                if (i < input_tokens.size() - 1) tokens_stream << ", ";
+            }
+            tokens_stream << "]";
+            LEAFRA_DEBUG() << tokens_stream.str();
+            
+            LEAFRA_DEBUG() << "Chunk " << chunk_number << " attention_mask vector (" << attention_mask.size() << " elements):";
+            std::ostringstream mask_stream;
+            mask_stream << "[";
+            for (size_t i = 0; i < attention_mask.size(); ++i) {
+                mask_stream << static_cast<int>(attention_mask[i]);
+                if (i < attention_mask.size() - 1) mask_stream << ", ";
+            }
+            mask_stream << "]";
+            LEAFRA_DEBUG() << mask_stream.str();
+        }
+        
         //Our coreml implementation expects inputs in alphabetical order of their names
         //I've added an explicit check by passing input names to the predict function to make
         //sure that the user is not confused when using the model. This of course requires naming
@@ -632,6 +668,21 @@ public:
             // Store the embedding vector in the chunk
             chunk.embedding = std::move(embeddings[0]);
             LEAFRA_DEBUG() << "Generated embedding with " << chunk.embedding.size() << " dimensions for chunk " << chunk_number;
+            
+            // Debug print the embedding vector
+            if (config_.debug_mode) {
+                LEAFRA_DEBUG() << "Chunk " << chunk_number << " embedding vector (" << chunk.embedding.size() << " dimensions):";
+                std::ostringstream embedding_stream;
+                embedding_stream << std::fixed << std::setprecision(6);
+                embedding_stream << "[";
+                for (size_t i = 0; i < chunk.embedding.size(); ++i) {
+                    embedding_stream << chunk.embedding[i];
+                    if (i < chunk.embedding.size() - 1) embedding_stream << ", ";
+                }
+                embedding_stream << "]";
+                LEAFRA_DEBUG() << embedding_stream.str();
+            }
+            
             return 1; // Success
         } else {
             LEAFRA_WARNING() << "CoreML model produced empty embedding for chunk " << chunk_number;
@@ -832,29 +883,44 @@ public:
      * @param chunks Vector of text chunks with embeddings
      * @param doc_id Document ID for generating unique FAISS IDs
      */
-    void insertChunkEmbeddingsIntoFaiss(const std::vector<TextChunk>& chunks, int64_t doc_id) {
+    bool insertChunkEmbeddingsIntoFaiss(const std::vector<TextChunk>& chunks, int64_t doc_id) {
         if (!faiss_index_ || !config_.vector_search.enabled) {
-            return;
+            return true; // Not an error if FAISS is disabled
         }
         
         // Reserve space to avoid reallocations
         std::vector<float> embeddings_to_add;
         std::vector<int64_t> chunk_ids;
         
-        // Count embeddings first to reserve space
+        // Count embeddings and validate - chunks should have embeddings at this point
         size_t embedding_count = 0;
+        size_t chunks_without_embeddings = 0;
         size_t embedding_dim = 0;
-        for (const auto& chunk : chunks) {
+        
+        for (size_t i = 0; i < chunks.size(); ++i) {
+            const auto& chunk = chunks[i];
             if (chunk.has_embedding() && !chunk.embedding.empty()) {
                 embedding_count++;
                 if (embedding_dim == 0) {
                     embedding_dim = chunk.embedding.size();
+                } else if (chunk.embedding.size() != embedding_dim) {
+                    LEAFRA_ERROR() << "Inconsistent embedding dimension: expected " << embedding_dim << ", got " << chunk.embedding.size();
+                    return false; // Return error for inconsistent embeddings
                 }
+            } else {
+                // Chunks are expected to have embeddings at this point
+                chunks_without_embeddings++;
+                LEAFRA_WARNING() << "Chunk " << i << " missing embedding - skipping FAISS insertion";
             }
         }
         
+        // Log warning if some chunks don't have embeddings
+        if (chunks_without_embeddings > 0) {
+            LEAFRA_WARNING() << "Skipped " << chunks_without_embeddings << " chunks without embeddings out of " << chunks.size() << " total chunks";
+        }
+        
         if (embedding_count == 0) {
-            return; // No embeddings to add
+            return true; // No embeddings to add, not an error
         }
         
         // Reserve space for efficiency
@@ -882,8 +948,8 @@ public:
         );
         
         if (faiss_result == ResultCode::SUCCESS) {
-            LEAFRA_INFO() << "✅ Added " << embedding_count << " embeddings to FAISS index";
-            send_event("🔍 Added " + std::to_string(embedding_count) + " embeddings to search index");
+            LEAFRA_INFO() << "✅ Added " << embedding_count << " embeddings to FAISS index (" << embedding_count << "/" << chunks.size() << " chunks)";
+            send_event("🔍 Added " + std::to_string(embedding_count) + "/" + std::to_string(chunks.size()) + " embeddings to search index");
             
             // Save updated FAISS index to database
             if (database_ && database_->isOpen()) {
@@ -894,9 +960,11 @@ public:
                     LEAFRA_WARNING() << "Failed to save FAISS index to database";
                 }
             }
+            return true;
         } else {
             LEAFRA_ERROR() << "Failed to add embeddings to FAISS index";
             send_event("❌ Failed to add embeddings to search index");
+            return false;
         }
     } //insertChunkEmbeddingsIntoFaiss
 #endif // LEAFRA_HAS_FAISS
@@ -983,7 +1051,7 @@ ResultCode LeafraCore::initialize(const Config& config) {
             LEAFRA_INFO() << "Initializing SentencePiece tokenizer";
             
             if (!config.tokenizer.sentencepiece_model_path.empty()) {
-                bool loaded = pImpl->tokenizer_->load_model(config.tokenizer.sentencepiece_model_path);
+                bool loaded = pImpl->tokenizer_->load_model(config.tokenizer);
                 if (loaded) {
                     LEAFRA_INFO() << "✅ SentencePiece model loaded from: " << config.tokenizer.sentencepiece_model_path;
                     LEAFRA_INFO() << "  - Vocabulary size: " << pImpl->tokenizer_->get_vocab_size();
@@ -1598,16 +1666,10 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
     }
     
     try {
-        // Trim query to 2000 characters if longer (roughly 512 tokens)
-        std::string trimmed_query = query;
-        if (trimmed_query.length() > 2000) {
-            trimmed_query = trimmed_query.substr(0, 2000);
-            LEAFRA_DEBUG() << "Trimmed query from " << query.length() << " to 2000 characters";
-        }
         
         // Create a single page with the query (using same format as existing code)
         std::vector<std::string> pages;
-        pages.push_back(trimmed_query);
+        pages.push_back(query);
         
         // Create chunks using the existing chunker
         std::vector<TextChunk> chunks;
@@ -1641,7 +1703,17 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
         }
         
         const auto& query_embedding = chunks[0].embedding;
-        LEAFRA_DEBUG() << "Generated embedding for query (dim: " << query_embedding.size() << ")";
+        std::ostringstream embedding_stream;
+        embedding_stream << "Generated embedding for query (dim: " << query_embedding.size() << "): [";
+        for (size_t i = 0; i < query_embedding.size(); ++i) {
+            embedding_stream << query_embedding[i];
+            if (i < query_embedding.size() - 1) {
+                embedding_stream << ", ";
+            }
+        }
+        embedding_stream << "]";
+        LEAFRA_DEBUG() << embedding_stream.str();
+        
         
 #ifdef LEAFRA_HAS_FAISS
         // Perform FAISS search
@@ -1662,16 +1734,17 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
             std::vector<FaissIndex::SearchResult> final_results;
             final_results.reserve(results.size());
             
-            for (const auto& faiss_result : results) {
-                // Query database to get chunk information using chunk_faiss_id
-                auto stmt = pImpl->database_->prepare(
-                    "SELECT c.doc_id, c.chunk_no, c.chunk_text, c.chunk_page_number, d.filename "
-                    "FROM chunks c "
-                    "JOIN docs d ON c.doc_id = d.id "
-                    "WHERE c.chunk_faiss_id = ?"
-                );
-                
-                if (stmt && stmt->isValid()) {
+            // Prepare the statement once outside the loop for better performance
+            auto stmt = pImpl->database_->prepare(
+                "SELECT c.doc_id, c.chunk_no, c.chunk_text, c.chunk_page_number, d.filename "
+                "FROM chunks c "
+                "JOIN docs d ON c.doc_id = d.id "
+                "WHERE c.chunk_faiss_id = ?"
+            );
+            
+            if (stmt && stmt->isValid()) {
+                for (const auto& faiss_result : results) {
+                    // Bind the FAISS ID parameter for this iteration
                     stmt->bindInt64(1, faiss_result.id);
                     
                     if (stmt->step()) {
@@ -1695,9 +1768,12 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
                     } else {
                         LEAFRA_WARNING() << "FAISS ID " << faiss_result.id << " not found in database";
                     }
-                } else {
-                    LEAFRA_ERROR() << "Failed to prepare chunk lookup query";
+                    
+                    // Reset the statement for the next iteration
+                    stmt->reset();
                 }
+            } else {
+                LEAFRA_ERROR() << "Failed to prepare chunk lookup query";
             }
             
             results = std::move(final_results);

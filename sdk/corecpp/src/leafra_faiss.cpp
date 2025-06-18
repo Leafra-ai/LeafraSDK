@@ -19,6 +19,51 @@
 
 namespace leafra {
 
+// Helper function to detect index type from a loaded FAISS index
+static std::pair<FaissIndex::IndexType, bool> detect_index_type_safe(const faiss::Index* index) {
+    if (!index) {
+        return {FaissIndex::IndexType::FLAT, false}; // Return error flag
+    }
+    
+    // Check for IndexIDMap wrapper first
+    const faiss::Index* actual_index = index;
+    const auto* id_map = dynamic_cast<const faiss::IndexIDMap*>(index);
+    if (id_map) {
+        actual_index = id_map->index;
+        if (!actual_index) {
+            return {FaissIndex::IndexType::FLAT, false}; // Null underlying index
+        }
+    }
+    
+    // Detect the underlying index type
+    if (dynamic_cast<const faiss::IndexFlat*>(actual_index)) {
+        return {FaissIndex::IndexType::FLAT, true};
+    } else if (dynamic_cast<const faiss::IndexIVFFlat*>(actual_index)) {
+        return {FaissIndex::IndexType::IVF_FLAT, true};
+    } else if (dynamic_cast<const faiss::IndexIVFPQ*>(actual_index)) {
+        return {FaissIndex::IndexType::IVF_PQ, true};
+    } else if (dynamic_cast<const faiss::IndexHNSWFlat*>(actual_index)) {
+        return {FaissIndex::IndexType::HNSW, true};
+    } else if (dynamic_cast<const faiss::IndexLSH*>(actual_index)) {
+        return {FaissIndex::IndexType::LSH, true};
+    }
+    
+    // Unknown type - return error flag
+    return {FaissIndex::IndexType::FLAT, false};
+}
+
+// Helper function to convert IndexType enum to string (matches member function format)
+static std::string index_type_to_string(FaissIndex::IndexType type) {
+    switch (type) {
+        case FaissIndex::IndexType::FLAT: return "IndexFlat";
+        case FaissIndex::IndexType::IVF_FLAT: return "IndexIVFFlat";
+        case FaissIndex::IndexType::IVF_PQ: return "IndexIVFPQ";
+        case FaissIndex::IndexType::HNSW: return "IndexHNSWFlat";
+        case FaissIndex::IndexType::LSH: return "IndexLSH";
+        default: return "Unknown";
+    }
+}
+
 class FaissIndex::Impl {
 public:
     std::unique_ptr<faiss::Index> index_;
@@ -346,7 +391,38 @@ ResultCode FaissIndex::save_to_db(SQLiteDatabase& db, const std::string& definit
         return ResultCode::ERROR_INVALID_PARAMETER;
     }
     
+    // Validate pImpl before use
+    if (!pImpl) {
+        LEAFRA_ERROR() << "Invalid FaissIndex state - pImpl is null";
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+    
     try {
+        // Validate index before serialization
+        auto* index = pImpl->get_index();
+        if (!index) {
+            LEAFRA_ERROR() << "Invalid FAISS index - null pointer";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Serialize FAISS index to memory buffer first to validate data
+        faiss::VectorIOWriter writer;
+        faiss::write_index(index, &writer);
+        
+        // Convert to blob for SQLite storage and validate it's not empty
+        std::vector<uint8_t> blob_data = std::move(writer.data);
+        if (blob_data.empty()) {
+            LEAFRA_ERROR() << "FAISS index serialization resulted in empty blob data";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Start transaction for atomic operations
+        SQLiteTransaction transaction(db);
+        if (!transaction.isActive()) {
+            LEAFRA_ERROR() << "Failed to begin transaction for FAISS index save";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
         // Handle existing entries by creating backups
         std::string backup_definition = definition + "_backup";
         
@@ -408,13 +484,6 @@ ResultCode FaissIndex::save_to_db(SQLiteDatabase& db, const std::string& definit
             LEAFRA_INFO() << "Existing entry renamed to backup: " << backup_definition;
         }
         
-        // Serialize FAISS index to memory buffer
-        faiss::VectorIOWriter writer;
-        faiss::write_index(pImpl->get_index(), &writer);
-        
-        // Convert to blob for SQLite storage
-        std::vector<uint8_t> blob_data = std::move(writer.data);
-        
         // Insert the new entry (now we know there's no conflict)
         std::string sql = "INSERT INTO faissindextable (definition, faissdata) VALUES (?, ?)";
         auto stmt = db.prepare(sql);
@@ -436,6 +505,12 @@ ResultCode FaissIndex::save_to_db(SQLiteDatabase& db, const std::string& definit
             return ResultCode::ERROR_PROCESSING_FAILED;
         }
         
+        // Commit transaction
+        if (!transaction.commit()) {
+            LEAFRA_ERROR() << "Failed to commit FAISS index save transaction";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
         LEAFRA_INFO() << "FAISS index saved to database with definition: " << definition 
                       << " (size: " << blob_data.size() << " bytes)";
         return ResultCode::SUCCESS;
@@ -450,6 +525,12 @@ ResultCode FaissIndex::restore_from_db(SQLiteDatabase& db, const std::string& de
     if (definition.empty()) {
         LEAFRA_ERROR() << "Invalid definition string";
         return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    // Validate pImpl before use
+    if (!pImpl) {
+        LEAFRA_ERROR() << "Invalid FaissIndex state - pImpl is null";
+        return ResultCode::ERROR_PROCESSING_FAILED;
     }
     
     try {
@@ -501,24 +582,63 @@ ResultCode FaissIndex::restore_from_db(SQLiteDatabase& db, const std::string& de
             return ResultCode::ERROR_INVALID_PARAMETER;
         }
         
+        // Check index type compatibility
+        auto [loaded_index_type, type_detected] = detect_index_type_safe(loaded_index.get());
+        if (!type_detected) {
+            LEAFRA_ERROR() << "Failed to detect index type from loaded FAISS index";
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        if (loaded_index_type != pImpl->index_type_) {
+            LEAFRA_ERROR() << "Index type mismatch: expected " << index_type_to_string(pImpl->index_type_)
+                          << ", got " << index_type_to_string(loaded_index_type);
+            return ResultCode::ERROR_INVALID_PARAMETER;
+        }
+        
+        // Validate loaded index is functional
+        if (loaded_index->ntotal < 0) {
+            LEAFRA_ERROR() << "Loaded FAISS index has invalid vector count: " << loaded_index->ntotal;
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Safely handle index assignment with proper state management
         auto* id_map_ptr = dynamic_cast<faiss::IndexIDMap*>(loaded_index.get());
         if (id_map_ptr) {
-            // Index is already an IndexIDMap
+            // Index is already an IndexIDMap - validate it first
+            if (!id_map_ptr->index) {
+                LEAFRA_ERROR() << "IndexIDMap has null underlying index";
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+            
+            // Safely transfer ownership
+            auto released_index = loaded_index.release();
             pImpl->id_map_index_ = std::unique_ptr<faiss::IndexIDMap>(
-                static_cast<faiss::IndexIDMap*>(loaded_index.release()));
+                static_cast<faiss::IndexIDMap*>(released_index));
             pImpl->index_.reset();  // Clear the regular index pointer
             pImpl->use_id_map_ = true;
         } else {
-            // Index is not an IndexIDMap, wrap it
-            pImpl->index_ = std::move(loaded_index);
-            pImpl->id_map_index_.reset();
-            pImpl->use_id_map_ = false;
-            // Re-enable ID mapping
-            pImpl->enable_id_map();
+            // Index is not an IndexIDMap, wrap it safely
+            try {
+                pImpl->index_ = std::move(loaded_index);
+                pImpl->id_map_index_.reset();
+                pImpl->use_id_map_ = false;
+                // Re-enable ID mapping
+                pImpl->enable_id_map();
+            } catch (const std::exception& e) {
+                LEAFRA_ERROR() << "Failed to enable ID mapping on loaded index: " << e.what();
+                return ResultCode::ERROR_PROCESSING_FAILED;
+            }
+        }
+        
+        // Final validation that the index is accessible
+        auto* final_index = pImpl->get_index();
+        if (!final_index) {
+            LEAFRA_ERROR() << "Failed to access restored FAISS index";
+            return ResultCode::ERROR_PROCESSING_FAILED;
         }
         
         LEAFRA_INFO() << "FAISS index restored from database with definition: " << definition
-                      << " (vectors: " << pImpl->get_index()->ntotal << ")";
+                      << " (vectors: " << final_index->ntotal << ")";
         return ResultCode::SUCCESS;
         
     } catch (const std::exception& e) {

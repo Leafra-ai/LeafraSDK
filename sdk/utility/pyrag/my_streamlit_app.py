@@ -44,41 +44,43 @@ class Document:
     metadata: Dict[str, Any]
 
 class DocumentProcessor:
-    """Handles PDF parsing and text extraction"""
+    """Handles PDF parsing and text extraction with page tracking"""
 
     @staticmethod
-    def extract_text_pypdf(pdf_path: str) -> str:
-        """Extract text using PyPDF2"""
-        text = ""
-        with open(pdf_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-        return text
+    def extract_text_with_pages_pdfium(pdf_path: str) -> tuple:
+        """Extract text with page information using pdfium"""
+        import pypdfium2 as pdfium
 
-    @staticmethod
-    def extract_text_pymupdf(pdf_path: str) -> str:
-        """Extract text using PyMuPDF (better quality)"""
-        text = ""
-        doc = fitz.open(pdf_path)
-        for page_num in range(doc.page_count):
-            page = doc[page_num]
-            text += page.get_text() + "\n"
-        doc.close()
-        return text
+        pages_text = []
+        pdf = pdfium.PdfDocument(pdf_path)
+
+        for page_num in range(len(pdf)):
+            page = pdf[page_num]
+            textpage = page.get_textpage()
+            page_text = textpage.get_text_range()
+            pages_text.append({
+                'page_number': page_num + 1,
+                'text': page_text
+            })
+            textpage.close()
+            page.close()
+
+        pdf.close()
+
+        # Combine all text
+        full_text = "\n".join([page['text'] for page in pages_text])
+        return full_text, pages_text
 
     @classmethod
-    def process_pdf(cls, pdf_path: str, method: str = "pymupdf") -> Document:
-        """Process PDF and return Document object"""
-        if method == "pymupdf":
-            text = cls.extract_text_pymupdf(pdf_path)
-        else:
-            text = cls.extract_text_pypdf(pdf_path)
+    def process_pdf(cls, pdf_path: str) -> Document:
+        """Process PDF and return Document object with page information"""
+        text, pages_info = cls.extract_text_with_pages_pdfium(pdf_path)
 
         metadata = {
             "source": pdf_path,
             "type": "pdf",
-            "processed_at": time.time()
+            "processed_at": time.time(),
+            "pages_info": pages_info  # Store page information
         }
 
         return Document(content=text, metadata=metadata)
@@ -87,6 +89,7 @@ class EmbeddingProvider:
     """Manages different embedding models"""
 
     SUPPORTED_MODELS = {
+        "multilingual-e5-small": {"dim": 384, "speed": "fast"},
         "all-MiniLM-L6-v2": {"dim": 384, "speed": "fast"},
         "all-mpnet-base-v2": {"dim": 768, "speed": "medium"},
         "e5-small-v2": {"dim": 384, "speed": "fast"},
@@ -105,14 +108,63 @@ class EmbeddingProvider:
             # E5 models expect prefixed queries
             texts = [f"passage: {text}" for text in texts]
 
-        return self.model.encode(texts)
+        return self.model.encode(texts,padding=True, max_length=512)
 
     def encode_query(self, query: str) -> np.ndarray:
         """Encode query (may need different prefix)"""
         if "e5" in self.model_name:
             query = f"query: {query}"
 
-        return self.model.encode([query])[0]
+        return self.model.encode([query],padding=True, max_length=512)[0]
+
+    def encode_query_with_debug(self, query: str) -> tuple:
+        """Encode query and return both embedding and token IDs for debugging"""
+        if "e5" in self.model_name:
+            prefixed_query = f"query: {query}"
+        else:
+            prefixed_query = query
+
+        # Get embedding
+        embedding = self.model.encode([prefixed_query], padding=True, max_length=512)[0]
+
+        # Get token IDs for debugging
+        token_ids = None
+        try:
+            # Try to get tokenizer from the model
+            if hasattr(self.model, 'tokenizer'):
+                tokenized = self.model.tokenizer(
+                    prefixed_query,
+                    truncation=True,
+                    max_length=512,
+                    return_tensors='pt'
+                )
+                token_ids = tokenized['input_ids'][0].tolist()
+
+                # Also try without return_tensors to see raw output
+                tokenized_raw = self.model.tokenizer(
+                    prefixed_query,
+                    truncation=True,
+                    max_length=512
+                )
+                token_ids_raw = tokenized_raw['input_ids']
+
+                # Store both for comparison in debug
+                token_ids = {
+                    'with_pt_tensors': token_ids,
+                    'raw_list': token_ids_raw,
+                    'tokenizer_info': {
+                        'pad_token_id': getattr(self.model.tokenizer, 'pad_token_id', None),
+                        'cls_token_id': getattr(self.model.tokenizer, 'cls_token_id', None),
+                        'sep_token_id': getattr(self.model.tokenizer, 'sep_token_id', None),
+                        'eos_token_id': getattr(self.model.tokenizer, 'eos_token_id', None),
+                        'bos_token_id': getattr(self.model.tokenizer, 'bos_token_id', None)
+                    }
+                }
+        except Exception as e:
+            # If tokenization fails, we'll just return None for token_ids
+            pass
+
+        return embedding, token_ids, prefixed_query
 
 class VectorStore:
     """FAISS-based vector store with persistence"""
@@ -242,21 +294,29 @@ class RAGSystem:
         else:
             self.llm = None
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
+            chunk_size=400,
             chunk_overlap=100,
             length_function=len,
         )
 
     def add_document(self, document: Document):
-        """Add a document to the knowledge base"""
+        """Add a document to the knowledge base with page tracking"""
         # Split document into chunks
         chunks = self.text_splitter.split_text(document.content)
 
-        # Create chunk documents
+        # Create chunk documents with page information
         chunk_docs = []
         for i, chunk in enumerate(chunks):
             chunk_metadata = document.metadata.copy()
             chunk_metadata.update({"chunk_id": i, "chunk_count": len(chunks)})
+
+            # Determine which page(s) this chunk comes from
+            if "pages_info" in document.metadata and document.metadata["pages_info"]:
+                page_numbers = self._find_chunk_pages(chunk, document.metadata["pages_info"])
+                chunk_metadata["page_numbers"] = page_numbers
+                if page_numbers:
+                    chunk_metadata["primary_page"] = page_numbers[0]  # First page where chunk appears
+
             chunk_docs.append(Document(content=chunk, metadata=chunk_metadata))
 
         # Generate embeddings
@@ -267,27 +327,67 @@ class RAGSystem:
         self.vector_store.add_documents(chunk_docs, embeddings)
         self.vector_store.save()
 
-    def query(self, question: str, k: int = 5) -> Dict:
+    def _find_chunk_pages(self, chunk_text: str, pages_info: list) -> list:
+        """Find which pages contain the given chunk text"""
+        page_numbers = []
+
+        # Clean the chunk text for better matching
+        chunk_clean = chunk_text.strip().replace('\n', ' ').replace('  ', ' ')
+
+        for page_info in pages_info:
+            page_text_clean = page_info['text'].replace('\n', ' ').replace('  ', ' ')
+
+            # Check if a significant portion of the chunk appears in this page
+            if len(chunk_clean) > 50:  # For longer chunks, check if most of it is on this page
+                # Split chunk into sentences and check if majority are on this page
+                chunk_sentences = [s.strip() for s in chunk_clean.split('.') if len(s.strip()) > 10]
+                if chunk_sentences:
+                    matches = sum(1 for sentence in chunk_sentences if sentence in page_text_clean)
+                    if matches > len(chunk_sentences) * 0.5:  # If >50% of sentences match
+                        page_numbers.append(page_info['page_number'])
+            else:  # For shorter chunks, simple substring check
+                if chunk_clean in page_text_clean:
+                    page_numbers.append(page_info['page_number'])
+
+        return page_numbers
+
+    def query(self, question: str, k: int = 5, debug: bool = False) -> Dict:
         """Query the RAG system"""
-        # Generate query embedding
-        query_embedding = self.embedding_provider.encode_query(question)
+        # Generate query embedding with optional debug info
+        if debug:
+            query_embedding, token_ids, prefixed_query = self.embedding_provider.encode_query_with_debug(question)
+            debug_info = {
+                "query_embedding": query_embedding,
+                "token_ids": token_ids,
+                "prefixed_query": prefixed_query,
+                "original_query": question
+            }
+        else:
+            query_embedding = self.embedding_provider.encode_query(question)
+            debug_info = None
 
         # Search for relevant documents
         search_results = self.vector_store.search(query_embedding, k=k)
 
         if not search_results:
-            return {
+            result = {
                 "answer": "No relevant documents found." if self.llm else None,
                 "sources": [],
                 "search_results": []
             }
+            if debug_info:
+                result["debug_info"] = debug_info
+            return result
 
         # If no LLM is available, return only search results
         if self.llm is None:
-            return {
+            result = {
                 "sources": [result['metadata'] for result in search_results],
                 "search_results": search_results
             }
+            if debug_info:
+                result["debug_info"] = debug_info
+            return result
 
         # Prepare context from search results
         context = "\n\n".join([
@@ -298,11 +398,14 @@ class RAGSystem:
         # Generate answer
         answer = self.llm.generate(question, context)
 
-        return {
+        result = {
             "answer": answer,
             "sources": [result['metadata'] for result in search_results],
             "search_results": search_results
         }
+        if debug_info:
+            result["debug_info"] = debug_info
+        return result
 
 def main():
     """Streamlit UI"""
@@ -326,7 +429,7 @@ def main():
         llm_provider = st.selectbox(
             "LLM Provider",
             ["none", "openai", "ollama"],
-            index=0,  # Default to "none"
+            index=2,  # Default to "none"
             help="Choose LLM provider (select 'none' for embedding-only search)"
         )
 
@@ -335,7 +438,7 @@ def main():
             api_key = st.text_input("OpenAI API Key", type="password", value=os.getenv("OPENAI_API_KEY", ""))
             llm_kwargs = {"api_key": api_key}
         elif llm_provider == "ollama":
-            llm_model = st.text_input("Ollama Model", value="llama2", help="Enter Ollama model name")
+            llm_model = st.text_input("Ollama Model", value="llama3.2:3b", help="Enter Ollama model name")
             llm_kwargs = {}
         else:  # llm_provider == "none"
             llm_model = None
@@ -343,8 +446,9 @@ def main():
 
         # Advanced settings
         with st.expander("Advanced Settings"):
-            chunk_size = st.slider("Chunk Size", 200, 2000, 1000)
+            chunk_size = st.slider("Chunk Size", 200, 2000, 400)
             search_k = st.slider("Search Results (k)", 1, 20, 5)
+            debug_mode = st.checkbox("🐛 Debug Mode", value=True, help="Show query embeddings and token IDs")
 
         # Initialize RAG system button
         if st.button("🚀 Init RAG System", type="primary"):
@@ -423,7 +527,62 @@ def main():
             spinner_text = "Searching documents..." if llm_provider == "none" else "Searching and generating answer..."
             with st.spinner(spinner_text):
                 try:
-                    result = st.session_state.rag_system.query(query, k=search_k)
+                    result = st.session_state.rag_system.query(query, k=search_k, debug=debug_mode)
+
+                    # Display debug information if enabled
+                    if debug_mode and "debug_info" in result:
+                        st.subheader("🐛 Debug Information")
+                        debug_info = result["debug_info"]
+
+                        with st.expander("Query Processing Debug", expanded=True):
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                st.write("**Original Query:**")
+                                st.code(debug_info["original_query"])
+
+                                st.write("**Processed Query:**")
+                                st.code(debug_info["prefixed_query"])
+
+                            with col2:
+                                if debug_info["token_ids"]:
+                                    st.write("**Token IDs:**")
+                                    if isinstance(debug_info["token_ids"], dict):
+                                        st.write("*PyTorch tensors:*")
+                                        st.code(str(debug_info["token_ids"]["with_pt_tensors"]))
+                                        st.write("*Raw list:*")
+                                        st.code(str(debug_info["token_ids"]["raw_list"]))
+
+                                        # Show tokenizer special tokens info
+                                        tokenizer_info = debug_info["token_ids"]["tokenizer_info"]
+                                        st.write("*Special Token IDs:*")
+                                        special_tokens = []
+                                        for token_name, token_id in tokenizer_info.items():
+                                            if token_id is not None:
+                                                special_tokens.append(f"{token_name}: {token_id}")
+                                        if special_tokens:
+                                            st.code("\n".join(special_tokens))
+                                    else:
+                                        st.code(str(debug_info["token_ids"]))
+                                else:
+                                    st.write("**Token IDs:** Not available")
+
+                            st.write("**Query Embedding Vector:**")
+                            embedding = debug_info["query_embedding"]
+                            st.write(f"Dimension: {len(embedding)}")
+
+                            # Show embedding vector in a text area for easy copying
+                            st.text_area(
+                                "Embedding Vector (first 10 values shown):",
+                                value=f"[{', '.join([f'{x:.6f}' for x in embedding[:10]])}...]",
+                                height=68,
+                                help="Full vector available in separate section below"
+                            )
+
+                        # Full embedding vector in a separate expander (not nested)
+                        embedding_str = "[" + ", ".join([f"{x:.6f}" for x in debug_info["query_embedding"]]) + "]"
+                        with st.expander("Full Embedding Vector"):
+                            st.code(embedding_str, language="python")
 
                     # Display answer only if LLM is available
                     if llm_provider != "none" and "answer" in result:
@@ -434,9 +593,49 @@ def main():
                     if result["search_results"]:
                         st.subheader("📚 Search Results")
                         for i, search_result in enumerate(result["search_results"]):
-                            with st.expander(f"Result {i+1} (Score: {search_result['score']:.3f})"):
+                            # Create title with page information
+                            title_parts = [f"Result {i+1}", f"Score: {search_result['score']:.3f}"]
+
+                            # Add page information if available
+                            metadata = search_result["metadata"]
+                            if "primary_page" in metadata:
+                                title_parts.append(f"📄 Page {metadata['primary_page']}")
+                            elif "page_numbers" in metadata and metadata["page_numbers"]:
+                                if len(metadata["page_numbers"]) == 1:
+                                    title_parts.append(f"📄 Page {metadata['page_numbers'][0]}")
+                                else:
+                                    pages_str = ", ".join(map(str, metadata["page_numbers"]))
+                                    title_parts.append(f"📄 Pages {pages_str}")
+
+                            title = " | ".join(title_parts)
+
+                            with st.expander(title):
                                 st.write(search_result["content"])
-                                st.json(search_result["metadata"])
+
+                                # Display metadata with better formatting
+                                st.write("**Document Information:**")
+                                col1, col2 = st.columns(2)
+
+                                with col1:
+                                    if "source" in metadata:
+                                        source_name = os.path.basename(metadata["source"])
+                                        st.write(f"📁 **Source:** {source_name}")
+                                    if "chunk_id" in metadata:
+                                        st.write(f"🧩 **Chunk:** {metadata['chunk_id'] + 1}")
+
+                                with col2:
+                                    if "page_numbers" in metadata and metadata["page_numbers"]:
+                                        if len(metadata["page_numbers"]) == 1:
+                                            st.write(f"📄 **Page:** {metadata['page_numbers'][0]}")
+                                        else:
+                                            pages_str = ", ".join(map(str, metadata["page_numbers"]))
+                                            st.write(f"📄 **Pages:** {pages_str}")
+                                    if "chunk_count" in metadata:
+                                        st.write(f"📊 **Total Chunks:** {metadata['chunk_count']}")
+
+                                # Show full metadata in a details section
+                                if st.button(f"🔍 Show Full Metadata", key=f"metadata_{i}"):
+                                    st.json(metadata)
                     else:
                         st.info("No relevant documents found for your query.")
 
