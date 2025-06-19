@@ -28,6 +28,7 @@ yarn-error.*
 
 # macOS
 .DS_Store
+**/.DS_Store
 *.pem
 
 # local env files
@@ -46,4 +47,13 @@ yarn-error.*
 
 #sentencepiece prebuilts 
 **/prebuilt/sentencepiece/
+
+#vscode 
+**/.vscode/
+
+#rag index
+rag_index_*
+
+
+
 
