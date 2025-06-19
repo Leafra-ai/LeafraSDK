@@ -18,3 +18,6 @@
 [submodule "sdk/corecpp/third_party/faiss-mobile"]
 	path = sdk/corecpp/third_party/faiss-mobile
 	url = https://github.com/DeveloperMindset-com/faiss-mobile.git
+[submodule "sdk/corecpp/third_party/llamacpp"]
+	path = sdk/corecpp/third_party/llamacpp
+	url = https://github.com/ggml-org/llama.cpp.git
