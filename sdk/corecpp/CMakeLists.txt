@@ -42,6 +42,11 @@ if(TARGET FAISS::FAISS)
     list(APPEND LEAFRA_CORE_SOURCES src/leafra_faiss.cpp)
 endif()
 
+# Add LlamaCpp source file if available
+if(TARGET LlamaCpp::LlamaCpp)
+    list(APPEND LEAFRA_CORE_SOURCES src/leafra_llamacpp.cpp)
+endif()
+
 # Core library headers
 set(LEAFRA_CORE_HEADERS
     include/leafra/leafra_core.h
@@ -66,6 +71,11 @@ endif()
 # Add FAISS header if available
 if(TARGET FAISS::FAISS)
     list(APPEND LEAFRA_CORE_HEADERS include/leafra/leafra_faiss.h)
+endif()
+
+# Add LlamaCpp header if available
+if(TARGET LlamaCpp::LlamaCpp)
+    list(APPEND LEAFRA_CORE_HEADERS include/leafra/leafra_llamacpp.h)
 endif()
 
 # Create the core library
@@ -178,6 +188,15 @@ if(TARGET FAISS::FAISS)
     message(STATUS "✅ LeafraCore linked with FAISS")
 else()
     message(STATUS "⚠️  Building LeafraCore without FAISS")
+endif()
+
+# Link LlamaCpp if available (defined in parent CMakeLists.txt)
+if(TARGET LlamaCpp::LlamaCpp)
+    target_link_libraries(LeafraCore PRIVATE LlamaCpp::LlamaCpp)
+    target_compile_definitions(LeafraCore PRIVATE LEAFRA_HAS_LLAMACPP=1)
+    message(STATUS "✅ LeafraCore linked with LlamaCpp")
+else()
+    message(STATUS "⚠️  Building LeafraCore without LlamaCpp")
 endif()
 
 # Platform-specific libraries for logging

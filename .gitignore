@@ -53,6 +53,8 @@ yarn-error.*
 
 #rag index
 rag_index_*
+LeafraCore.framework
+sdk/install/
 
 
 

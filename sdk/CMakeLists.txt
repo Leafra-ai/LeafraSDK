@@ -878,6 +878,133 @@ else()
 endif()
 
 # ==============================================================================
+# LlamaCpp Integration
+# ==============================================================================
+
+set(LLAMACPP_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/llamacpp")
+
+# Platform-specific LlamaCpp configuration
+if(APPLE)
+    # iOS/macOS - Use XCFramework
+    set(LLAMACPP_XCFRAMEWORK_PATH "${LLAMACPP_ROOT_DIR}/apple/llama.xcframework")
+    
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        # Determine iOS platform (device vs simulator)
+        if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
+            set(LLAMACPP_PLATFORM_DIR "${LLAMACPP_XCFRAMEWORK_PATH}/ios-arm64_x86_64-simulator")
+        else()
+            set(LLAMACPP_PLATFORM_DIR "${LLAMACPP_XCFRAMEWORK_PATH}/ios-arm64")
+        endif()
+        
+        set(LLAMACPP_FRAMEWORK_PATH "${LLAMACPP_PLATFORM_DIR}/llama.framework")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_FRAMEWORK_PATH}/llama")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_FRAMEWORK_PATH}/Headers")
+        
+    else()
+        # macOS
+        set(LLAMACPP_PLATFORM_DIR "${LLAMACPP_XCFRAMEWORK_PATH}/macos-arm64_x86_64")
+        set(LLAMACPP_FRAMEWORK_PATH "${LLAMACPP_PLATFORM_DIR}/llama.framework")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_FRAMEWORK_PATH}/llama")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_FRAMEWORK_PATH}/Headers")
+    endif()
+    
+elseif(ANDROID)
+    # Android - Use prebuilt shared libraries
+    if(ANDROID_ABI STREQUAL "arm64-v8a")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/android/arm64-v8a/libllama.so")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/android/arm64-v8a/include")
+    elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/android/armeabi-v7a/libllama.so")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/android/armeabi-v7a/include")
+    elseif(ANDROID_ABI STREQUAL "x86_64")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/android/x86_64/libllama.so")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/android/x86_64/include")
+    elseif(ANDROID_ABI STREQUAL "x86")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/android/x86/libllama.so")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/android/x86/include")
+    else()
+        message(WARNING "Unsupported Android ABI for LlamaCpp: ${ANDROID_ABI}")
+    endif()
+    
+elseif(WIN32)
+    # Windows - Use prebuilt DLL
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        # 64-bit
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/windows/x64/llama.dll")
+        set(LLAMACPP_IMPORT_LIB "${LLAMACPP_ROOT_DIR}/windows/x64/llama.lib")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/windows/x64/include")
+    else()
+        # 32-bit
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/windows/x86/llama.dll")
+        set(LLAMACPP_IMPORT_LIB "${LLAMACPP_ROOT_DIR}/windows/x86/llama.lib")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/windows/x86/include")
+    endif()
+    
+else()
+    # Linux - Use prebuilt shared library
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/linux/x86_64/libllama.so")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/linux/x86_64/include")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(LLAMACPP_LIBRARY "${LLAMACPP_ROOT_DIR}/linux/aarch64/libllama.so")
+        set(LLAMACPP_INCLUDE_DIR "${LLAMACPP_ROOT_DIR}/linux/aarch64/include")
+    else()
+        message(WARNING "Unsupported Linux architecture for LlamaCpp: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+endif()
+
+# Create LlamaCpp imported target if library exists
+if(EXISTS "${LLAMACPP_LIBRARY}" AND EXISTS "${LLAMACPP_INCLUDE_DIR}")
+    message(STATUS "✅ Found LlamaCpp library: ${LLAMACPP_LIBRARY}")
+    message(STATUS "✅ LlamaCpp include directory: ${LLAMACPP_INCLUDE_DIR}")
+    
+    if(APPLE)
+        # For Apple platforms, link the framework
+        add_library(LlamaCpp::LlamaCpp SHARED IMPORTED)
+        set_target_properties(LlamaCpp::LlamaCpp PROPERTIES
+            IMPORTED_LOCATION "${LLAMACPP_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${LLAMACPP_INCLUDE_DIR}"
+            FRAMEWORK TRUE
+        )
+        
+        # For iOS, we might need to set additional properties
+        if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+            set_target_properties(LlamaCpp::LlamaCpp PROPERTIES
+                IMPORTED_LINK_INTERFACE_LIBRARIES ""
+            )
+        endif()
+        
+    elseif(WIN32 AND EXISTS "${LLAMACPP_IMPORT_LIB}")
+        # For Windows, use the import library
+        add_library(LlamaCpp::LlamaCpp SHARED IMPORTED)
+        set_target_properties(LlamaCpp::LlamaCpp PROPERTIES
+            IMPORTED_LOCATION "${LLAMACPP_LIBRARY}"
+            IMPORTED_IMPLIB "${LLAMACPP_IMPORT_LIB}"
+            INTERFACE_INCLUDE_DIRECTORIES "${LLAMACPP_INCLUDE_DIR}"
+        )
+        
+    else()
+        # For other platforms (Android, Linux), use shared library
+        add_library(LlamaCpp::LlamaCpp SHARED IMPORTED)
+        set_target_properties(LlamaCpp::LlamaCpp PROPERTIES
+            IMPORTED_LOCATION "${LLAMACPP_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${LLAMACPP_INCLUDE_DIR}"
+        )
+    endif()
+    
+    set(LLAMACPP_FOUND TRUE)
+    message(STATUS "✅ LlamaCpp integration enabled")
+else()
+    if(NOT EXISTS "${LLAMACPP_LIBRARY}")
+        message(STATUS "❌ LlamaCpp library not found at: ${LLAMACPP_LIBRARY}")
+    endif()
+    if(NOT EXISTS "${LLAMACPP_INCLUDE_DIR}")
+        message(STATUS "❌ LlamaCpp headers not found at: ${LLAMACPP_INCLUDE_DIR}")
+    endif()
+    set(LLAMACPP_FOUND FALSE)
+endif()
+
+# ==============================================================================
 # FAISS Integration (Vector Search Library) with OpenMP
 # ==============================================================================
 
