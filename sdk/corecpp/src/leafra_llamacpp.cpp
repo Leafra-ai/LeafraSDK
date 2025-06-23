@@ -1,4 +1,5 @@
 #include "leafra/leafra_llamacpp.h"
+#include "leafra/types.h"
 
 #ifdef LEAFRA_HAS_LLAMACPP
 
@@ -1024,6 +1025,35 @@ std::string format_chat(const std::vector<std::string>& messages, const std::str
     }
     
     return formatted.str();
+}
+
+LlamaCppConfig from_llm_config(const LLMConfig& llm_config) {
+    LlamaCppConfig config(llm_config.model_path);
+    
+    // Map basic parameters
+    config.n_ctx = llm_config.context_size;
+    config.n_predict = llm_config.max_tokens;
+    config.n_batch = llm_config.batch_size;
+    config.n_threads = llm_config.num_threads;
+    config.n_threads_batch = llm_config.num_threads;
+    
+    // Map generation parameters
+    config.temperature = llm_config.temperature;
+    config.top_p = llm_config.top_p;
+    config.top_k = llm_config.top_k;
+    config.repeat_penalty = llm_config.repetition_penalty;
+    config.repeat_last_n = llm_config.repetition_context;
+    
+    // Map hardware/performance parameters
+    config.n_gpu_layers = llm_config.gpu_layers;
+    config.use_mmap = llm_config.use_memory_mapping;
+    config.use_mlock = llm_config.use_memory_locking;
+    
+    // Map system configuration
+    config.seed = llm_config.seed;
+    config.debug_mode = llm_config.debug_mode;
+    
+    return config;
 }
 
 } // namespace utils

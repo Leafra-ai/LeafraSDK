@@ -108,6 +108,16 @@ public:
      */
     ResultCode semantic_search(const std::string& query, int max_results, std::vector<FaissIndex::SearchResult>& results);
 #endif
+
+#ifdef LEAFRA_HAS_LLAMACPP
+    /**
+     * @brief Perform LLM inference on a given prompt
+     * @param prompt Input prompt text
+     * @param response Output response text
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode llm_inference(const std::string& prompt, std::string& response);
+#endif
     
     /**
      * @brief Create SDK instance

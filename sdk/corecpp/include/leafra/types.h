@@ -216,6 +216,59 @@ struct LEAFRA_API VectorSearchConfig {
     // Note: FAISS enum conversion methods are implemented in leafra_core.cpp
     // when LEAFRA_HAS_FAISS is defined and leafra_faiss.h is included
 };
+// LLM model configuration
+/**
+ * @brief General LLM (Large Language Model) configuration for the SDK
+ */
+struct LEAFRA_API LLMConfig {
+    bool enabled = false;                   // Whether to enable LLM functionality
+    std::string model_path = "";            // Path to the LLM model file
+    std::string framework = "llamacpp";     // LLM framework: "llamacpp", "ollama", etc.
+    
+    // Context and processing parameters
+    int32_t context_size = 4096;           // Maximum context length in tokens
+    int32_t max_tokens = 128;              // Maximum tokens to generate per request
+    int32_t batch_size = 512;              // Batch size for processing
+    int32_t num_threads = -1;              // Number of threads (-1 = auto-detect)
+    
+    // Generation parameters
+    float temperature = 0.8f;              // Sampling temperature (0.0 = deterministic, higher = more random)
+    float top_p = 0.9f;                    // Nucleus sampling (top-p) probability
+    int32_t top_k = 40;                    // Top-k sampling (0 = disabled)
+    float repetition_penalty = 1.1f;       // Penalty for repeating tokens
+    int32_t repetition_context = 64;       // Number of previous tokens to consider for repetition penalty
+    
+    // Performance and hardware parameters
+    int32_t gpu_layers = 0;                // Number of layers to offload to GPU (0 = CPU only)
+    bool use_memory_mapping = true;        // Use memory mapping for model loading (faster startup)
+    bool use_memory_locking = false;       // Lock model in RAM (prevents swapping)
+    
+    // System configuration
+    std::string system_prompt = "";        // System prompt to use for conversations
+    int32_t seed = -1;                     // Random seed for reproducible outputs (-1 = random)
+    bool debug_mode = false;               // Enable debug output
+    
+    // Default constructor
+    LLMConfig() = default;
+    
+    // Constructor with model path
+    explicit LLMConfig(const std::string& model_path_param) 
+        : enabled(true), model_path(model_path_param) {}
+    
+    // Check if configuration is valid
+    bool is_valid() const {
+        return enabled && !model_path.empty() && !framework.empty() &&
+               context_size > 0 && max_tokens > 0 && batch_size > 0 &&
+               temperature >= 0.0f && top_p > 0.0f && top_p <= 1.0f &&
+               repetition_penalty > 0.0f;
+    }
+    
+    // Helper method to get model filename from path
+    std::string get_model_filename() const {
+        size_t pos = model_path.find_last_of("/\\");
+        return (pos == std::string::npos) ? model_path : model_path.substr(pos + 1);
+    }
+};
 
 // Configuration structure
 struct LEAFRA_API Config {
@@ -229,6 +282,7 @@ struct LEAFRA_API Config {
     TokenizerConfig tokenizer;             // Tokenization configuration
     EmbeddingModelConfig embedding_inference; // Embedding model inference configuration
     VectorSearchConfig vector_search;       // Vector search configuration
+    LLMConfig llm;                         // Large Language Model configuration
 };
 
 // Data structures

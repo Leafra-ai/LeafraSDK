@@ -325,6 +325,15 @@ int main(int argc, char* argv[]) {
         config.vector_search.metric = "COSINE";
         config.vector_search.dimension = 384;
 
+        config.llm.enabled = true;
+        config.llm.framework = "llamacpp";
+        config.llm.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/llm/llama-3.1-8b-instruct-q4_0.gguf";
+        config.llm.temperature = 0.7f;
+        config.llm.top_p = 0.9f;
+        config.llm.top_k = 40;
+        config.llm.max_tokens = 1024;
+        config.llm.context_size = 4096;
+
         print_separator("SDK Configuration");
         std::cout << "Application: " << config.name << std::endl;
         std::cout << "Platform: Desktop (macOS/Linux/Windows)" << std::endl;

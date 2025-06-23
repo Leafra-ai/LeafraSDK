@@ -41,6 +41,11 @@
 #include "leafra/leafra_faiss.h"
 #endif
 
+#ifdef LEAFRA_HAS_LLAMACPP
+// LlamaCpp interface header
+#include "leafra/leafra_llamacpp.h"
+#endif
+
 namespace leafra {
 
 // Implementation of ChunkingConfig constructors
@@ -112,6 +117,12 @@ public:
     std::vector<TfLiteDelegate*> tf_delegates_;
     bool tf_initialized_;
 #endif
+
+#ifdef LEAFRA_HAS_LLAMACPP
+    // LlamaCpp inference components
+    std::unique_ptr<leafra::llamacpp::LlamaCppModel> llamacpp_model_;
+    bool llamacpp_initialized_;
+#endif
     
     Impl() : initialized_(false), event_callback_(nullptr) {
         data_processor_ = std::make_unique<DataProcessor>();
@@ -136,6 +147,12 @@ public:
         tf_interpreter_ = nullptr;
         tf_options_ = nullptr;
         tf_initialized_ = false;
+#endif
+
+#ifdef LEAFRA_HAS_LLAMACPP
+        // Initialize LlamaCpp variables
+        llamacpp_model_ = nullptr;
+        llamacpp_initialized_ = false;
 #endif
     }
     
@@ -1283,7 +1300,46 @@ ResultCode LeafraCore::initialize(const Config& config) {
         LEAFRA_WARNING() << "⚠️  SQLite integration disabled - database initialization skipped";
 #endif // LEAFRA_HAS_SQLITE
     
-
+#ifdef LEAFRA_HAS_LLAMACPP
+        if (config.llm.enabled) {
+            LEAFRA_INFO() << "Initializing LLM inference";
+            LEAFRA_INFO() << "  - Framework: " << config.llm.framework;
+            LEAFRA_INFO() << "  - Model path: " << config.llm.model_path;
+            LEAFRA_INFO() << "  - Context size: " << config.llm.context_size;
+            LEAFRA_INFO() << "  - Max tokens: " << config.llm.max_tokens;
+            LEAFRA_INFO() << "  - Temperature: " << config.llm.temperature;
+            
+            // Initialize LlamaCpp backend
+            if (!leafra::llamacpp::global::initialize(false)) {
+                LEAFRA_ERROR() << "Failed to initialize LlamaCpp backend";
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            
+            // Create LlamaCpp model instance
+            pImpl->llamacpp_model_ = std::make_unique<leafra::llamacpp::LlamaCppModel>();
+            
+            // Convert LLMConfig to LlamaCppConfig and load model
+            auto llamacpp_config = leafra::llamacpp::utils::from_llm_config(config.llm);
+            
+            if (!pImpl->llamacpp_model_->load_model(llamacpp_config)) {
+                LEAFRA_ERROR() << "Failed to load LlamaCpp model: " << pImpl->llamacpp_model_->get_last_error();
+                pImpl->llamacpp_model_.reset();
+                leafra::llamacpp::global::cleanup();
+                return ResultCode::ERROR_INITIALIZATION_FAILED;
+            }
+            
+            // Set system prompt if provided
+            if (!config.llm.system_prompt.empty()) {
+                if (!pImpl->llamacpp_model_->set_system_prompt(config.llm.system_prompt)) {
+                    LEAFRA_WARNING() << "Failed to set system prompt: " << pImpl->llamacpp_model_->get_last_error();
+                }
+            }
+            
+            pImpl->llamacpp_initialized_ = true;
+            LEAFRA_INFO() << "✅ LlamaCpp model loaded successfully";
+            LEAFRA_INFO() << "  - Model info: " << pImpl->llamacpp_model_->get_model_info();
+        }
+#endif
 
         pImpl->initialized_ = true;
         LEAFRA_INFO() << "LeafraSDK initialized successfully";
@@ -1375,6 +1431,25 @@ ResultCode LeafraCore::shutdown() {
             
             pImpl->tf_initialized_ = false;
             LEAFRA_DEBUG() << "TensorFlow Lite shutdown completed";
+        }
+#endif
+
+#ifdef LEAFRA_HAS_LLAMACPP
+        // Cleanup LlamaCpp resources
+        if (pImpl->llamacpp_initialized_) {
+            LEAFRA_DEBUG() << "Shutting down LlamaCpp";
+            
+            // Unload model and cleanup
+            if (pImpl->llamacpp_model_) {
+                pImpl->llamacpp_model_->unload();
+                pImpl->llamacpp_model_.reset();
+            }
+            
+            // Cleanup global LlamaCpp resources
+            leafra::llamacpp::global::cleanup();
+            
+            pImpl->llamacpp_initialized_ = false;
+            LEAFRA_DEBUG() << "LlamaCpp shutdown completed";
         }
 #endif
         
@@ -1793,10 +1868,58 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
         LEAFRA_ERROR() << "Exception in semantic_search: " << e.what();
         return ResultCode::ERROR_PROCESSING_FAILED;
     }
-}
+} //semantic_search
 
+//LLM inference functions
 
+ResultCode LeafraCore::llm_inference(const std::string& prompt, std::string& response) {
+    if (!pImpl->initialized_) {
+        LEAFRA_ERROR() << "LeafraCore not initialized";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    if (prompt.empty()) {
+        LEAFRA_ERROR() << "Empty prompt provided";
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
 
-
+#ifdef LEAFRA_HAS_LLAMACPP
+    if (!pImpl->llamacpp_initialized_ || !pImpl->llamacpp_model_) {
+        LEAFRA_ERROR() << "LlamaCpp not initialized or model not loaded";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    try {
+        LEAFRA_DEBUG() << "Generating response for prompt: " << prompt.substr(0, 100) << (prompt.length() > 100 ? "..." : "");
+        
+        // Generate response using LlamaCpp
+        response = pImpl->llamacpp_model_->generate_text(prompt, pImpl->config_.llm.max_tokens);
+        if (response.empty()) {
+            LEAFRA_ERROR() << "Failed to generate text: " << pImpl->llamacpp_model_->get_last_error();
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Log generation statistics
+        auto stats = pImpl->llamacpp_model_->get_last_stats();
+        LEAFRA_INFO() << "LLM inference completed successfully";
+        LEAFRA_INFO() << "  - Prompt tokens: " << stats.prompt_tokens;
+        LEAFRA_INFO() << "  - Generated tokens: " << stats.generated_tokens;
+        LEAFRA_INFO() << "  - Prompt eval time: " << stats.prompt_eval_time << "ms";
+        LEAFRA_INFO() << "  - Generation time: " << stats.generation_time << "ms";
+        LEAFRA_INFO() << "  - Tokens/second: " << stats.tokens_per_second;
+        
+        pImpl->send_event("LLM inference completed - Generated " + std::to_string(stats.generated_tokens) + " tokens");
+        
+        return ResultCode::SUCCESS;
+        
+    } catch (const std::exception& e) {
+        LEAFRA_ERROR() << "Exception in llm_inference: " << e.what();
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+#else
+    LEAFRA_ERROR() << "LlamaCpp support not compiled";
+    return ResultCode::ERROR_NOT_IMPLEMENTED;
+#endif
+} //llm_inference
 
 } // namespace leafra 

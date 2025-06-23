@@ -13,6 +13,7 @@
 struct llama_model;
 struct llama_context;
 struct llama_sampling_context;
+struct LLMConfig;
 
 namespace leafra {
 namespace llamacpp {
@@ -317,6 +318,13 @@ namespace utils {
         const std::vector<std::string>& messages,
         const std::string& system_prompt = ""
     );
+    
+    /**
+     * @brief Convert LLMConfig to LlamaCppConfig
+     * @param llm_config General LLM configuration from SDK
+     * @return LlamaCppConfig with equivalent parameters
+     */
+    LlamaCppConfig from_llm_config(const struct LLMConfig& llm_config);
 }
 
 } // namespace llamacpp
