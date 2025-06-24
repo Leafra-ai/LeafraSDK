@@ -330,7 +330,7 @@ public:
             ASSERT_FALSE(response.empty());
             std::cout << "   Note: Model appears to reset context after each generation" << std::endl;
         } else {
-            ASSERT_GT(context_used, 0);
+        ASSERT_GT(context_used, 0);
         }
         
         // Test context reset (should work regardless)

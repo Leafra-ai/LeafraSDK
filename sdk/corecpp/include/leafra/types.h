@@ -43,6 +43,9 @@ using byte_t = uint8_t;
 using data_buffer_t = std::vector<byte_t>;
 using callback_t = std::function<void(const std::string&)>;
 
+// LLM-related callback types
+using token_callback_t = std::function<bool(const std::string& token, bool is_final)>;
+
 /**
  * @brief Helper structure for accessing chunk token information
  * 
@@ -173,7 +176,7 @@ struct LEAFRA_API EmbeddingModelConfig {
 
 #ifdef LEAFRA_HAS_FAISS
 // Forward declarations for FAISS types
-class FaissIndex;
+    class FaissIndex;
 #endif
 
 /**
@@ -216,7 +219,7 @@ struct LEAFRA_API VectorSearchConfig {
     // Note: FAISS enum conversion methods are implemented in leafra_core.cpp
     // when LEAFRA_HAS_FAISS is defined and leafra_faiss.h is included
 };
-// LLM model configuration
+
 /**
  * @brief General LLM (Large Language Model) configuration for the SDK
  */
@@ -226,27 +229,36 @@ struct LEAFRA_API LLMConfig {
     std::string framework = "llamacpp";     // LLM framework: "llamacpp", "ollama", etc.
     
     // Context and processing parameters
-    int32_t context_size = 4096;           // Maximum context length in tokens
-    int32_t max_tokens = 128;              // Maximum tokens to generate per request
-    int32_t batch_size = 512;              // Batch size for processing
-    int32_t num_threads = -1;              // Number of threads (-1 = auto-detect)
+    int32_t n_ctx = 4096;                  // Maximum context length in tokens
+    int32_t n_predict = 128;               // Maximum tokens to generate per request
+    int32_t n_batch = 512;                 // Batch size for processing
+    int32_t n_ubatch = 512;                // Physical batch size for prompt processing
+    int32_t n_threads = -1;                // Number of threads (-1 = auto-detect)
+    int32_t n_threads_batch = -1;          // Number of threads for batch processing (-1 = auto)
     
     // Generation parameters
     float temperature = 0.8f;              // Sampling temperature (0.0 = deterministic, higher = more random)
     float top_p = 0.9f;                    // Nucleus sampling (top-p) probability
     int32_t top_k = 40;                    // Top-k sampling (0 = disabled)
-    float repetition_penalty = 1.1f;       // Penalty for repeating tokens
-    int32_t repetition_context = 64;       // Number of previous tokens to consider for repetition penalty
+    float min_p = 0.05f;                   // Minimum probability for sampling
+    float repeat_penalty = 1.1f;           // Penalty for repeating tokens
+    int32_t repeat_last_n = 64;            // Number of previous tokens to consider for repetition penalty
+    
+    // Advanced sampling parameters (usually not changed)
+    float tfs_z = 1.0f;                    // Tail free sampling (1.0 = disabled)
+    float typical_p = 1.0f;                // Typical sampling (1.0 = disabled)
     
     // Performance and hardware parameters
-    int32_t gpu_layers = 0;                // Number of layers to offload to GPU (0 = CPU only)
-    bool use_memory_mapping = true;        // Use memory mapping for model loading (faster startup)
-    bool use_memory_locking = false;       // Lock model in RAM (prevents swapping)
+    int32_t n_gpu_layers = -1;             // Number of layers to offload to GPU (-1 = auto, 0 = CPU only)
+    bool use_mmap = true;                  // Use memory mapping for model loading (faster startup)
+    bool use_mlock = false;                // Lock model in RAM (prevents swapping)
+    bool numa = false;                     // Enable NUMA optimization
     
     // System configuration
     std::string system_prompt = "";        // System prompt to use for conversations
     int32_t seed = -1;                     // Random seed for reproducible outputs (-1 = random)
     bool debug_mode = false;               // Enable debug output
+    bool verbose_prompt = false;           // Print prompt before generation
     
     // Default constructor
     LLMConfig() = default;
@@ -258,9 +270,9 @@ struct LEAFRA_API LLMConfig {
     // Check if configuration is valid
     bool is_valid() const {
         return enabled && !model_path.empty() && !framework.empty() &&
-               context_size > 0 && max_tokens > 0 && batch_size > 0 &&
+               n_ctx > 0 && n_predict > 0 && n_batch > 0 && n_ubatch > 0 &&
                temperature >= 0.0f && top_p > 0.0f && top_p <= 1.0f &&
-               repetition_penalty > 0.0f;
+               repeat_penalty > 0.0f && min_p >= 0.0f && min_p <= 1.0f;
     }
     
     // Helper method to get model filename from path

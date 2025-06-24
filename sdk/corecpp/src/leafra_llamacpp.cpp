@@ -35,7 +35,7 @@ public:
         cleanup();
     }
     
-    bool load_model(const LlamaCppConfig& config) {
+    bool load_model(const LLMConfig& config) {
         config_ = config;
         
         // Initialize llama backend if not already done
@@ -55,15 +55,14 @@ public:
         // Clean up any existing model
         cleanup();
         
-        // Set up model parameters
+        // Initialize model parameters
         llama_model_params model_params = llama_model_default_params();
         model_params.n_gpu_layers = config.n_gpu_layers;
         model_params.use_mmap = config.use_mmap;
         model_params.use_mlock = config.use_mlock;
-        model_params.vocab_only = false;
         
         // Load model
-        model_ = llama_model_load_from_file(config.model_path.c_str(), model_params);
+        model_ = llama_load_model_from_file(config.model_path.c_str(), model_params);
         if (!model_) {
             last_error_ = "Failed to load model from: " + config.model_path;
             LEAFRA_ERROR() << last_error_;
@@ -607,11 +606,11 @@ public:
         return context_used_;
     }
     
-    const LlamaCppConfig& get_config() const {
+    const LLMConfig& get_config() const {
         return config_;
     }
     
-    void update_generation_config(const LlamaCppConfig& config) {
+    void update_generation_config(const LLMConfig& config) {
         // Update only generation parameters
         config_.n_predict = config.n_predict;
         config_.temperature = config.temperature;
@@ -673,7 +672,7 @@ public:
         }
         
         if (config_.debug_mode) {
-            LEAFRA_DEBUG() << "Updated generation config and recreated sampler";
+            LEAFRA_INFO() << "🔄 Generation parameters updated";
         }
     }
     
@@ -682,20 +681,22 @@ public:
     }
     
     std::string get_model_info() const {
-        if (!is_loaded()) {
+        if (!model_) {
             return "No model loaded";
         }
         
         std::ostringstream info;
-        info << "Model Information:\n";
-        info << "  - Path: " << config_.model_path << "\n";
+        info << "LlamaCpp Model Information:\n";
+        info << "  - Model path: " << config_.model_path << "\n";
         info << "  - Vocabulary size: " << vocab_size_ << "\n";
         info << "  - Context size: " << context_size_ << "\n";
         info << "  - Context used: " << context_used_ << "\n";
         info << "  - Embedding dimension: " << llama_model_n_embd(model_) << "\n";
         info << "  - Model size: " << llama_model_n_params(model_) << " parameters\n";
         info << "  - GPU layers: " << config_.n_gpu_layers << "\n";
-        info << "  - Threads: " << config_.n_threads << "\n";
+        info << "  - Threads: " << config_.n_threads << " (batch: " << config_.n_threads_batch << ")\n";
+        info << "  - Memory mapping: " << (config_.use_mmap ? "enabled" : "disabled") << "\n";
+        info << "  - Memory locking: " << (config_.use_mlock ? "enabled" : "disabled") << "\n";
         
         return info.str();
     }
@@ -911,7 +912,7 @@ private:
     llama_model* model_;
     const llama_vocab* vocab_;
     llama_sampler* sampler_;  // Modern sampling chain
-    LlamaCppConfig config_;
+    LLMConfig config_;
     int32_t vocab_size_ = 0;
     int32_t context_size_ = 0;
     int32_t context_used_;
@@ -930,7 +931,7 @@ LlamaCppModel::LlamaCppModel(LlamaCppModel&&) noexcept = default;
 
 LlamaCppModel& LlamaCppModel::operator=(LlamaCppModel&&) noexcept = default;
 
-bool LlamaCppModel::load_model(const LlamaCppConfig& config) {
+bool LlamaCppModel::load_model(const LLMConfig& config) {
     return pImpl->load_model(config);
 }
 
@@ -990,11 +991,11 @@ int32_t LlamaCppModel::get_context_used() const {
     return pImpl->get_context_used();
 }
 
-const LlamaCppConfig& LlamaCppModel::get_config() const {
+const LLMConfig& LlamaCppModel::get_config() const {
     return pImpl->get_config();
 }
 
-void LlamaCppModel::update_generation_config(const LlamaCppConfig& config) {
+void LlamaCppModel::update_generation_config(const LLMConfig& config) {
     pImpl->update_generation_config(config);
 }
 
@@ -1104,8 +1105,8 @@ bool is_valid_model_file(const std::string& model_path) {
            magic[2] == 'U' && magic[3] == 'F';
 }
 
-LlamaCppConfig get_recommended_config(const std::string& model_path) {
-    LlamaCppConfig config(model_path);
+LLMConfig get_recommended_config(const std::string& model_path) {
+    LLMConfig config(model_path);
     
     // Try to analyze model and set reasonable defaults
     if (is_valid_model_file(model_path)) {
@@ -1130,34 +1131,6 @@ LlamaCppConfig get_recommended_config(const std::string& model_path) {
 
 
 
-LlamaCppConfig from_llm_config(const LLMConfig& llm_config) {
-    LlamaCppConfig config(llm_config.model_path);
-    
-    // Map basic parameters
-    config.n_ctx = llm_config.context_size;
-    config.n_predict = llm_config.max_tokens;
-    config.n_batch = llm_config.batch_size;
-    config.n_threads = llm_config.num_threads;
-    config.n_threads_batch = llm_config.num_threads;
-    
-    // Map generation parameters
-    config.temperature = llm_config.temperature;
-    config.top_p = llm_config.top_p;
-    config.top_k = llm_config.top_k;
-    config.repeat_penalty = llm_config.repetition_penalty;
-    config.repeat_last_n = llm_config.repetition_context;
-    
-    // Map hardware/performance parameters
-    config.n_gpu_layers = llm_config.gpu_layers;
-    config.use_mmap = llm_config.use_memory_mapping;
-    config.use_mlock = llm_config.use_memory_locking;
-    
-    // Map system configuration
-    config.seed = llm_config.seed;
-    config.debug_mode = llm_config.debug_mode;
-    
-    return config;
-}
 
 std::vector<std::string> get_available_chat_templates() {
     std::vector<std::string> templates;

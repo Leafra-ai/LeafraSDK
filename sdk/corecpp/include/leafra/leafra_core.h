@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include <memory>
+#include <functional>
 
 #ifdef LEAFRA_HAS_FAISS
 #include "leafra_faiss.h"
@@ -107,6 +108,18 @@ public:
      * @return ResultCode indicating success or failure
      */
     ResultCode semantic_search(const std::string& query, int max_results, std::vector<FaissIndex::SearchResult>& results);
+    
+#ifdef LEAFRA_HAS_LLAMACPP
+    /**
+     * @brief Perform semantic search with LLM response generation
+     * @param query Search query string
+     * @param max_results Maximum number of search results to use as context
+     * @param results Output vector for search results (populated with found chunks)
+     * @param callback Token callback function for streaming LLM response
+     * @return ResultCode indicating success or failure
+     */
+    ResultCode semantic_search_with_llm(const std::string& query, int max_results, std::vector<FaissIndex::SearchResult>& results, token_callback_t callback);
+#endif
 #endif
 
 #ifdef LEAFRA_HAS_LLAMACPP

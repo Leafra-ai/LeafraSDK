@@ -59,7 +59,7 @@ set(ALL_SOURCES ${COMMON_SOURCES} ${PLATFORM_SOURCES})
 add_executable(test_llamacpp_basic 
     test_llamacpp_simple.cpp
     ${ALL_SOURCES}
-)
+    )
 
 # Add compile definitions for the test executable
 target_compile_definitions(test_llamacpp_basic PRIVATE LEAFRA_HAS_LLAMACPP=1)
@@ -95,7 +95,7 @@ if(APPLE)
             INSTALL_RPATH "${LLAMA_FRAMEWORK_DIR}"
         )
     endif()
-    
+
     # Link with the required Apple frameworks and imported llama framework
     target_link_libraries(test_llamacpp_basic 
         "-framework Foundation"
@@ -107,7 +107,7 @@ if(APPLE)
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
                 # Define model file path
         set(MODEL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/models/llm/unsloth/Llama-3.2-3B-Instruct-Q4_K_M.gguf")
-        
+
         # Check if model file exists
         if(NOT EXISTS ${MODEL_FILE})
             message(FATAL_ERROR "Model file not found: ${MODEL_FILE}")
@@ -148,7 +148,7 @@ if(APPLE)
             COMMENT "Embedding and signing llama.framework in app bundle"
         )
     endif()
-endif()
+endif() 
 
 # Enable testing
 enable_testing()

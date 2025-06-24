@@ -215,7 +215,7 @@ public:
             // Check if document already exists and delete it if found
             if (!handleExistingDocument(filename, absolute_path)) {
                 LEAFRA_ERROR() << "Failed to handle existing document: " << filename;
-                return false;
+                            return false;
             }
 
             // Bind parameters for document
@@ -264,12 +264,12 @@ public:
                 
                 // Convert embedding to blob
                 std::vector<uint8_t> embedding_blob;
-                // Convert float vector to byte vector
-                const float* float_data = chunk.embedding.data();
+                    // Convert float vector to byte vector
+                    const float* float_data = chunk.embedding.data();
                 //TODO AD: We need to handle different endianness'es here per architecture to be portable 
-                const uint8_t* byte_data = reinterpret_cast<const uint8_t*>(float_data);
-                size_t byte_size = chunk.embedding.size() * sizeof(float);
-                embedding_blob.assign(byte_data, byte_data + byte_size);
+                    const uint8_t* byte_data = reinterpret_cast<const uint8_t*>(float_data);
+                    size_t byte_size = chunk.embedding.size() * sizeof(float);
+                    embedding_blob.assign(byte_data, byte_data + byte_size);
                 
                 // Calculate FAISS ID for this chunk (same as used in FAISS insertion)
                 
@@ -316,7 +316,7 @@ public:
     #endif // LEAFRA_HAS_FAISS
             LEAFRA_INFO() << "✅ Successfully inserted document '" << filename << "' with " << chunks.size() << " chunks";
             send_event("💾 Stored document: " + filename + " (" + std::to_string(chunks.size()) + " chunks)");
-                        
+            
             return true;
             
         } catch (const std::exception& e) {
@@ -735,7 +735,7 @@ public:
             std::string chunk_text = std::string(chunk.content);
             
             // Add "passage: or queary" prefix for multilingual-e5-small model per 
-            // https://huggingface.co/intfloat/multilingual-e5-small             
+            // https://huggingface.co/intfloat/multilingual-e5-small 
             chunk_text = prefix + chunk_text;
             
             std::vector<int> token_ids = tokenizer_->encode_as_ids(chunk_text, SentencePieceTokenizer::TokenizeOptions());
@@ -794,7 +794,7 @@ public:
                   ", Avg size: " + std::to_string(chunks.size() > 0 ? total_chunk_chars / chunks.size() : 0) + " chars, " +
                   std::to_string(chunks.size() > 0 ? total_tokens / chunks.size() : 0) + " " + token_type + " tokens");
     } //calculateAndLogChunkStatistics
-
+ 
 #ifdef LEAFRA_HAS_SQLITE
     /**
      * @brief Check if document exists and delete it if found
@@ -1305,8 +1305,8 @@ ResultCode LeafraCore::initialize(const Config& config) {
             LEAFRA_INFO() << "Initializing LLM inference";
             LEAFRA_INFO() << "  - Framework: " << config.llm.framework;
             LEAFRA_INFO() << "  - Model path: " << config.llm.model_path;
-            LEAFRA_INFO() << "  - Context size: " << config.llm.context_size;
-            LEAFRA_INFO() << "  - Max tokens: " << config.llm.max_tokens;
+            LEAFRA_INFO() << "  - Context size: " << config.llm.n_ctx;
+            LEAFRA_INFO() << "  - Max tokens: " << config.llm.n_predict;
             LEAFRA_INFO() << "  - Temperature: " << config.llm.temperature;
             
             // Initialize LlamaCpp backend
@@ -1318,10 +1318,8 @@ ResultCode LeafraCore::initialize(const Config& config) {
             // Create LlamaCpp model instance
             pImpl->llamacpp_model_ = std::make_unique<leafra::llamacpp::LlamaCppModel>();
             
-            // Convert LLMConfig to LlamaCppConfig and load model
-            auto llamacpp_config = leafra::llamacpp::utils::from_llm_config(config.llm);
-            
-            if (!pImpl->llamacpp_model_->load_model(llamacpp_config)) {
+            // Load model directly with LLMConfig
+            if (!pImpl->llamacpp_model_->load_model(config.llm)) {
                 LEAFRA_ERROR() << "Failed to load LlamaCpp model: " << pImpl->llamacpp_model_->get_last_error();
                 pImpl->llamacpp_model_.reset();
                 leafra::llamacpp::global::cleanup();
@@ -1702,8 +1700,7 @@ shared_ptr<LeafraCore> LeafraCore::create() {
 
 
 
-// Chunk retrieval functions
-
+// Simple Semantic search 
 ResultCode LeafraCore::semantic_search(const std::string& query, int max_results, std::vector<FaissIndex::SearchResult>& results) {
     if (!pImpl->initialized_) {
         LEAFRA_ERROR() << "LeafraCore not initialized";
@@ -1860,6 +1857,8 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
         LEAFRA_WARNING() << "SQLite support not compiled, returning FAISS IDs only";
 #endif
         
+
+
         LEAFRA_INFO() << "Semantic search completed with " << results.size() << " results";
         return ResultCode::SUCCESS;
 #endif
@@ -1870,8 +1869,128 @@ ResultCode LeafraCore::semantic_search(const std::string& query, int max_results
     }
 } //semantic_search
 
-//LLM inference functions
+//Semantic Search with LLM 
+//This is a simple semantic search that uses the LLM to generate a response to the query - and it streams the results to the user via a callback.
+//first it uses the semantic_search to get the most relevant n chunks (max_results)
+//then it uses the generate_chat_response_stream to generate a response to the query using the chunks as context
+//the response is streamed to the user via the callback
+//the callback is a function that takes a string and a bool (is_final)
+//the string is the token that is generated by the LLM
+//the bool is true if the token is the last token in the response
+//the callback is used to stream the response to the user
+//internally it uses the semantic_search and generate_chat_response_stream(const std::vector<ChatMessage>& messages, TokenCallback callback, int32_t max_tokens) {
+ResultCode LeafraCore::semantic_search_with_llm(const std::string& query, int max_results, std::vector<FaissIndex::SearchResult>& results, token_callback_t callback) {
+    if (!pImpl->initialized_) {
+        LEAFRA_ERROR() << "LeafraCore not initialized";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+    
+    if (query.empty() || max_results <= 0) {
+        LEAFRA_ERROR() << "Invalid query or max_results";
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
+    
+    if (!callback) {
+        LEAFRA_ERROR() << "Invalid callback function";
+        return ResultCode::ERROR_INVALID_PARAMETER;
+    }
 
+#ifdef LEAFRA_HAS_LLAMACPP
+    if (!pImpl->llamacpp_initialized_ || !pImpl->llamacpp_model_) {
+        LEAFRA_ERROR() << "LlamaCpp not initialized or model not loaded";
+        return ResultCode::ERROR_INITIALIZATION_FAILED;
+    }
+#else
+    LEAFRA_ERROR() << "LlamaCpp support not compiled";
+    return ResultCode::ERROR_NOT_IMPLEMENTED;
+#endif
+
+    try {
+        // Step 1: Perform semantic search to get the most relevant chunks
+        LEAFRA_DEBUG() << "Performing semantic search for query: " << query.substr(0, 100) << (query.length() > 100 ? "..." : "");
+        
+        ResultCode search_result = semantic_search(query, max_results, results);
+        if (search_result != ResultCode::SUCCESS) {
+            LEAFRA_ERROR() << "Semantic search failed";
+            return search_result;
+        }
+        
+        if (results.empty()) {
+            LEAFRA_WARNING() << "No search results found for query";
+            // Still proceed with LLM generation but without context
+        }
+        
+        LEAFRA_INFO() << "Found " << results.size() << " relevant chunks for LLM context";
+        
+        // Step 2: Build context from search results
+        std::ostringstream context_stream;
+        context_stream << "Based on the following relevant information:\n\n";
+        
+        for (size_t i = 0; i < results.size(); ++i) {
+            const auto& result = results[i];
+            context_stream << "Context " << (i + 1) << " (from " << result.filename 
+                          << ", page " << result.page_number << "):\n";
+            context_stream << result.content << "\n\n";
+        }
+        
+        context_stream << "Please answer the following question: " << query;
+        
+        std::string context = context_stream.str();
+        LEAFRA_DEBUG() << "Built context for LLM (length: " << context.length() << " chars)";
+        
+        // Step 3: Create chat messages for the LLM
+        std::vector<leafra::llamacpp::ChatMessage> messages;
+        
+        // Add system prompt if configured
+        if (!pImpl->config_.llm.system_prompt.empty()) {
+            messages.emplace_back("system", pImpl->config_.llm.system_prompt);
+        }
+        
+        // Add the user query with context
+        messages.emplace_back("user", context);
+        
+        // Step 4: Generate response using LLM with streaming
+        LEAFRA_DEBUG() << "Starting LLM generation with streaming callback";
+        
+#ifdef LEAFRA_HAS_LLAMACPP
+        bool generation_success = pImpl->llamacpp_model_->generate_chat_response_stream(
+            messages, 
+            callback, 
+            pImpl->config_.llm.n_predict
+        );
+        
+        if (!generation_success) {
+            LEAFRA_ERROR() << "LLM generation failed: " << pImpl->llamacpp_model_->get_last_error();
+            return ResultCode::ERROR_PROCESSING_FAILED;
+        }
+        
+        // Log generation statistics
+        auto stats = pImpl->llamacpp_model_->get_last_stats();
+        LEAFRA_INFO() << "Semantic search with LLM completed successfully";
+        LEAFRA_INFO() << "  - Search results: " << results.size();
+        LEAFRA_INFO() << "  - Prompt tokens: " << stats.prompt_tokens;
+        LEAFRA_INFO() << "  - Generated tokens: " << stats.generated_tokens;
+        LEAFRA_INFO() << "  - Generation time: " << stats.generation_time << "ms";
+        LEAFRA_INFO() << "  - Tokens/second: " << stats.tokens_per_second;
+        
+        pImpl->send_event("Semantic search with LLM completed - Generated " + std::to_string(stats.generated_tokens) + " tokens");
+        
+        return ResultCode::SUCCESS;
+#endif
+        
+    } catch (const std::exception& e) {
+        LEAFRA_ERROR() << "Exception in semantic_search_with_llm: " << e.what();
+        return ResultCode::ERROR_PROCESSING_FAILED;
+    }
+} //semantic_search_with_llm
+
+
+
+
+
+//LLM inference functions
+//TODO AD: We need to turn this into a chat response - and use the chat template to generate the response.
+//Also naming is not great - we need to use a more descriptive name.
 ResultCode LeafraCore::llm_inference(const std::string& prompt, std::string& response) {
     if (!pImpl->initialized_) {
         LEAFRA_ERROR() << "LeafraCore not initialized";
@@ -1893,7 +2012,7 @@ ResultCode LeafraCore::llm_inference(const std::string& prompt, std::string& res
         LEAFRA_DEBUG() << "Generating response for prompt: " << prompt.substr(0, 100) << (prompt.length() > 100 ? "..." : "");
         
         // Generate response using LlamaCpp
-        response = pImpl->llamacpp_model_->generate_text(prompt, pImpl->config_.llm.max_tokens);
+        response = pImpl->llamacpp_model_->generate_text(prompt, pImpl->config_.llm.n_predict);
         if (response.empty()) {
             LEAFRA_ERROR() << "Failed to generate text: " << pImpl->llamacpp_model_->get_last_error();
             return ResultCode::ERROR_PROCESSING_FAILED;

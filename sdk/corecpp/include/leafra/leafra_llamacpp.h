@@ -8,6 +8,7 @@
 #include <memory>
 #include <functional>
 #include <cstdint>
+#include "types.h"
 
 // Forward declarations
 struct llama_model;
@@ -17,52 +18,6 @@ struct LLMConfig;
 
 namespace leafra {
 namespace llamacpp {
-
-/**
- * @brief Configuration for LlamaCpp model loading and inference
- */
-struct LlamaCppConfig {
-    // Model file path
-    std::string model_path;
-    
-    // Context and generation parameters
-    int32_t n_ctx = 4096;           // Context size (max tokens)
-    int32_t n_batch = 512;          // Batch size for prompt processing
-    int32_t n_ubatch = 512;         // Physical batch size for prompt processing
-    int32_t n_threads = -1;         // Number of threads (-1 = auto)
-    int32_t n_threads_batch = -1;   // Number of threads for batch processing (-1 = auto)
-    
-    // Generation parameters
-    int32_t n_predict = 128;        // Number of tokens to predict
-    float temperature = 0.8f;       // Sampling temperature
-    float top_p = 0.9f;            // Nucleus sampling probability
-    int32_t top_k = 40;            // Top-k sampling
-    float min_p = 0.05f;           // Minimum probability for sampling
-    float repeat_penalty = 1.1f;    // Repetition penalty
-    int32_t repeat_last_n = 64;     // Last n tokens to consider for repetition penalty
-    
-    // Model loading parameters
-    bool use_mmap = true;           // Use memory mapping for model loading
-    bool use_mlock = false;         // Use memory locking
-    bool numa = false;              // NUMA optimization
-    int32_t n_gpu_layers = -1;       // Number of layers to offload to GPU (-1 = auto --> fully offload to gpu )
-    
-    // Advanced options
-    bool verbose_prompt = false;    // Print prompt before generation
-    bool debug_mode = false;        // Enable debug output
-    
-    // Sampling parameters
-    int32_t seed = -1;              // Random seed (-1 = random)
-    float tfs_z = 1.0f;            // Tail free sampling - not enabled by default
-    float typical_p = 1.0f;        // Typical sampling - not enabled by default
-    
-    // Default constructor
-    LlamaCppConfig() = default;
-    
-    // Constructor with model path
-    explicit LlamaCppConfig(const std::string& model_path_param) 
-        : model_path(model_path_param) {}
-};
 
 /**
  * @brief Chat message structure for conversation formatting
@@ -75,13 +30,8 @@ struct ChatMessage {
     ChatMessage(const std::string& r, const std::string& c) : role(r), content(c) {}
 };
 
-/**
- * @brief Token generation callback function type
- * @param token The generated token text
- * @param is_final Whether this is the final token
- * @return true to continue generation, false to stop
- */
-using TokenCallback = std::function<bool(const std::string& token, bool is_final)>;
+// Use the centralized token callback type from types.h
+using TokenCallback = leafra::token_callback_t;
 
 /**
  * @brief Statistics about model and generation
@@ -115,7 +65,7 @@ public:
      * @param config Model configuration
      * @return true if successful, false otherwise
      */
-    bool load_model(const LlamaCppConfig& config);
+    bool load_model(const LLMConfig& config);
     
     /**
      * @brief Check if model is loaded and ready
@@ -220,13 +170,13 @@ public:
      * @brief Get model configuration
      * @return Current model configuration
      */
-    const LlamaCppConfig& get_config() const;
+    const LLMConfig& get_config() const;
     
     /**
      * @brief Update generation parameters without reloading model
      * @param config New configuration (only generation parameters will be updated)
      */
-    void update_generation_config(const LlamaCppConfig& config);
+    void update_generation_config(const LLMConfig& config);
     
     /**
      * @brief Get statistics from last generation
@@ -355,22 +305,15 @@ namespace utils {
     bool is_valid_model_file(const std::string& model_path);
     
     /**
-     * @brief Get recommended configuration for a model
-     * @param model_path Path to model file
+     * @brief Get recommended configuration for a model file
+     * @param model_path Path to the model file
      * @return Recommended configuration or default config if analysis fails
      */
-    LlamaCppConfig get_recommended_config(const std::string& model_path);
-    
-    /**
-     * @brief Convert LLMConfig to LlamaCppConfig
-     * @param llm_config General LLM configuration from SDK
-     * @return LlamaCppConfig with equivalent parameters
-     */
-    LlamaCppConfig from_llm_config(const struct LLMConfig& llm_config);
+    LLMConfig get_recommended_config(const std::string& model_path);
     
     /**
      * @brief Get list of available built-in chat templates
-     * @return Vector of template names that can be used with set_chat_template()
+     * @return Vector of template names
      */
     std::vector<std::string> get_available_chat_templates();
 }

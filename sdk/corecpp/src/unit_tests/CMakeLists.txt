@@ -15,7 +15,7 @@ add_subdirectory(filemanager)
 # You can add more test subdirectories here in the future
 # add_subdirectory(sqlite)
 # add_subdirectory(sentencepiece)
-# add_subdirectory(parsing)
+# add_subdirectory(parsing) 
 
 # LlamaCpp tests
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llamacpp")

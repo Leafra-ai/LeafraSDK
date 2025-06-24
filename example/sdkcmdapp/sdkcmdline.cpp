@@ -40,6 +40,7 @@ void print_usage(const char* program_name) {
     std::cout << "  --print_chunks_full       - Print full content of all chunks" << std::endl;
     std::cout << "  --print_chunks_brief N    - Print first N lines of each chunk" << std::endl;
     std::cout << "  --semantic_search \"query\" [max_results] - Perform semantic search (default: 5 results)" << std::endl;
+    std::cout << "  --semantic_search_llm \"query\" [max_results] - Perform semantic search with LLM response generation (default: 5 results)" << std::endl;
     std::cout << "\nSupported file types:" << std::endl;
     std::cout << "  • Text files (.txt)" << std::endl;
     std::cout << "  • PDF files (.pdf)" << std::endl;
@@ -166,6 +167,7 @@ int main(int argc, char* argv[]) {
     bool print_chunks_brief = false;
     int max_lines = 0;
     bool semantic_search_mode = false;
+    bool semantic_search_llm_mode = false;
     std::string search_query;
     int max_results = 5;
     
@@ -228,6 +230,25 @@ int main(int argc, char* argv[]) {
                 }
             } else {
                 std::cerr << "❌ Error: --semantic_search requires a query string argument" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--semantic_search_llm") {
+            if (i + 1 < argc) {
+                semantic_search_mode = true;
+                search_query = argv[++i];
+                
+                // Check if the next argument is a number (max_results)
+                if (i + 1 < argc) {
+                    std::string next_arg = argv[i + 1];
+                    if (next_arg.find_first_not_of("0123456789") == std::string::npos) {
+                        max_results = std::stoi(argv[++i]);
+                    }
+                }
+                
+                // Set a flag to indicate we want LLM response generation
+                semantic_search_llm_mode = true;
+            } else {
+                std::cerr << "❌ Error: --semantic_search_llm requires a query string" << std::endl;
                 return 1;
             }
         } else {
@@ -326,13 +347,10 @@ int main(int argc, char* argv[]) {
         config.vector_search.dimension = 384;
 
         config.llm.enabled = true;
-        config.llm.framework = "llamacpp";
-        config.llm.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/llm/llama-3.1-8b-instruct-q4_0.gguf";
+        config.llm.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/llm/unsloth/Llama-3.2-3B-Instruct-Q4_K_M.gguf";
+        config.llm.n_ctx = 4096; //max tokens to use for context
+        config.llm.n_predict = 512; //max tokens to generate
         config.llm.temperature = 0.7f;
-        config.llm.top_p = 0.9f;
-        config.llm.top_k = 40;
-        config.llm.max_tokens = 1024;
-        config.llm.context_size = 4096;
 
         print_separator("SDK Configuration");
         std::cout << "Application: " << config.name << std::endl;
@@ -373,14 +391,40 @@ int main(int argc, char* argv[]) {
         
         // Handle semantic search mode
         if (semantic_search_mode) {
-            print_separator("Semantic Search");
-            std::cout << "🔍 Performing semantic search..." << std::endl;
+            if (semantic_search_llm_mode) {
+                print_separator("Semantic Search with LLM");
+                std::cout << "🔍🤖 Performing semantic search with LLM response generation..." << std::endl;
+            } else {
+                print_separator("Semantic Search");
+                std::cout << "🔍 Performing semantic search..." << std::endl;
+            }
             std::cout << "Query: \"" << search_query << "\"" << std::endl;
             std::cout << "Max Results: " << max_results << std::endl;
             
 #ifdef LEAFRA_HAS_FAISS
             std::vector<FaissIndex::SearchResult> search_results;
-            ResultCode search_result = sdk->semantic_search(search_query, max_results, search_results);
+            ResultCode search_result;
+            
+            if (semantic_search_llm_mode) {
+#ifdef LEAFRA_HAS_LLAMACPP
+                // Token callback to capture and display streaming response
+                std::string llm_response;
+                auto token_callback = [&llm_response](const std::string& token, bool is_final) -> bool {
+                    std::cout << token << std::flush;
+                    llm_response += token;
+                    return true; // Continue generation
+                };
+                
+                std::cout << "\n🤖 LLM Response:\n" << std::endl;
+                search_result = sdk->semantic_search_with_llm(search_query, max_results, search_results, token_callback);
+                std::cout << "\n" << std::endl;
+#else
+                std::cout << "❌ LlamaCpp support not compiled - semantic search with LLM unavailable" << std::endl;
+                search_result = ResultCode::ERROR_NOT_IMPLEMENTED;
+#endif
+            } else {
+                search_result = sdk->semantic_search(search_query, max_results, search_results);
+            }
             
             if (search_result == ResultCode::SUCCESS) {
                 std::cout << "\n✅ Semantic search completed successfully!" << std::endl;
