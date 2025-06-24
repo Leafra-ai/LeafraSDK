@@ -45,7 +45,7 @@ struct LlamaCppConfig {
     bool use_mmap = true;           // Use memory mapping for model loading
     bool use_mlock = false;         // Use memory locking
     bool numa = false;              // NUMA optimization
-    int32_t n_gpu_layers = 0;       // Number of layers to offload to GPU
+    int32_t n_gpu_layers = -1;       // Number of layers to offload to GPU (-1 = auto --> fully offload to gpu )
     
     // Advanced options
     bool verbose_prompt = false;    // Print prompt before generation
@@ -53,8 +53,8 @@ struct LlamaCppConfig {
     
     // Sampling parameters
     int32_t seed = -1;              // Random seed (-1 = random)
-    float tfs_z = 1.0f;            // Tail free sampling
-    float typical_p = 1.0f;        // Typical sampling
+    float tfs_z = 1.0f;            // Tail free sampling - not enabled by default
+    float typical_p = 1.0f;        // Typical sampling - not enabled by default
     
     // Default constructor
     LlamaCppConfig() = default;
@@ -62,6 +62,17 @@ struct LlamaCppConfig {
     // Constructor with model path
     explicit LlamaCppConfig(const std::string& model_path_param) 
         : model_path(model_path_param) {}
+};
+
+/**
+ * @brief Chat message structure for conversation formatting
+ */
+struct ChatMessage {
+    std::string role;       // "system", "user", "assistant", etc.
+    std::string content;    // Message content
+    
+    ChatMessage() = default;
+    ChatMessage(const std::string& r, const std::string& c) : role(r), content(c) {}
 };
 
 /**
@@ -248,6 +259,48 @@ public:
      */
     bool set_system_prompt(const std::string& system_prompt);
 
+    /**
+     * @brief Generate response for a chat conversation
+     * @param messages Vector of chat messages (conversation history)
+     * @param max_tokens Maximum number of tokens to generate
+     * @return Generated response or empty string on error
+     */
+    std::string generate_chat_response(const std::vector<ChatMessage>& messages, int32_t max_tokens = 0);
+    
+    /**
+     * @brief Generate response for a chat conversation with streaming
+     * @param messages Vector of chat messages (conversation history)
+     * @param callback Function called for each generated token
+     * @param max_tokens Maximum number of tokens to generate
+     * @return true if generation completed successfully
+     */
+    bool generate_chat_response_stream(
+        const std::vector<ChatMessage>& messages,
+        TokenCallback callback,
+        int32_t max_tokens = 0
+    );
+    
+    /**
+     * @brief Format chat messages using the model's built-in chat template
+     * @param messages Vector of chat messages
+     * @param add_generation_prompt Whether to add assistant prefix for generation
+     * @return Formatted prompt string
+     */
+    std::string format_chat_prompt(const std::vector<ChatMessage>& messages, bool add_generation_prompt = true);
+    
+    /**
+     * @brief Set custom chat template for this model
+     * @param template_name Name of the template (e.g., "chatml", "llama2", "llama3")
+     * @return true if successful
+     */
+    bool set_chat_template(const std::string& template_name);
+    
+    /**
+     * @brief Get the model's default chat template name
+     * @return Chat template name or empty string if not available
+     */
+    std::string get_chat_template() const;
+
 private:
     class Impl;
     std::unique_ptr<Impl> pImpl;
@@ -309,22 +362,17 @@ namespace utils {
     LlamaCppConfig get_recommended_config(const std::string& model_path);
     
     /**
-     * @brief Format text with proper chat template (if applicable)
-     * @param messages Vector of alternating user/assistant messages
-     * @param system_prompt Optional system prompt
-     * @return Formatted text ready for generation
-     */
-    std::string format_chat(
-        const std::vector<std::string>& messages,
-        const std::string& system_prompt = ""
-    );
-    
-    /**
      * @brief Convert LLMConfig to LlamaCppConfig
      * @param llm_config General LLM configuration from SDK
      * @return LlamaCppConfig with equivalent parameters
      */
     LlamaCppConfig from_llm_config(const struct LLMConfig& llm_config);
+    
+    /**
+     * @brief Get list of available built-in chat templates
+     * @return Vector of template names that can be used with set_chat_template()
+     */
+    std::vector<std::string> get_available_chat_templates();
 }
 
 } // namespace llamacpp

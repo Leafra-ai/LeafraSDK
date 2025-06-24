@@ -16,6 +16,7 @@
 #include <fstream>
 #include <random>
 #include <cstring>
+#include <ctime>
 
 namespace leafra {
 namespace llamacpp {
@@ -29,7 +30,7 @@ static std::mt19937 g_rng;
 // LlamaCppModel::Impl definition
 class LlamaCppModel::Impl {
 public:
-    Impl() = default;
+    Impl() : context_(nullptr), model_(nullptr), vocab_(nullptr), sampler_(nullptr), context_used_(0) {}
     ~Impl() {
         cleanup();
     }
@@ -96,6 +97,50 @@ public:
         context_size_ = llama_n_ctx(context_);
         context_used_ = 0;
         
+        // Initialize sampling chain
+        auto sparams = llama_sampler_chain_default_params();
+        sampler_ = llama_sampler_chain_init(sparams);
+        
+        // Add sampling components based on configuration
+        if (config.temperature <= 0.0f) {
+            // Greedy sampling
+            llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
+        } else {
+            // Temperature-based sampling chain
+            if (config.top_k > 0) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_top_k(config.top_k));
+            }
+            if (config.top_p < 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_top_p(config.top_p, 1));
+            }
+            if (config.min_p > 0.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_min_p(config.min_p, 1));
+            }
+            if (config.tfs_z < 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_top_n_sigma(config.tfs_z));
+            }
+            if (config.typical_p < 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_typical(config.typical_p, 1));
+            }
+            
+            // Add temperature
+            llama_sampler_chain_add(sampler_, llama_sampler_init_temp(config.temperature));
+            
+            // Add repetition penalty
+            if (config.repeat_penalty != 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_penalties(
+                    config.repeat_last_n,  // penalty_last_n
+                    config.repeat_penalty, // penalty_repeat
+                    0.0f,                  // penalty_freq
+                    0.0f                   // penalty_present
+                ));
+            }
+            
+            // Final sampling step
+            uint32_t seed = config.seed >= 0 ? static_cast<uint32_t>(config.seed) : static_cast<uint32_t>(std::time(nullptr));
+            llama_sampler_chain_add(sampler_, llama_sampler_init_dist(seed));
+        }
+        
         // Set up RNG
         this->seed_rng(config.seed);
         
@@ -110,6 +155,10 @@ public:
     }
     
     void cleanup() {
+        if (sampler_) {
+            llama_sampler_free(sampler_);
+            sampler_ = nullptr;
+        }
         if (context_) {
             llama_free(context_);
             context_ = nullptr;
@@ -214,13 +263,11 @@ public:
         auto generation_start = std::chrono::high_resolution_clock::now();
         
         for (int32_t i = 0; i < max_tokens; ++i) {
-            // Sample next token
-            llama_token next_token;
-            if (config_.temperature <= 0.0f) {
-                next_token = this->sample_token_greedy(context_);
-            } else {
-                next_token = this->sample_token_with_temperature(context_, config_.temperature, config_.top_p, config_.top_k);
-            }
+            // Sample next token using modern sampling API
+            llama_token next_token = llama_sampler_sample(sampler_, context_, -1);
+            
+            // Accept the token (updates internal state of samplers)
+            llama_sampler_accept(sampler_, next_token);
             
             // Check for EOS token
             if (llama_vocab_is_eog(vocab_, next_token)) {
@@ -235,6 +282,9 @@ public:
             // Get token text and call callback
             std::string token_text = get_token_text(next_token);
             if (callback && !callback(token_text, false)) {
+                if (callback) {
+                    callback("", true); // Signal end of generation (user stopped)
+                }
                 break; // User requested stop
             }
             
@@ -248,6 +298,11 @@ public:
             }
             
             context_used_++;
+        }
+        
+        // Call final callback if we completed the loop without EOS or user stop
+        if (callback) {
+            callback("", true); // Signal end of generation (max tokens reached)
         }
         
         llama_batch_free(batch);
@@ -380,26 +435,14 @@ public:
         std::string result;
         result.reserve(tokens.size() * 4); // Rough estimate
         
-        // Convert to llama_token vector
-        std::vector<llama_token> llama_tokens(tokens.begin(), tokens.end());
-        
-        // Calculate required buffer size
-        int32_t buf_size = 0;
-        for (llama_token token : llama_tokens) {
-            buf_size += llama_token_to_piece(vocab_, token, nullptr, 0, 0, false);
-        }
-        
-        if (buf_size <= 0) {
-            return "";
-        }
-        
-        // Allocate buffer and detokenize
-        std::vector<char> buffer(buf_size + 1);
-        int32_t total_len = llama_detokenize(vocab_, llama_tokens.data(), static_cast<int32_t>(llama_tokens.size()),
-                                           buffer.data(), buf_size, false, false);
-        
-        if (total_len > 0) {
-            result.assign(buffer.data(), total_len);
+        // Use the same approach as get_token_text but for multiple tokens
+        // This is more reliable than llama_detokenize
+        for (int32_t token : tokens) {
+            char buffer[256];
+            int32_t len = llama_token_to_piece(vocab_, token, buffer, sizeof(buffer), 0, false);
+            if (len > 0 && len < static_cast<int32_t>(sizeof(buffer))) {
+                result.append(buffer, len);
+            }
         }
         
         return result;
@@ -585,6 +628,53 @@ public:
         
         // Re-seed RNG if seed changed
         this->seed_rng(config.seed);
+        
+        // Recreate sampler with new parameters
+        if (sampler_) {
+            llama_sampler_free(sampler_);
+            sampler_ = nullptr;
+        }
+        
+        auto sparams = llama_sampler_chain_default_params();
+        sampler_ = llama_sampler_chain_init(sparams);
+        
+        // Add sampling components based on new configuration
+        if (config_.temperature <= 0.0f) {
+            llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
+        } else {
+            if (config_.top_k > 0) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_top_k(config_.top_k));
+            }
+            if (config_.top_p < 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_top_p(config_.top_p, 1));
+            }
+            if (config_.min_p > 0.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_min_p(config_.min_p, 1));
+            }
+            if (config_.tfs_z < 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_top_n_sigma(config_.tfs_z));
+            }
+            if (config_.typical_p < 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_typical(config_.typical_p, 1));
+            }
+            
+            llama_sampler_chain_add(sampler_, llama_sampler_init_temp(config_.temperature));
+            
+            if (config_.repeat_penalty != 1.0f) {
+                llama_sampler_chain_add(sampler_, llama_sampler_init_penalties(
+                    config_.repeat_last_n,
+                    config_.repeat_penalty,
+                    0.0f, 0.0f
+                ));
+            }
+            
+            uint32_t seed = config_.seed >= 0 ? static_cast<uint32_t>(config_.seed) : static_cast<uint32_t>(std::time(nullptr));
+            llama_sampler_chain_add(sampler_, llama_sampler_init_dist(seed));
+        }
+        
+        if (config_.debug_mode) {
+            LEAFRA_DEBUG() << "Updated generation config and recreated sampler";
+        }
     }
     
     GenerationStats get_last_stats() const {
@@ -662,12 +752,133 @@ public:
         return true;
     }
     
+    std::string generate_chat_response(const std::vector<ChatMessage>& messages, int32_t max_tokens) {
+        std::string formatted_prompt = format_chat_prompt(messages, true);
+        if (formatted_prompt.empty()) {
+            last_error_ = "Failed to format chat prompt";
+            return "";
+        }
+        
+        return generate_text(formatted_prompt, max_tokens);
+    }
+    
+    bool generate_chat_response_stream(const std::vector<ChatMessage>& messages, TokenCallback callback, int32_t max_tokens) {
+        std::string formatted_prompt = format_chat_prompt(messages, true);
+        if (formatted_prompt.empty()) {
+            last_error_ = "Failed to format chat prompt";
+            return false;
+        }
+        
+        return generate_text_stream(formatted_prompt, callback, max_tokens);
+    }
+    
+    std::string format_chat_prompt(const std::vector<ChatMessage>& messages, bool add_generation_prompt) {
+        if (!is_loaded()) {
+            last_error_ = "Model not loaded";
+            return "";
+        }
+        
+        // Convert ChatMessage to llama_chat_message
+        std::vector<llama_chat_message> llama_messages;
+        std::vector<std::string> role_storage, content_storage;
+        
+        // Store strings to keep them alive
+        role_storage.reserve(messages.size());
+        content_storage.reserve(messages.size());
+        llama_messages.reserve(messages.size());
+        
+        for (const auto& msg : messages) {
+            role_storage.push_back(msg.role);
+            content_storage.push_back(msg.content);
+            llama_messages.push_back({
+                role_storage.back().c_str(),
+                content_storage.back().c_str()
+            });
+        }
+        
+        // Use custom template if set, otherwise use model's default (nullptr)
+        const char* template_name = chat_template_name_.empty() ? nullptr : chat_template_name_.c_str();
+        
+        // First pass to get required buffer size
+        int32_t required_size = llama_chat_apply_template(
+            template_name,
+            llama_messages.data(),
+            llama_messages.size(),
+            add_generation_prompt,
+            nullptr,
+            0
+        );
+        
+        if (required_size < 0) {
+            last_error_ = "Chat template not supported or invalid";
+            return "";
+        }
+        
+        // Allocate buffer and format
+        std::vector<char> buffer(required_size + 1);
+        int32_t actual_size = llama_chat_apply_template(
+            template_name,
+            llama_messages.data(),
+            llama_messages.size(),
+            add_generation_prompt,
+            buffer.data(),
+            buffer.size()
+        );
+        
+        if (actual_size < 0 || actual_size >= static_cast<int32_t>(buffer.size())) {
+            last_error_ = "Failed to format chat template";
+            return "";
+        }
+        
+        return std::string(buffer.data(), actual_size);
+    }
+    
+    bool set_chat_template(const std::string& template_name) {
+        // Validate template by trying to format an empty conversation
+        std::vector<llama_chat_message> test_messages = {
+            {"user", "test"}
+        };
+        
+        int32_t test_size = llama_chat_apply_template(
+            template_name.c_str(),
+            test_messages.data(),
+            test_messages.size(),
+            true,
+            nullptr,
+            0
+        );
+        
+        if (test_size < 0) {
+            last_error_ = "Invalid or unsupported chat template: " + template_name;
+            return false;
+        }
+        
+        chat_template_name_ = template_name;
+        return true;
+    }
+    
+    std::string get_chat_template() const {
+        if (!chat_template_name_.empty()) {
+            return chat_template_name_;
+        }
+        
+        // Try to get model's default template
+        if (is_loaded()) {
+            const char* model_template = llama_model_chat_template(model_, nullptr);
+            if (model_template) {
+                return std::string(model_template);
+            }
+        }
+        
+        return "";
+    }
+    
 private:
     // Helper methods
     std::string get_current_timestamp() {
-        auto now = std::chrono::high_resolution_clock::now();
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
-        return std::to_string(ms.count());
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        return std::ctime(&time_t);
     }
     
     void seed_rng(int32_t seed) {
@@ -693,126 +904,21 @@ private:
         batch.n_tokens++;
     }
     
-    llama_token sample_token_greedy(llama_context* ctx) {
-        const float* logits = llama_get_logits_ith(ctx, -1);
-        if (!logits) return 0;
-        
-        const struct llama_vocab* vocab = llama_model_get_vocab(llama_get_model(ctx));
-        const int32_t n_vocab = llama_vocab_n_tokens(vocab);
-        
-        llama_token result = 0;
-        float max_logit = logits[0];
-        
-        for (int32_t i = 1; i < n_vocab; i++) {
-            if (logits[i] > max_logit) {
-                max_logit = logits[i];
-                result = i;
-            }
-        }
-        
-        return result;
-    }
-    
-    llama_token sample_token_with_temperature(llama_context* ctx, float temperature, float top_p, int32_t top_k) {
-        const float* logits = llama_get_logits_ith(ctx, -1);
-        if (!logits) return 0;
-        
-        const struct llama_vocab* vocab = llama_model_get_vocab(llama_get_model(ctx));
-        const int32_t n_vocab = llama_vocab_n_tokens(vocab);
-        
-        std::vector<llama_token_data> candidates;
-        candidates.reserve(n_vocab);
-        
-        for (int32_t i = 0; i < n_vocab; i++) {
-            candidates.push_back({i, logits[i], 0.0f});
-        }
-        
-        llama_token_data_array candidates_p = { candidates.data(), candidates.size(), -1, false };
-        
-        // Apply temperature
-        if (temperature <= 0.0f) {
-            // Greedy sampling
-            auto max_iter = std::max_element(candidates.begin(), candidates.end(),
-                [](const llama_token_data& a, const llama_token_data& b) {
-                    return a.logit < b.logit;
-                });
-            return max_iter->id;
-        }
-        
-        // Apply temperature scaling
-        for (auto& candidate : candidates) {
-            candidate.logit /= temperature;
-        }
-        
-        // Apply top-k filtering
-        if (top_k > 0 && top_k < n_vocab) {
-            std::partial_sort(candidates.begin(), candidates.begin() + top_k, candidates.end(),
-                [](const llama_token_data& a, const llama_token_data& b) {
-                    return a.logit > b.logit;
-                });
-            candidates.resize(top_k);
-            candidates_p.size = top_k;
-        }
-        
-        // Apply top-p filtering (nucleus sampling)
-        if (top_p < 1.0f) {
-            std::sort(candidates.begin(), candidates.end(),
-                [](const llama_token_data& a, const llama_token_data& b) {
-                    return a.logit > b.logit;
-                });
-            
-            // Convert logits to probabilities using softmax
-            float max_logit = candidates[0].logit;
-            float sum_exp = 0.0f;
-            for (auto& candidate : candidates) {
-                candidate.p = std::exp(candidate.logit - max_logit);
-                sum_exp += candidate.p;
-            }
-            for (auto& candidate : candidates) {
-                candidate.p /= sum_exp;
-            }
-            
-            // Apply nucleus sampling
-            float cumulative_prob = 0.0f;
-            size_t nucleus_size = 0;
-            for (size_t i = 0; i < candidates.size(); i++) {
-                cumulative_prob += candidates[i].p;
-                nucleus_size++;
-                if (cumulative_prob >= top_p) {
-                    break;
-                }
-            }
-            candidates.resize(nucleus_size);
-            candidates_p.size = nucleus_size;
-        }
-        
-        // Sample from the filtered candidates
-        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-        float r = dist(g_rng);
-        
-        float cumulative_prob = 0.0f;
-        for (const auto& candidate : candidates) {
-            cumulative_prob += candidate.p;
-            if (r <= cumulative_prob) {
-                return candidate.id;
-            }
-        }
-        
-        // Fallback: return the first candidate
-        return candidates.empty() ? 0 : candidates[0].id;
-    }
+
 
     // Member variables
-    llama_model* model_ = nullptr;
-    llama_context* context_ = nullptr;
-    const llama_vocab* vocab_ = nullptr;
+    llama_context* context_;
+    llama_model* model_;
+    const llama_vocab* vocab_;
+    llama_sampler* sampler_;  // Modern sampling chain
     LlamaCppConfig config_;
     int32_t vocab_size_ = 0;
     int32_t context_size_ = 0;
-    int32_t context_used_ = 0;
+    int32_t context_used_;
     std::string system_prompt_;
     GenerationStats last_stats_;
     mutable std::string last_error_;
+    std::string chat_template_name_;  // Custom template name if set
 };
 
 // LlamaCppModel implementation
@@ -912,6 +1018,26 @@ bool LlamaCppModel::set_system_prompt(const std::string& system_prompt) {
     return pImpl->set_system_prompt(system_prompt);
 }
 
+std::string LlamaCppModel::generate_chat_response(const std::vector<ChatMessage>& messages, int32_t max_tokens) {
+    return pImpl->generate_chat_response(messages, max_tokens);
+}
+
+bool LlamaCppModel::generate_chat_response_stream(const std::vector<ChatMessage>& messages, TokenCallback callback, int32_t max_tokens) {
+    return pImpl->generate_chat_response_stream(messages, callback, max_tokens);
+}
+
+std::string LlamaCppModel::format_chat_prompt(const std::vector<ChatMessage>& messages, bool add_generation_prompt) {
+    return pImpl->format_chat_prompt(messages, add_generation_prompt);
+}
+
+bool LlamaCppModel::set_chat_template(const std::string& template_name) {
+    return pImpl->set_chat_template(template_name);
+}
+
+std::string LlamaCppModel::get_chat_template() const {
+    return pImpl->get_chat_template();
+}
+
 // Global functions
 namespace global {
 
@@ -1002,30 +1128,7 @@ LlamaCppConfig get_recommended_config(const std::string& model_path) {
     return config;
 }
 
-std::string format_chat(const std::vector<std::string>& messages, const std::string& system_prompt) {
-    std::ostringstream formatted;
-    
-    // Add system prompt if provided
-    if (!system_prompt.empty()) {
-        formatted << system_prompt << "\n\n";
-    }
-    
-    // Format alternating user/assistant messages
-    for (size_t i = 0; i < messages.size(); ++i) {
-        if (i % 2 == 0) {
-            formatted << "User: " << messages[i] << "\n";
-        } else {
-            formatted << "Assistant: " << messages[i] << "\n";
-        }
-    }
-    
-    // If last message was from user, add assistant prompt
-    if (messages.size() % 2 == 1) {
-        formatted << "Assistant: ";
-    }
-    
-    return formatted.str();
-}
+
 
 LlamaCppConfig from_llm_config(const LLMConfig& llm_config) {
     LlamaCppConfig config(llm_config.model_path);
@@ -1054,6 +1157,25 @@ LlamaCppConfig from_llm_config(const LLMConfig& llm_config) {
     config.debug_mode = llm_config.debug_mode;
     
     return config;
+}
+
+std::vector<std::string> get_available_chat_templates() {
+    std::vector<std::string> templates;
+    
+    // Get the number of built-in templates
+    const char* template_names[64]; // Should be enough for all built-in templates
+    int32_t count = llama_chat_builtin_templates(template_names, 64);
+    
+    if (count > 0) {
+        templates.reserve(count);
+        for (int32_t i = 0; i < count; ++i) {
+            if (template_names[i]) {
+                templates.emplace_back(template_names[i]);
+            }
+        }
+    }
+    
+    return templates;
 }
 
 } // namespace utils
