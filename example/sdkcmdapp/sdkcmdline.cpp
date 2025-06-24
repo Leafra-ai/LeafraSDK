@@ -349,8 +349,7 @@ int main(int argc, char* argv[]) {
         config.llm.enabled = true;
         config.llm.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/llm/unsloth/Llama-3.2-3B-Instruct-Q4_K_M.gguf";
         config.llm.n_ctx = 4096; //max tokens to use for context
-        config.llm.n_predict = 512; //max tokens to generate
-        config.llm.temperature = 0.7f;
+        config.llm.n_predict = 256; //max tokens to generate
 
         print_separator("SDK Configuration");
         std::cout << "Application: " << config.name << std::endl;

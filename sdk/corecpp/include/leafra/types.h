@@ -249,7 +249,7 @@ struct LEAFRA_API LLMConfig {
     float typical_p = 1.0f;                // Typical sampling (1.0 = disabled)
     
     // Performance and hardware parameters
-    int32_t n_gpu_layers = -1;             // Number of layers to offload to GPU (-1 = auto, 0 = CPU only)
+    int32_t n_gpu_layers = 32;             // TODO AD: How to set this automatically? Number of layers to offload to GPU (-1 = auto, 0 = CPU only)
     bool use_mmap = true;                  // Use memory mapping for model loading (faster startup)
     bool use_mlock = false;                // Lock model in RAM (prevents swapping)
     bool numa = false;                     // Enable NUMA optimization

@@ -36,7 +36,10 @@ add_executable(sdkcmdline sdkcmdline.cpp)
 target_link_libraries(sdkcmdline PRIVATE LeafraCore)
 
 # Ensure we have the same compile definitions as LeafraCore
-target_compile_definitions(sdkcmdline PRIVATE LEAFRA_HAS_FAISS=1)
+target_compile_definitions(sdkcmdline PRIVATE 
+    LEAFRA_HAS_FAISS=1
+    LEAFRA_HAS_LLAMACPP=1
+)
 
 # Include directories - point to the SDK headers
 if(LEAFRA_REPO_ROOT)

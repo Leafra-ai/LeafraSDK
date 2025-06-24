@@ -1966,7 +1966,7 @@ ResultCode LeafraCore::semantic_search_with_llm(const std::string& query, int ma
         
         // Log generation statistics
         auto stats = pImpl->llamacpp_model_->get_last_stats();
-        LEAFRA_INFO() << "Semantic search with LLM completed successfully";
+        LEAFRA_INFO() << "\n Semantic search with LLM completed successfully";
         LEAFRA_INFO() << "  - Search results: " << results.size();
         LEAFRA_INFO() << "  - Prompt tokens: " << stats.prompt_tokens;
         LEAFRA_INFO() << "  - Generated tokens: " << stats.generated_tokens;

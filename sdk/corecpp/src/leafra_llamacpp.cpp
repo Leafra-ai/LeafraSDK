@@ -62,7 +62,7 @@ public:
         model_params.use_mlock = config.use_mlock;
         
         // Load model
-        model_ = llama_load_model_from_file(config.model_path.c_str(), model_params);
+        model_ = llama_model_load_from_file(config.model_path.c_str(), model_params);
         if (!model_) {
             last_error_ = "Failed to load model from: " + config.model_path;
             LEAFRA_ERROR() << last_error_;
@@ -76,7 +76,7 @@ public:
         ctx_params.n_ubatch = config.n_ubatch;
         ctx_params.n_threads = config.n_threads > 0 ? config.n_threads : static_cast<int32_t>(std::thread::hardware_concurrency());
         ctx_params.n_threads_batch = config.n_threads_batch > 0 ? config.n_threads_batch : ctx_params.n_threads;
-        ctx_params.embeddings = true; // Enable embeddings support
+        ctx_params.embeddings = false; // TODO AD: disabling for now - what's the perf impact? Enable embeddings support
         
         // Create context
         context_ = llama_init_from_model(model_, ctx_params);
