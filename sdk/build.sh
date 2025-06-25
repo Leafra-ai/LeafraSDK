@@ -165,11 +165,13 @@ build_ios() {
         local arch="x86_64;arm64"
         local build_dir="${BUILD_DIR}/ios-simulator"
         local platform="ios-simulator"
+        local install_dir="ios-simulator"
     else
         local sdk="iphoneos"
         local arch="arm64"
         local build_dir="${BUILD_DIR}/ios"
         local platform="ios"
+        local install_dir="ios"
     fi
     
     # Check and build dependencies
@@ -183,8 +185,8 @@ build_ios() {
         -DCMAKE_OSX_SYSROOT="$sdk" \
         -DCMAKE_OSX_ARCHITECTURES="$arch" \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
-        -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/ios" \
-        -DLEAFRA_BUILD_RN_BINDINGS=OFF \
+        -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/$install_dir" \
+        -DLEAFRA_BUILD_RN_BINDINGS=ON \
         ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     

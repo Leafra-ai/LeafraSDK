@@ -31,8 +31,22 @@ if(APPLE)
     set(LEAFRA_PLATFORM "apple")
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set(LEAFRA_PLATFORM_IOS ON)
+        
+        # Configure RPATH for iOS frameworks
+        set(CMAKE_MACOSX_RPATH ON)
+        set(CMAKE_SKIP_BUILD_RPATH FALSE)
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+        set(CMAKE_INSTALL_RPATH "@executable_path/Frameworks;@loader_path/Frameworks")
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
     else()
         set(LEAFRA_PLATFORM_MACOS ON)
+        
+        # Configure RPATH for macOS frameworks
+        set(CMAKE_MACOSX_RPATH ON)
+        set(CMAKE_SKIP_BUILD_RPATH FALSE)
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+        set(CMAKE_INSTALL_RPATH "@executable_path/../Frameworks;@loader_path/../Frameworks")
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
     endif()
 elseif(ANDROID)
     set(LEAFRA_PLATFORM "android")
@@ -974,6 +988,19 @@ if(EXISTS "${LLAMACPP_LIBRARY}" AND EXISTS "${LLAMACPP_INCLUDE_DIR}")
             )
         endif()
         
+        # Set RPATH for framework location on Apple platforms
+        if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+            # iOS - frameworks are typically in the app bundle's Frameworks directory
+            set_target_properties(LlamaCpp::LlamaCpp PROPERTIES
+                INTERFACE_LINK_OPTIONS "-Wl,-rpath,@executable_path/Frameworks;-Wl,-rpath,@loader_path/Frameworks"
+            )
+        else()
+            # macOS - frameworks can be in various locations
+            set_target_properties(LlamaCpp::LlamaCpp PROPERTIES
+                INTERFACE_LINK_OPTIONS "-Wl,-rpath,@executable_path/../Frameworks;-Wl,-rpath,@loader_path/../Frameworks"
+            )
+        endif()
+        
     elseif(WIN32 AND EXISTS "${LLAMACPP_IMPORT_LIB}")
         # For Windows, use the import library
         add_library(LlamaCpp::LlamaCpp SHARED IMPORTED)
@@ -994,6 +1021,17 @@ if(EXISTS "${LLAMACPP_LIBRARY}" AND EXISTS "${LLAMACPP_INCLUDE_DIR}")
     
     set(LLAMACPP_FOUND TRUE)
     message(STATUS "✅ LlamaCpp integration enabled")
+    
+    # Install LlamaCpp framework for Apple platforms
+    if(APPLE AND EXISTS "${LLAMACPP_FRAMEWORK_PATH}")
+        # Install the entire framework directory
+        install(DIRECTORY "${LLAMACPP_FRAMEWORK_PATH}"
+            DESTINATION Frameworks
+            USE_SOURCE_PERMISSIONS
+        )
+        message(STATUS "✅ LlamaCpp framework will be installed to Frameworks/")
+    endif()
+    
 else()
     if(NOT EXISTS "${LLAMACPP_LIBRARY}")
         message(STATUS "❌ LlamaCpp library not found at: ${LLAMACPP_LIBRARY}")
