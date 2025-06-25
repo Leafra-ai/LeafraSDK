@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <functional>
 #include "../../../include/leafra/leafra_chunker.h"
-#include "../../../src/leafra/leafra_unicode.h"
+#include "../../../include/leafra/leafra_unicode.h"
 #include "../../../include/leafra/leafra_debug.h"
 
 using namespace leafra;

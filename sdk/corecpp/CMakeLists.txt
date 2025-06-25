@@ -61,7 +61,8 @@ set(LEAFRA_CORE_HEADERS
     include/leafra/leafra_chunker.h
     include/leafra/leafra_debug.h
     include/leafra/leafra_filemanager.h
-)
+    include/leafra/leafra_unicode.h
+    )
 
 # Add CoreML header on Apple platforms
 if(APPLE AND TARGET Apple::CoreML)
@@ -89,7 +90,7 @@ endif()
 set_target_properties(LeafraCore PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
-    PUBLIC_HEADER "${LEAFRA_CORE_HEADERS}"
+    PUBLIC_HEADER ""
 )
 
 # Include directories
@@ -119,7 +120,7 @@ if(LEAFRA_BUILD_RN_BINDINGS AND LEAFRA_PLATFORM_IOS)
         message(STATUS "⚠️  React Native headers not found at: ${RN_NODE_MODULES_PATH}")
         message(STATUS "   LeafraCore will build without React Native integration")
     endif()
-elif(LEAFRA_BUILD_RN_BINDINGS AND NOT LEAFRA_PLATFORM_IOS)
+elseif(LEAFRA_BUILD_RN_BINDINGS AND NOT LEAFRA_PLATFORM_IOS)
     message(STATUS "⚠️  React Native bridge skipped - only supported on iOS")
 endif()
 
@@ -291,13 +292,14 @@ if(LEAFRA_BUILD_SHARED)
     )
 endif()
 
+
+
 # Platform-specific settings
 if(APPLE)
     set_target_properties(LeafraCore PROPERTIES
         FRAMEWORK TRUE
         FRAMEWORK_VERSION A
         MACOSX_FRAMEWORK_IDENTIFIER com.leafra.core
-        PUBLIC_HEADER "${LEAFRA_CORE_HEADERS}"
     )
     
     if(LEAFRA_PLATFORM_IOS)
@@ -316,4 +318,11 @@ install(TARGETS LeafraCore
     RUNTIME DESTINATION bin
     FRAMEWORK DESTINATION Frameworks
     PUBLIC_HEADER DESTINATION include/leafra
-) 
+)
+
+# For Apple frameworks, manually install headers to Headers/leafra subdirectory
+if(APPLE)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/leafra/
+        DESTINATION Frameworks/LeafraCore.framework/Headers/leafra
+        FILES_MATCHING PATTERN "*.h")
+endif() 

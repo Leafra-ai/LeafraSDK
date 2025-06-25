@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types.h"
-#include "../../src/leafra/leafra_unicode.h"
+#include "leafra_unicode.h"
 #include <string>
 #include <string_view>
 #include <vector>

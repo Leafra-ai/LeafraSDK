@@ -1,7 +1,7 @@
 #include "../../../include/leafra/leafra_chunker.h"
 #include "../../../include/leafra/leafra_parsing.h"
 #include "../../../include/leafra/leafra_debug.h"
-#include "../../../src/leafra/leafra_unicode.h"
+#include "../../../include/leafra/leafra_unicode.h"
 #include <iostream>
 #include <cassert>
 #include <vector>
