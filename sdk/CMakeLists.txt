@@ -1150,7 +1150,7 @@ add_subdirectory(corecpp)
 # Platform-specific bindings
 if(LEAFRA_BUILD_RN_BINDINGS)
     if(LEAFRA_PLATFORM_IOS OR LEAFRA_PLATFORM_MACOS)
-        add_subdirectory(react-native/ios)
+        # React Native bridge is now integrated directly into LeafraCore
     endif()
     
     if(LEAFRA_PLATFORM_ANDROID)

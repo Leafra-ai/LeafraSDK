@@ -101,6 +101,28 @@ target_include_directories(LeafraCore
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Add React Native include paths if building RN bindings (iOS only)
+if(LEAFRA_BUILD_RN_BINDINGS AND LEAFRA_PLATFORM_IOS)
+    # React Native headers are in the example project's Pods
+    set(RN_NODE_MODULES_PATH "${PROJECT_SOURCE_DIR}/../example/Leafra/ios/Pods/Headers/Public")
+    
+    if(EXISTS "${RN_NODE_MODULES_PATH}")
+        target_include_directories(LeafraCore 
+            PRIVATE 
+                ${PROJECT_SOURCE_DIR}/react-native/ios
+                ${RN_NODE_MODULES_PATH}
+                ${RN_NODE_MODULES_PATH}/React-Core
+        )
+        message(STATUS "✅ React Native headers found at: ${RN_NODE_MODULES_PATH}")
+        message(STATUS "   React Native bridge integrated into LeafraCore")
+    else()
+        message(STATUS "⚠️  React Native headers not found at: ${RN_NODE_MODULES_PATH}")
+        message(STATUS "   LeafraCore will build without React Native integration")
+    endif()
+elif(LEAFRA_BUILD_RN_BINDINGS AND NOT LEAFRA_PLATFORM_IOS)
+    message(STATUS "⚠️  React Native bridge skipped - only supported on iOS")
+endif()
+
 # Link PDFium if available (defined in parent CMakeLists.txt)
 if(TARGET PDFium::PDFium)
     target_link_libraries(LeafraCore PRIVATE PDFium::PDFium)
@@ -208,6 +230,36 @@ if(APPLE)
     set_source_files_properties(src/leafra_filemanager.cpp PROPERTIES
         COMPILE_FLAGS "-x objective-c++"
     )
+    
+    
+    # Configure React Native bridge files to compile with ARC if building RN bindings
+    if(LEAFRA_BUILD_RN_BINDINGS)
+        set_source_files_properties(
+            ${PROJECT_SOURCE_DIR}/react-native/ios/LeafraSDKModule.mm
+            ${PROJECT_SOURCE_DIR}/react-native/ios/LeafraSDKBridge.mm
+            PROPERTIES COMPILE_FLAGS "-fobjc-arc"
+        )
+        
+        # Add weak linking for React Native symbols so framework builds successfully
+        # These symbols will be resolved at runtime when loaded into a React Native app
+        target_link_libraries(LeafraCore PRIVATE 
+            "-Wl,-U,_OBJC_CLASS_$_RCTEventEmitter"
+            "-Wl,-U,_OBJC_METACLASS_$_RCTEventEmitter" 
+            "-Wl,-U,_RCTRegisterModule"
+        )
+        message(STATUS "✅ Added weak linking for React Native symbols")
+    endif()
+    
+    # Add weak linking for React Native symbols if building RN bindings
+    if(LEAFRA_BUILD_RN_BINDINGS)
+        # These symbols will be resolved at runtime when loaded into a React Native app
+        target_link_libraries(LeafraCore PRIVATE 
+            "-Wl,-U,_OBJC_CLASS_$_RCTEventEmitter"
+            "-Wl,-U,_OBJC_METACLASS_$_RCTEventEmitter" 
+            "-Wl,-U,_RCTRegisterModule"
+        )
+        message(STATUS "✅ Added weak linking for React Native symbols")
+    endif()
     
     # Add Core Graphics and other frameworks required by PDFium
     if(TARGET PDFium::PDFium)
