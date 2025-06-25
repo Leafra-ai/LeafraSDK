@@ -74,11 +74,27 @@ PODS:
   - hermes-engine/Pre-built (0.79.2)
   - LeafraSDK (1.0.0):
     - LeafraSDK/Core (= 1.0.0)
+    - LeafraSDK/LLMInference (= 1.0.0)
+    - LeafraSDK/PDFProcessing (= 1.0.0)
     - LeafraSDK/ReactNative (= 1.0.0)
+    - LeafraSDK/Tokenization (= 1.0.0)
+    - LeafraSDK/VectorSearch (= 1.0.0)
     - React-Core
   - LeafraSDK/Core (1.0.0):
     - React-Core
+  - LeafraSDK/LLMInference (1.0.0):
+    - LeafraSDK/Core
+    - React-Core
+  - LeafraSDK/PDFProcessing (1.0.0):
+    - LeafraSDK/Core
+    - React-Core
   - LeafraSDK/ReactNative (1.0.0):
+    - LeafraSDK/Core
+    - React-Core
+  - LeafraSDK/Tokenization (1.0.0):
+    - LeafraSDK/Core
+    - React-Core
+  - LeafraSDK/VectorSearch (1.0.0):
     - LeafraSDK/Core
     - React-Core
   - RCT-Folly (2024.11.18.00):
@@ -2021,7 +2037,7 @@ SPEC CHECKSUMS:
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   hermes-engine: 314be5250afa5692b57b4dd1705959e1973a8ebe
-  LeafraSDK: 345a0385d3bfe480338ba182c9269f2e2039c255
+  LeafraSDK: 45440079ccdf865110695a8687a03e44023074b2
   RCT-Folly: e78785aa9ba2ed998ea4151e314036f6c49e6d82
   RCTDeprecation: 83ffb90c23ee5cea353bd32008a7bca100908f8c
   RCTRequired: eb7c0aba998009f47a540bec9e9d69a54f68136e

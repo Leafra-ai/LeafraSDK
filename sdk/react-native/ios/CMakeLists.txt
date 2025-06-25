@@ -16,6 +16,7 @@ set_target_properties(LeafraSDKiOS PROPERTIES
     FRAMEWORK TRUE
     FRAMEWORK_VERSION A
     MACOSX_FRAMEWORK_IDENTIFIER com.leafra.sdk.ios
+    PUBLIC_HEADER "LeafraSDKModule.h;LeafraSDKBridge.h"
 )
 
 # Link with core library
@@ -25,7 +26,7 @@ target_link_libraries(LeafraSDKiOS PRIVATE LeafraCore)
 target_include_directories(LeafraSDKiOS 
     PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../corecpp/include
+        ${PROJECT_SOURCE_DIR}/corecpp/include
 )
 
 # Add React Native include paths if available
@@ -73,4 +74,11 @@ install(TARGETS LeafraSDKiOS
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     FRAMEWORK DESTINATION Frameworks
+    PUBLIC_HEADER DESTINATION Frameworks/LeafraSDKiOS.framework/Headers
+)
+
+# Install core headers to the framework
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/corecpp/include/
+    DESTINATION Frameworks/LeafraSDKiOS.framework/Headers
+    FILES_MATCHING PATTERN "*.h"
 ) 

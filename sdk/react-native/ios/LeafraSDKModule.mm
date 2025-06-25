@@ -29,12 +29,18 @@ RCT_EXPORT_MODULE(LeafraSDK);
                 [strongSelf sendEventWithName:@"LeafraSDKEvent" body:@{@"message": message}];
             }
         }];
+        
+        // Set up token event listener for LLM callbacks
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(handleTokenEvent:)
+                                                     name:@"LeafraSDKTokenEvent"
+                                                   object:nil];
     }
     return self;
 }
 
 - (NSArray<NSString *> *)supportedEvents {
-    return @[@"LeafraSDKEvent"];
+    return @[@"LeafraSDKEvent", @"LeafraSDKTokenEvent"];
 }
 
 - (void)startObserving {
@@ -43,6 +49,19 @@ RCT_EXPORT_MODULE(LeafraSDK);
 
 - (void)stopObserving {
     _hasListeners = NO;
+}
+
+- (void)handleTokenEvent:(NSNotification *)notification {
+    if (_hasListeners) {
+        NSDictionary *userInfo = notification.userInfo;
+        if (userInfo[@"token"]) {
+            [self sendEventWithName:@"LeafraSDKTokenEvent" body:@{@"token": userInfo[@"token"]}];
+        }
+    }
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 #pragma mark - SDK Methods
@@ -185,6 +204,44 @@ RCT_EXPORT_METHOD(matrixDeterminant:(NSDictionary *)matrix
     } else {
         resolve(determinant);
     }
+}
+
+#pragma mark - Semantic Search Methods
+
+RCT_EXPORT_METHOD(semanticSearch:(NSString *)query
+                  maxResults:(NSNumber *)maxResults
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSError *error = nil;
+        NSDictionary *result = [self.sdkBridge semanticSearch:query maxResults:maxResults error:&error];
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                reject(@"SEMANTIC_SEARCH_ERROR", error.localizedDescription, error);
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
+RCT_EXPORT_METHOD(semanticSearchWithLLM:(NSString *)query
+                  maxResults:(NSNumber *)maxResults
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSError *error = nil;
+        NSDictionary *result = [self.sdkBridge semanticSearchWithLLM:query maxResults:maxResults error:&error];
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                reject(@"SEMANTIC_SEARCH_LLM_ERROR", error.localizedDescription, error);
+            } else {
+                resolve(result);
+            }
+        });
+    });
 }
 
 @end 

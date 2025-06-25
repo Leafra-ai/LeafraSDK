@@ -10,6 +10,8 @@
  */
 @interface LeafraSDKBridge : NSObject
 
+typedef void (^EventCallback)(NSString *message);
+
 /**
  * @brief Initialize the SDK with configuration
  * @param config Configuration dictionary from React Native
@@ -95,9 +97,27 @@
 - (NSNumber *)matrixDeterminant:(NSDictionary *)matrix error:(NSError **)error;
 
 /**
+ * @brief Semantic search method
+ * @param query Search query
+ * @param maxResults Maximum number of results
+ * @param error Error pointer for error handling
+ * @return Dictionary containing result code and search results
+ */
+- (NSDictionary *)semanticSearch:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error;
+
+/**
+ * @brief Semantic search method with LLM
+ * @param query Search query
+ * @param maxResults Maximum number of results
+ * @param error Error pointer for error handling
+ * @return Dictionary containing result code and search results
+ */
+- (NSDictionary *)semanticSearchWithLLM:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error;
+
+/**
  * @brief Set event callback
  * @param callback Block to be called when events occur
  */
-- (void)setEventCallback:(void (^)(NSString *message))callback;
+- (void)setEventCallback:(EventCallback)callback;
 
 @end 

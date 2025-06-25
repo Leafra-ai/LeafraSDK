@@ -2,6 +2,12 @@
 #include "leafra/leafra_core.h"
 #include "leafra/math_utils.h"
 #include "leafra/data_processor.h"
+#include "leafra/leafra_chunker.h"
+
+#ifdef LEAFRA_HAS_FAISS
+#include "leafra/leafra_faiss.h"
+#endif
+
 #include <memory>
 
 @interface LeafraSDKBridge()
@@ -51,6 +57,7 @@
 - (leafra::Config)configFromDictionary:(NSDictionary *)dict {
     leafra::Config config;
     
+    // Basic configuration
     if (dict[@"name"]) {
         config.name = [dict[@"name"] UTF8String];
     }
@@ -66,7 +73,227 @@
     if (dict[@"bufferSize"]) {
         config.buffer_size = [dict[@"bufferSize"] unsignedIntegerValue];
     }
-    //TODO AD: Add other SDK config options here if needed later to expose to the app
+    if (dict[@"leafraDocumentDatabaseName"]) {
+        config.leafra_document_database_name = [dict[@"leafraDocumentDatabaseName"] UTF8String];
+    }
+    
+    // Chunking configuration
+    if (dict[@"chunking"]) {
+        NSDictionary *chunkingDict = dict[@"chunking"];
+        if (chunkingDict[@"enabled"]) {
+            config.chunking.enabled = [chunkingDict[@"enabled"] boolValue];
+        }
+        if (chunkingDict[@"chunkSize"]) {
+            config.chunking.chunk_size = [chunkingDict[@"chunkSize"] unsignedIntegerValue];
+        }
+        if (chunkingDict[@"overlapPercentage"]) {
+            config.chunking.overlap_percentage = [chunkingDict[@"overlapPercentage"] doubleValue];
+        }
+        if (chunkingDict[@"preserveWordBoundaries"]) {
+            config.chunking.preserve_word_boundaries = [chunkingDict[@"preserveWordBoundaries"] boolValue];
+        }
+        if (chunkingDict[@"includeMetadata"]) {
+            config.chunking.include_metadata = [chunkingDict[@"includeMetadata"] boolValue];
+        }
+        if (chunkingDict[@"sizeUnit"]) {
+            NSString *sizeUnit = chunkingDict[@"sizeUnit"];
+            if ([sizeUnit isEqualToString:@"TOKENS"]) {
+                config.chunking.size_unit = leafra::ChunkSizeUnit::TOKENS;
+            } else {
+                config.chunking.size_unit = leafra::ChunkSizeUnit::CHARACTERS;
+            }
+        }
+        if (chunkingDict[@"tokenMethod"]) {
+            NSString *tokenMethod = chunkingDict[@"tokenMethod"];
+            if ([tokenMethod isEqualToString:@"SIMPLE"]) {
+                config.chunking.token_method = leafra::TokenApproximationMethod::SIMPLE;
+            } else {
+                config.chunking.token_method = leafra::TokenApproximationMethod::SIMPLE; // Default to SIMPLE since it's the only available option
+            }
+        }
+        if (chunkingDict[@"printChunksFull"]) {
+            config.chunking.print_chunks_full = [chunkingDict[@"printChunksFull"] boolValue];
+        }
+        if (chunkingDict[@"printChunksBrief"]) {
+            config.chunking.print_chunks_brief = [chunkingDict[@"printChunksBrief"] boolValue];
+        }
+        if (chunkingDict[@"maxLines"]) {
+            config.chunking.max_lines = [chunkingDict[@"maxLines"] intValue];
+        }
+    }
+    
+    // Tokenizer configuration
+    if (dict[@"tokenizer"]) {
+        NSDictionary *tokenizerDict = dict[@"tokenizer"];
+        if (tokenizerDict[@"enableSentencepiece"]) {
+            config.tokenizer.enable_sentencepiece = [tokenizerDict[@"enableSentencepiece"] boolValue];
+        }
+        if (tokenizerDict[@"modelName"]) {
+            config.tokenizer.model_name = [tokenizerDict[@"modelName"] UTF8String];
+        }
+        if (tokenizerDict[@"sentencepieceModelPath"]) {
+            config.tokenizer.sentencepiece_model_path = [tokenizerDict[@"sentencepieceModelPath"] UTF8String];
+        }
+        if (tokenizerDict[@"sentencepieceJsonPath"]) {
+            config.tokenizer.sentencepiece_json_path = [tokenizerDict[@"sentencepieceJsonPath"] UTF8String];
+        }
+    }
+    
+    // Embedding model configuration
+    if (dict[@"embeddingInference"]) {
+        NSDictionary *embeddingDict = dict[@"embeddingInference"];
+        if (embeddingDict[@"enabled"]) {
+            config.embedding_inference.enabled = [embeddingDict[@"enabled"] boolValue];
+        }
+        if (embeddingDict[@"framework"]) {
+            config.embedding_inference.framework = [embeddingDict[@"framework"] UTF8String];
+        }
+        if (embeddingDict[@"modelPath"]) {
+            config.embedding_inference.model_path = [embeddingDict[@"modelPath"] UTF8String];
+        }
+        if (embeddingDict[@"coremlComputeUnits"]) {
+            config.embedding_inference.coreml_compute_units = [embeddingDict[@"coremlComputeUnits"] UTF8String];
+        }
+        if (embeddingDict[@"tfliteEnableCoremLDelegate"]) {
+            config.embedding_inference.tflite_enable_coreml_delegate = [embeddingDict[@"tfliteEnableCoremLDelegate"] boolValue];
+        }
+        if (embeddingDict[@"tfliteEnableMetalDelegate"]) {
+            config.embedding_inference.tflite_enable_metal_delegate = [embeddingDict[@"tfliteEnableMetalDelegate"] boolValue];
+        }
+        if (embeddingDict[@"tfliteEnableXnnpackDelegate"]) {
+            config.embedding_inference.tflite_enable_xnnpack_delegate = [embeddingDict[@"tfliteEnableXnnpackDelegate"] boolValue];
+        }
+        if (embeddingDict[@"tfliteNumThreads"]) {
+            config.embedding_inference.tflite_num_threads = [embeddingDict[@"tfliteNumThreads"] intValue];
+        }
+        if (embeddingDict[@"tfliteUseNnapi"]) {
+            config.embedding_inference.tflite_use_nnapi = [embeddingDict[@"tfliteUseNnapi"] boolValue];
+        }
+    }
+    
+    // Vector search configuration
+    if (dict[@"vectorSearch"]) {
+        NSDictionary *vectorDict = dict[@"vectorSearch"];
+        if (vectorDict[@"enabled"]) {
+            config.vector_search.enabled = [vectorDict[@"enabled"] boolValue];
+        }
+        if (vectorDict[@"dimension"]) {
+            config.vector_search.dimension = [vectorDict[@"dimension"] intValue];
+        }
+        if (vectorDict[@"indexType"]) {
+            config.vector_search.index_type = [vectorDict[@"indexType"] UTF8String];
+        }
+        if (vectorDict[@"metric"]) {
+            config.vector_search.metric = [vectorDict[@"metric"] UTF8String];
+        }
+        if (vectorDict[@"nlist"]) {
+            config.vector_search.nlist = [vectorDict[@"nlist"] intValue];
+        }
+        if (vectorDict[@"nprobe"]) {
+            config.vector_search.nprobe = [vectorDict[@"nprobe"] intValue];
+        }
+        if (vectorDict[@"m"]) {
+            config.vector_search.m = [vectorDict[@"m"] intValue];
+        }
+        if (vectorDict[@"nbits"]) {
+            config.vector_search.nbits = [vectorDict[@"nbits"] intValue];
+        }
+        if (vectorDict[@"hnswM"]) {
+            config.vector_search.hnsw_m = [vectorDict[@"hnswM"] intValue];
+        }
+        if (vectorDict[@"lshNbits"]) {
+            config.vector_search.lsh_nbits = [vectorDict[@"lshNbits"] intValue];
+        }
+        if (vectorDict[@"indexDefinition"]) {
+            config.vector_search.index_definition = [vectorDict[@"indexDefinition"] UTF8String];
+        }
+        if (vectorDict[@"autoSave"]) {
+            config.vector_search.auto_save = [vectorDict[@"autoSave"] boolValue];
+        }
+        if (vectorDict[@"autoLoad"]) {
+            config.vector_search.auto_load = [vectorDict[@"autoLoad"] boolValue];
+        }
+    }
+    
+    // LLM configuration
+    if (dict[@"llm"]) {
+        NSDictionary *llmDict = dict[@"llm"];
+        if (llmDict[@"enabled"]) {
+            config.llm.enabled = [llmDict[@"enabled"] boolValue];
+        }
+        if (llmDict[@"modelPath"]) {
+            config.llm.model_path = [llmDict[@"modelPath"] UTF8String];
+        }
+        if (llmDict[@"framework"]) {
+            config.llm.framework = [llmDict[@"framework"] UTF8String];
+        }
+        if (llmDict[@"nCtx"]) {
+            config.llm.n_ctx = [llmDict[@"nCtx"] intValue];
+        }
+        if (llmDict[@"nPredict"]) {
+            config.llm.n_predict = [llmDict[@"nPredict"] intValue];
+        }
+        if (llmDict[@"nBatch"]) {
+            config.llm.n_batch = [llmDict[@"nBatch"] intValue];
+        }
+        if (llmDict[@"nUbatch"]) {
+            config.llm.n_ubatch = [llmDict[@"nUbatch"] intValue];
+        }
+        if (llmDict[@"nThreads"]) {
+            config.llm.n_threads = [llmDict[@"nThreads"] intValue];
+        }
+        if (llmDict[@"nThreadsBatch"]) {
+            config.llm.n_threads_batch = [llmDict[@"nThreadsBatch"] intValue];
+        }
+        if (llmDict[@"temperature"]) {
+            config.llm.temperature = [llmDict[@"temperature"] floatValue];
+        }
+        if (llmDict[@"topP"]) {
+            config.llm.top_p = [llmDict[@"topP"] floatValue];
+        }
+        if (llmDict[@"topK"]) {
+            config.llm.top_k = [llmDict[@"topK"] intValue];
+        }
+        if (llmDict[@"minP"]) {
+            config.llm.min_p = [llmDict[@"minP"] floatValue];
+        }
+        if (llmDict[@"repeatPenalty"]) {
+            config.llm.repeat_penalty = [llmDict[@"repeatPenalty"] floatValue];
+        }
+        if (llmDict[@"repeatLastN"]) {
+            config.llm.repeat_last_n = [llmDict[@"repeatLastN"] intValue];
+        }
+        if (llmDict[@"tfsZ"]) {
+            config.llm.tfs_z = [llmDict[@"tfsZ"] floatValue];
+        }
+        if (llmDict[@"typicalP"]) {
+            config.llm.typical_p = [llmDict[@"typicalP"] floatValue];
+        }
+        if (llmDict[@"nGpuLayers"]) {
+            config.llm.n_gpu_layers = [llmDict[@"nGpuLayers"] intValue];
+        }
+        if (llmDict[@"useMmap"]) {
+            config.llm.use_mmap = [llmDict[@"useMmap"] boolValue];
+        }
+        if (llmDict[@"useMlock"]) {
+            config.llm.use_mlock = [llmDict[@"useMlock"] boolValue];
+        }
+        if (llmDict[@"numa"]) {
+            config.llm.numa = [llmDict[@"numa"] boolValue];
+        }
+        if (llmDict[@"systemPrompt"]) {
+            config.llm.system_prompt = [llmDict[@"systemPrompt"] UTF8String];
+        }
+        if (llmDict[@"seed"]) {
+            config.llm.seed = [llmDict[@"seed"] intValue];
+        }
+        if (llmDict[@"debugMode"]) {
+            config.llm.debug_mode = [llmDict[@"debugMode"] boolValue];
+        }
+        if (llmDict[@"verbosePrompt"]) {
+            config.llm.verbose_prompt = [llmDict[@"verbosePrompt"] boolValue];
+        }
+    }
     
     return config;
 }
@@ -328,6 +555,134 @@
     
     return @(determinant);
 }
+
+#pragma mark - Semantic Search Methods
+
+#ifdef LEAFRA_HAS_FAISS
+
+- (NSDictionary *)dictionaryFromSearchResult:(const leafra::FaissIndex::SearchResult&)result {
+    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+    
+    dict[@"id"] = @(result.id);
+    dict[@"distance"] = @(result.distance);
+    
+    // Optional chunk metadata
+    if (result.doc_id != -1) {
+        dict[@"docId"] = @(result.doc_id);
+    }
+    if (result.chunk_index != -1) {
+        dict[@"chunkIndex"] = @(result.chunk_index);
+    }
+    if (result.page_number != -1) {
+        dict[@"pageNumber"] = @(result.page_number);
+    }
+    if (!result.content.empty()) {
+        dict[@"content"] = [NSString stringWithUTF8String:result.content.c_str()];
+    }
+    if (!result.filename.empty()) {
+        dict[@"filename"] = [NSString stringWithUTF8String:result.filename.c_str()];
+    }
+    
+    return dict;
+}
+
+- (NSDictionary *)semanticSearch:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error {
+    if (!_coreSDK) {
+        if (error) {
+            *error = [self errorFromResultCode:leafra::ResultCode::ERROR_INITIALIZATION_FAILED
+                                       message:@"SDK not initialized"];
+        }
+        return @{@"result": @((int)leafra::ResultCode::ERROR_INITIALIZATION_FAILED), @"results": @[]};
+    }
+    
+    std::string queryString = [query UTF8String];
+    int maxResultsInt = [maxResults intValue];
+    std::vector<leafra::FaissIndex::SearchResult> searchResults;
+    
+    leafra::ResultCode result = _coreSDK->semantic_search(queryString, maxResultsInt, searchResults);
+    
+    if (result != leafra::ResultCode::SUCCESS && error) {
+        *error = [self errorFromResultCode:result message:@"Semantic search failed"];
+    }
+    
+    // Convert search results to NSArray
+    NSMutableArray *resultsArray = [NSMutableArray arrayWithCapacity:searchResults.size()];
+    for (const auto& searchResult : searchResults) {
+        [resultsArray addObject:[self dictionaryFromSearchResult:searchResult]];
+    }
+    
+    return @{
+        @"result": @((int)result),
+        @"results": resultsArray
+    };
+}
+
+- (NSDictionary *)semanticSearchWithLLM:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error {
+    if (!_coreSDK) {
+        if (error) {
+            *error = [self errorFromResultCode:leafra::ResultCode::ERROR_INITIALIZATION_FAILED
+                                       message:@"SDK not initialized"];
+        }
+        return @{@"result": @((int)leafra::ResultCode::ERROR_INITIALIZATION_FAILED), @"results": @[]};
+    }
+    
+    std::string queryString = [query UTF8String];
+    int maxResultsInt = [maxResults intValue];
+    std::vector<leafra::FaissIndex::SearchResult> searchResults;
+    
+    // Create token callback that sends tokens via React Native event emitter
+    auto tokenCallback = [self](const std::string& token, bool isEnd) -> bool {
+        if (_eventCallback) {
+            NSString *tokenString = [NSString stringWithUTF8String:token.c_str()];
+            
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // Send token event to React Native
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"LeafraSDKTokenEvent"
+                                                                    object:nil
+                                                                  userInfo:@{@"token": tokenString}];
+            });
+        }
+        return true; // Continue generation
+    };
+    
+    leafra::ResultCode result = _coreSDK->semantic_search_with_llm(queryString, maxResultsInt, searchResults, tokenCallback);
+    
+    if (result != leafra::ResultCode::SUCCESS && error) {
+        *error = [self errorFromResultCode:result message:@"Semantic search with LLM failed"];
+    }
+    
+    // Convert search results to NSArray
+    NSMutableArray *resultsArray = [NSMutableArray arrayWithCapacity:searchResults.size()];
+    for (const auto& searchResult : searchResults) {
+        [resultsArray addObject:[self dictionaryFromSearchResult:searchResult]];
+    }
+    
+    return @{
+        @"result": @((int)result),
+        @"results": resultsArray
+    };
+}
+
+#else
+
+// Fallback implementations when FAISS is not available
+- (NSDictionary *)semanticSearch:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error {
+    if (error) {
+        *error = [self errorFromResultCode:leafra::ResultCode::ERROR_NOT_IMPLEMENTED
+                                   message:@"FAISS support not compiled"];
+    }
+    return @{@"result": @((int)leafra::ResultCode::ERROR_NOT_IMPLEMENTED), @"results": @[]};
+}
+
+- (NSDictionary *)semanticSearchWithLLM:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error {
+    if (error) {
+        *error = [self errorFromResultCode:leafra::ResultCode::ERROR_NOT_IMPLEMENTED
+                                   message:@"FAISS support not compiled"];
+    }
+    return @{@"result": @((int)leafra::ResultCode::ERROR_NOT_IMPLEMENTED), @"results": @[]};
+}
+
+#endif
 
 - (void)setEventCallback:(void (^)(NSString *message))callback {
     _eventCallback = [callback copy];

@@ -3,13 +3,119 @@ import { NativeModules, NativeEventEmitter } from 'react-native';
 const { LeafraSDK: LeafraSDKNative } = NativeModules;
 
 // TypeScript interfaces
+
+// Chunking configuration
+export interface ChunkingConfig {
+  enabled?: boolean;
+  chunkSize?: number;
+  overlapPercentage?: number;
+  preserveWordBoundaries?: boolean;
+  includeMetadata?: boolean;
+  sizeUnit?: string; // "CHARACTERS" or "TOKENS"
+  tokenMethod?: string; // "SIMPLE" or "SENTENCEPIECE"
+  printChunksFull?: boolean;
+  printChunksBrief?: boolean;
+  maxLines?: number;
+}
+
+// Tokenizer configuration
+export interface TokenizerConfig {
+  enableSentencepiece?: boolean;
+  modelName?: string;
+  sentencepieceModelPath?: string;
+  sentencepieceJsonPath?: string;
+}
+
+// Embedding model configuration
+export interface EmbeddingModelConfig {
+  enabled?: boolean;
+  framework?: string; // "coreml", "tensorflow_lite", "tensorflow"
+  modelPath?: string;
+  // CoreML specific
+  coremlComputeUnits?: string; // "all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"
+  // TensorFlow Lite specific
+  tfliteEnableCoremLDelegate?: boolean;
+  tfliteEnableMetalDelegate?: boolean;
+  tfliteEnableXnnpackDelegate?: boolean;
+  tfliteNumThreads?: number;
+  tfliteUseNnapi?: boolean;
+}
+
+// Vector search configuration
+export interface VectorSearchConfig {
+  enabled?: boolean;
+  dimension?: number;
+  indexType?: string; // "FLAT", "IVF_FLAT", "IVF_PQ", "HNSW", "LSH"
+  metric?: string; // "L2", "INNER_PRODUCT", "COSINE"
+  nlist?: number;
+  nprobe?: number;
+  m?: number;
+  nbits?: number;
+  hnswM?: number;
+  lshNbits?: number;
+  indexDefinition?: string;
+  autoSave?: boolean;
+  autoLoad?: boolean;
+}
+
+// LLM configuration
+export interface LLMConfig {
+  enabled?: boolean;
+  modelPath?: string;
+  framework?: string; // "llamacpp", "ollama", etc.
+  // Context and processing parameters
+  nCtx?: number;
+  nPredict?: number;
+  nBatch?: number;
+  nUbatch?: number;
+  nThreads?: number;
+  nThreadsBatch?: number;
+  // Generation parameters
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  minP?: number;
+  repeatPenalty?: number;
+  repeatLastN?: number;
+  tfsZ?: number;
+  typicalP?: number;
+  // Performance and hardware parameters
+  nGpuLayers?: number;
+  useMmap?: boolean;
+  useMlock?: boolean;
+  numa?: boolean;
+  // System configuration
+  systemPrompt?: string;
+  seed?: number;
+  debugMode?: boolean;
+  verbosePrompt?: boolean;
+}
+
+// Main configuration interface
 export interface LeafraConfig {
   name?: string;
   version?: string;
   debugMode?: boolean;
   maxThreads?: number;
   bufferSize?: number;
-  //TODO AD: Add other SDK config options here if needed later to expose to the app
+  leafraDocumentDatabaseName?: string;
+  chunking?: ChunkingConfig;
+  tokenizer?: TokenizerConfig;
+  embeddingInference?: EmbeddingModelConfig;
+  vectorSearch?: VectorSearchConfig;
+  llm?: LLMConfig;
+}
+
+// Search result interface for semantic search
+export interface SearchResult {
+  id: number;         // Vector ID (FAISS ID)
+  distance: number;   // Distance/similarity score
+  // Optional chunk metadata
+  docId?: number;     // Document ID from database
+  chunkIndex?: number; // Chunk index within document
+  pageNumber?: number; // Page number where chunk appears
+  content?: string;   // Chunk text content
+  filename?: string;  // Source document filename
 }
 
 export interface Point2D {
@@ -46,6 +152,7 @@ export enum ResultCode {
 }
 
 export type EventCallback = (message: string) => void;
+export type TokenCallback = (token: string) => void;
 
 class LeafraSDKManager {
   private eventEmitter: NativeEventEmitter;
@@ -123,6 +230,42 @@ class LeafraSDKManager {
    */
   async matrixDeterminant(matrix: Matrix3x3): Promise<number> {
     return LeafraSDKNative.matrixDeterminant(matrix);
+  }
+
+  /**
+   * Perform semantic search using vector embeddings
+   */
+  async semanticSearch(query: string, maxResults: number): Promise<{ result: ResultCode; results: SearchResult[] }> {
+    return LeafraSDKNative.semanticSearch(query, maxResults);
+  }
+
+  /**
+   * Perform semantic search with LLM processing
+   */
+  async semanticSearchWithLLM(
+    query: string, 
+    maxResults: number, 
+    tokenCallback?: TokenCallback
+  ): Promise<{ result: ResultCode; results: SearchResult[] }> {
+    if (tokenCallback) {
+      // Set up token callback listener
+      const subscription = this.eventEmitter.addListener('LeafraSDKTokenEvent', (event: { token: string }) => {
+        if (event.token) {
+          tokenCallback(event.token);
+        }
+      });
+      
+      try {
+        const result = await LeafraSDKNative.semanticSearchWithLLM(query, maxResults);
+        subscription.remove();
+        return result;
+      } catch (error) {
+        subscription.remove();
+        throw error;
+      }
+    } else {
+      return LeafraSDKNative.semanticSearchWithLLM(query, maxResults);
+    }
   }
 
   /**
