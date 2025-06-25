@@ -234,38 +234,5 @@ std::string PlatformUtils::resolve_sdk_resource_path(const std::string& relative
     return "";
 }
 
-// TokenizerConfig method implementation
-bool TokenizerConfig::resolve_model_path() {
-    // If already resolved and exists, keep it
-    if (!sentencepiece_model_path.empty() && PlatformUtils::file_exists(sentencepiece_model_path)) {
-        return true;
-    }
-    
-    // Look for sentencepiece.bpe.model in sdk/corecpp/third_party/models/embedding/{model_name}/ directory
-    std::string model_path = "sdk/corecpp/third_party/models/embedding/" + model_name + "/sentencepiece.bpe.model";
-    std::string resolved_path = PlatformUtils::resolve_sdk_resource_path(model_path);
-    
-    if (!resolved_path.empty()) {
-        sentencepiece_model_path = resolved_path;
-        
-        // Also resolve the tokenizer_config.json file in the same directory
-        std::string json_path = "sdk/corecpp/third_party/models/embedding/" + model_name + "/tokenizer_config.json";
-        std::string resolved_json_path = PlatformUtils::resolve_sdk_resource_path(json_path);
-        
-        if (!resolved_json_path.empty()) {
-            sentencepiece_json_path = resolved_json_path;
-        } else {
-            // Set empty if JSON file not found (it might be optional)
-            sentencepiece_json_path = "";
-        }
-        
-        return true;
-    }
-    
-    // Fallback: set default paths even if they don't exist
-    sentencepiece_model_path = "";
-    sentencepiece_json_path = "";
-    return false;
-}
 
 } // namespace leafra 

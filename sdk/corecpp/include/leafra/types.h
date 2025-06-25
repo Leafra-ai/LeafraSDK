@@ -109,15 +109,6 @@ struct LEAFRA_API TokenizerConfig {
     TokenizerConfig(const std::string& model_name_param, bool enable = true) 
         : enable_sentencepiece(enable), model_name(model_name_param) {}
     
-    /**
-     * @brief Resolve the model path from the model name
-     * 
-     * This method looks for the model in prebuilt/models/{model_name}/ directory
-     * and sets the sentencepiece_model_path accordingly.
-     * 
-     * @return true if model path was resolved successfully, false otherwise
-     */
-    bool resolve_model_path();
 };
 
 /**

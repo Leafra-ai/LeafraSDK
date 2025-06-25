@@ -325,4 +325,44 @@ if(APPLE)
     install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/leafra/
         DESTINATION Frameworks/LeafraCore.framework/Headers/leafra
         FILES_MATCHING PATTERN "*.h")
+        
+    # Copy bundled model files to framework Resources/models directory
+    message(STATUS "🔍 Debug: LEAFRA_BUNDLED_MODEL_PATHS = '${LEAFRA_BUNDLED_MODEL_PATHS}'")
+    if(DEFINED LEAFRA_BUNDLED_MODEL_PATHS)
+        message(STATUS "🔍 Debug: LEAFRA_BUNDLED_MODEL_PATHS is DEFINED")
+    else()
+        message(STATUS "🔍 Debug: LEAFRA_BUNDLED_MODEL_PATHS is NOT DEFINED")
+    endif()
+    if(DEFINED LEAFRA_BUNDLED_MODEL_PATHS AND NOT "${LEAFRA_BUNDLED_MODEL_PATHS}" STREQUAL "")
+        message(STATUS "🔍 Debug: Entering model bundling section")
+        # Convert semicolon-separated list to CMake list
+        string(REPLACE ";" "\\;" MODEL_PATHS_LIST "${LEAFRA_BUNDLED_MODEL_PATHS}")
+        string(REPLACE "\\;" ";" MODEL_PATHS_LIST "${MODEL_PATHS_LIST}")
+        message(STATUS "🔍 Debug: MODEL_PATHS_LIST = ${MODEL_PATHS_LIST}")
+        
+        set(MODEL_COUNT 0)
+        foreach(model_path ${MODEL_PATHS_LIST})
+            if(EXISTS "${model_path}")
+                get_filename_component(model_filename "${model_path}" NAME)
+                if(IS_DIRECTORY "${model_path}")
+                    # Handle directories (like .mlmodelc packages)
+                    install(DIRECTORY "${model_path}"
+                        DESTINATION "Frameworks/LeafraCore.framework/Resources/models"
+                        USE_SOURCE_PERMISSIONS)
+                    message(STATUS "📦 Bundling model directory: ${model_filename}")
+                else()
+                    # Handle individual files
+                    install(FILES "${model_path}"
+                        DESTINATION "Frameworks/LeafraCore.framework/Resources/models"
+                        RENAME "${model_filename}")
+                    message(STATUS "📦 Bundling model file: ${model_filename}")
+                endif()
+                math(EXPR MODEL_COUNT "${MODEL_COUNT} + 1")
+            else()
+                message(WARNING "⚠️  Bundled model file/directory not found: ${model_path}")
+            endif()
+        endforeach()
+        
+        message(STATUS "✅ ${MODEL_COUNT} model files will be bundled in framework")
+    endif()
 endif() 

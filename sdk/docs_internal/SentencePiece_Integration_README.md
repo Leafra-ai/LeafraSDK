@@ -30,13 +30,8 @@ config.chunking.size_unit = leafra::ChunkSizeUnit::TOKENS;
 // SentencePiece Configuration (separate from chunking) - NEW: Model Name Approach
 config.tokenizer.enable_sentencepiece = true;
 config.tokenizer.model_name = "llama2"; // Model name corresponds to folder in prebuilt/models/
+config.tokenizer.model_path = "...."
 
-// Resolve the model path from the model name  
-bool model_found = config.tokenizer.resolve_model_path();
-if (!model_found) {
-    std::cout << "Warning: SentencePiece model not found, will use fallback" << std::endl;
-}
-```
 
 ### 2. SentencePiece Model Setup - NEW: Simple Model Name Approach
 

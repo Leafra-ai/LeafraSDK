@@ -11,6 +11,53 @@ INSTALL_DIR="install"
 CMAKE_BUILD_TYPE="Release"
 VERBOSE=false
 
+# Bundle models 
+# Paths are relative to the sdk directory, they are checked and converted to absolute paths before being passed to the cmake build
+BUNDLE_MODELS=true 
+TOKENIZER_MODEL_PATHS=("corecpp/third_party/models/embedding/multilingual-e5-small/sentencepiece.bpe.model" "corecpp/third_party/models/embedding/multilingual-e5-small/tokenizer_config.json")
+EMBEDDING_MODEL_PATHS=("corecpp/third_party/models/embedding/generated_models/coreml/e5_embedding_model_i512a512_FP32.mlmodelc")
+LLM_MODEL_PATHS=("corecpp/third_party/models/llm/unsloth/Llama-3.2-3B-Instruct-Q4_K_M.gguf")
+# Function to check if file exists and exit if not found
+check_file_exists() {
+    local path="$1"
+    if [ ! -e "$path" ]; then
+        echo "ERROR: Required model file/directory not found: $path"
+        echo "Please ensure all model files and directories are present in the correct locations"
+        exit 1
+    fi
+}
+
+# If bundling models is enabled, validate all paths exist before merging
+if [ "$BUNDLE_MODELS" = true ]; then
+    # Initialize empty array for bundled model paths
+    BUNDLED_MODEL_PATHS=()
+    
+    # Validate all tokenizer model paths exist
+    for path in "${TOKENIZER_MODEL_PATHS[@]}"; do
+        check_file_exists "$path"
+    done
+    
+    # Validate all embedding model paths exist
+    for path in "${EMBEDDING_MODEL_PATHS[@]}"; do
+        check_file_exists "$path"
+    done
+    
+    # Validate all LLM model paths exist
+    for path in "${LLM_MODEL_PATHS[@]}"; do
+        check_file_exists "$path"
+    done
+    
+    # If we get here, all paths are valid - merge them and convert to absolute paths
+    BUNDLED_MODEL_PATHS=()
+    for path in "${TOKENIZER_MODEL_PATHS[@]}" "${EMBEDDING_MODEL_PATHS[@]}" "${LLM_MODEL_PATHS[@]}"; do
+        BUNDLED_MODEL_PATHS+=("$(realpath "$path")")
+    done
+    
+    echo "Successfully validated ${#BUNDLED_MODEL_PATHS[@]} model files for bundling (converted to absolute paths)"
+fi
+
+
+
 # Platform detection
 if [[ "$OSTYPE" == "darwin"* ]]; then
     PLATFORM="apple"
@@ -188,6 +235,7 @@ build_ios() {
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/$install_dir" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \
         ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
+        ${BUNDLED_MODEL_PATHS:+-DLEAFRA_BUNDLED_MODEL_PATHS="$(IFS=';'; echo "${BUNDLED_MODEL_PATHS[*]}")"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) $target
@@ -215,6 +263,7 @@ build_macos() {
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/macos" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \
         ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
+        ${BUNDLED_MODEL_PATHS:+-DLEAFRA_BUNDLED_MODEL_PATHS="$(IFS=';'; echo "${BUNDLED_MODEL_PATHS[*]}")"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
     
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) $target

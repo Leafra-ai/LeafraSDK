@@ -13,17 +13,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(LEAFRA_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(LEAFRA_SDK_CORECPP_ROOT "${LEAFRA_SDK_ROOT}/corecpp")
 set(LEAFRA_SDK_THIRD_PARTY_ROOT "${LEAFRA_SDK_CORECPP_ROOT}/third_party")
-set(LEAFRA_SDK_MODELS_ROOT "${LEAFRA_SDK_THIRD_PARTY_ROOT}/models")
 set(LEAFRA_SDK_PREBUILT_ROOT "${LEAFRA_SDK_THIRD_PARTY_ROOT}/prebuilt")
 
 # Define paths as preprocessor macros for C++ code
 add_compile_definitions(
     LEAFRA_SDK_ROOT="${LEAFRA_SDK_ROOT}"
-    LEAFRA_SDK_MODELS_ROOT="${LEAFRA_SDK_MODELS_ROOT}"
 )
 
 message(STATUS "📁 LeafraSDK Root: ${LEAFRA_SDK_ROOT}")
-message(STATUS "📁 Models Directory: ${LEAFRA_SDK_MODELS_ROOT}")
 message(STATUS "📁 Prebuilt Libraries: ${LEAFRA_SDK_PREBUILT_ROOT}")
 
 # Platform detection

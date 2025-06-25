@@ -312,11 +312,13 @@ int main(int argc, char* argv[]) {
         config.tokenizer.enable_sentencepiece = true;
         
         //TODO AD: change this to model path like we do for the embedding_inference.model_path
-        config.tokenizer.model_name = "multilingual-e5-small"; // Model name corresponds to folder in models/
-        
+        config.tokenizer.model_name = "multilingual-e5-small"; // Model name corresponds to folder in models - it's important to keep this name correct as there's a HACK in the code now 
+        config.tokenizer.sentencepiece_model_path = std::string(LEAFRA_MODELS_ROOT) + "/sentencepiece.bpe.model";
+        config.tokenizer.sentencepiece_json_path = std::string(LEAFRA_MODELS_ROOT) + "/tokenizer_config.json";
         // Resolve the model path from the model name
-        bool model_found = config.tokenizer.resolve_model_path();
-        if (model_found) {
+        
+        if (std::filesystem::exists(config.tokenizer.sentencepiece_model_path) && 
+            (config.tokenizer.sentencepiece_json_path.empty() || std::filesystem::exists(config.tokenizer.sentencepiece_json_path))) {
             std::cout << "📍 Found SentencePiece model: " << config.tokenizer.model_name << std::endl;
             std::cout << "   Model file: " << config.tokenizer.sentencepiece_model_path << std::endl;
             if (!config.tokenizer.sentencepiece_json_path.empty()) {
@@ -326,8 +328,8 @@ int main(int argc, char* argv[]) {
             }
         } else {
             std::cout << "⚠️  SentencePiece model '" << config.tokenizer.model_name << "' not found" << std::endl;
-            std::cout << "   Expected location: sdk/corecpp/third_party/models/embedding/" << config.tokenizer.model_name << "/sentencepiece.bpe.model" << std::endl;
-            std::cout << "   Expected config: sdk/corecpp/third_party/models/embedding/" << config.tokenizer.model_name << "/tokenizer_config.json" << std::endl;
+            std::cout << "   Expected model_path location: " << config.tokenizer.sentencepiece_model_path << std::endl;
+            std::cout << "   Expected json path location: "  << config.tokenizer.sentencepiece_json_path << std::endl;
             std::cout << "   Using fallback: " << config.tokenizer.sentencepiece_model_path << std::endl;
         }
         
@@ -338,7 +340,7 @@ int main(int argc, char* argv[]) {
         
         config.embedding_inference.enabled = true;
         config.embedding_inference.framework = "coreml";
-        config.embedding_inference.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/embedding/generated_models/coreml/e5_embedding_model_i512a512_FP32.mlmodelc";
+        config.embedding_inference.model_path = std::string(LEAFRA_MODELS_ROOT) + "/e5_embedding_model_i512a512_FP32.mlmodelc";
         config.vector_search.enabled = true;
         //AD TEMP
         //config.vector_search.index_type = "HNSW";
@@ -347,7 +349,7 @@ int main(int argc, char* argv[]) {
         config.vector_search.dimension = 384;
 
         config.llm.enabled = true;
-        config.llm.model_path = std::string(LEAFRA_SDK_MODELS_ROOT) + "/llm/unsloth/Llama-3.2-3B-Instruct-Q4_K_M.gguf";
+        config.llm.model_path = std::string(LEAFRA_MODELS_ROOT) + "/Llama-3.2-3B-Instruct-Q4_K_M.gguf";
         config.llm.n_ctx = 4096; //max tokens to use for context
         config.llm.n_predict = 256; //max tokens to generate
 

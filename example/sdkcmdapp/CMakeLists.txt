@@ -60,7 +60,7 @@ elseif(PLATFORM_NAME STREQUAL "ios")
     )
 endif()
 
-# Add compile definitions for available features
+# Add compile definitions for available features and model paths
 target_compile_definitions(sdkcmdline PRIVATE 
     LEAFRA_HAS_FAISS=1
     LEAFRA_HAS_LLAMACPP=1
@@ -69,8 +69,7 @@ target_compile_definitions(sdkcmdline PRIVATE
     LEAFRA_HAS_SENTENCEPIECE=1
     LEAFRA_HAS_ICU=1
     LEAFRA_HAS_PDFIUM=1
-    # Add SDK paths for model loading
-    LEAFRA_SDK_MODELS_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/corecpp/third_party/models"
+    LEAFRA_MODELS_ROOT="${LEAFRA_FRAMEWORK_PATH}/Resources/models"
 )
 
 # Set output directory
