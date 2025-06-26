@@ -30,11 +30,6 @@ target 'Leafra' do
   end
 
   config = use_native_modules!(config_command)
-
-  # LeafraSDK dependency
-  pod 'LeafraSDK', :path => '../../../sdk'
-  # AD TEMP for grabbing the xcframework 
-  # pod 'TensorFlowLiteSwift', '~> 2.17.0', :subspecs => ['CoreML', 'Metal']
   
 
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
