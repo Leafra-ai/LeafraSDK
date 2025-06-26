@@ -296,10 +296,72 @@ endif()
 
 # Platform-specific settings
 if(APPLE)
+    # Configure Info.plist from template with platform-specific settings
+    set(MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PROJECT_VERSION})
+    set(MACOSX_FRAMEWORK_BUNDLE_VERSION ${PROJECT_VERSION})
+    
+    # Set platform-specific values
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
+            set(PLIST_SUPPORTED_PLATFORMS "iPhoneSimulator")
+            set(PLIST_PLATFORM_NAME "iphonesimulator")
+            set(PLIST_MIN_OS_VERSION "16.4")
+            set(PLIST_DEVICE_FAMILY_SECTION "
+    <key>UIDeviceFamily</key>
+    <array>
+        <integer>1</integer>
+        <integer>2</integer>
+    </array>")
+        else()
+            set(PLIST_SUPPORTED_PLATFORMS "iPhoneOS")
+            set(PLIST_PLATFORM_NAME "iphoneos")
+            set(PLIST_MIN_OS_VERSION "16.4")
+            set(PLIST_DEVICE_FAMILY_SECTION "
+    <key>UIDeviceFamily</key>
+    <array>
+        <integer>1</integer>
+        <integer>2</integer>
+    </array>")
+        endif()
+    else()
+        # macOS
+        set(PLIST_SUPPORTED_PLATFORMS "MacOSX")
+        set(PLIST_PLATFORM_NAME "macosx")
+        set(PLIST_MIN_OS_VERSION "10.15")
+        set(PLIST_DEVICE_FAMILY_SECTION "")
+    endif()
+    
+    # Extract SDK name dynamically from CMAKE_OSX_SYSROOT
+    if(CMAKE_OSX_SYSROOT)
+        # Extract SDK name from path like /Applications/Xcode.app/.../iPhoneOS18.2.sdk
+        get_filename_component(SDK_NAME_WITH_EXT ${CMAKE_OSX_SYSROOT} NAME)
+        string(REGEX REPLACE "\\.sdk$" "" PLIST_SDK_NAME ${SDK_NAME_WITH_EXT})
+        string(TOLOWER ${PLIST_SDK_NAME} PLIST_SDK_NAME)
+    else()
+        # Fallback to platform name if SDK path not available
+        set(PLIST_SDK_NAME ${PLIST_PLATFORM_NAME})
+    endif()
+    
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
+        @ONLY
+    )
+    
+    # Configure resource bundle Info.plist
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/Resources.plist.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/Resources.plist"
+        @ONLY
+    )
+    
     set_target_properties(LeafraCore PROPERTIES
         FRAMEWORK TRUE
         FRAMEWORK_VERSION A
         MACOSX_FRAMEWORK_IDENTIFIER com.leafra.core
+        MACOSX_FRAMEWORK_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
+        MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        MACOSX_FRAMEWORK_BUNDLE_VERSION ${PROJECT_VERSION}
     )
     
     if(LEAFRA_PLATFORM_IOS)
@@ -340,6 +402,12 @@ if(APPLE)
         string(REPLACE "\\;" ";" MODEL_PATHS_LIST "${MODEL_PATHS_LIST}")
         message(STATUS "🔍 Debug: MODEL_PATHS_LIST = ${MODEL_PATHS_LIST}")
         
+        # Create resource bundle with Info.plist
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Resources.plist" 
+                DESTINATION "Frameworks/LeafraCore.framework/LeafraResources.bundle" 
+                RENAME "Info.plist")
+        message(STATUS "📦 Creating LeafraResources.bundle with Info.plist")
+        
         set(MODEL_COUNT 0)
         foreach(model_path ${MODEL_PATHS_LIST})
             if(EXISTS "${model_path}")
@@ -347,13 +415,13 @@ if(APPLE)
                 if(IS_DIRECTORY "${model_path}")
                     # Handle directories (like .mlmodelc packages)
                     install(DIRECTORY "${model_path}"
-                        DESTINATION "Frameworks/LeafraCore.framework/Resources/models"
+                        DESTINATION "Frameworks/LeafraCore.framework/LeafraResources.bundle/models"
                         USE_SOURCE_PERMISSIONS)
                     message(STATUS "📦 Bundling model directory: ${model_filename}")
                 else()
                     # Handle individual files
                     install(FILES "${model_path}"
-                        DESTINATION "Frameworks/LeafraCore.framework/Resources/models"
+                        DESTINATION "Frameworks/LeafraCore.framework/LeafraResources.bundle/models"
                         RENAME "${model_filename}")
                     message(STATUS "📦 Bundling model file: ${model_filename}")
                 endif()
@@ -363,6 +431,6 @@ if(APPLE)
             endif()
         endforeach()
         
-        message(STATUS "✅ ${MODEL_COUNT} model files will be bundled in framework")
+        message(STATUS "✅ ${MODEL_COUNT} model files will be bundled in LeafraResources.bundle")
     endif()
 endif() 

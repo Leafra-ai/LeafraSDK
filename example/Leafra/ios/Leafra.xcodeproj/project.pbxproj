@@ -12,14 +12,49 @@
 		24F792D9F00738FC0524946B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5B202CD46E9F2F48D1493AAA /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */; };
+		61D1A5752E0DD33E00296821 /* LeafraCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5732E0DD32800296821 /* LeafraCore.framework */; };
+		61D1A5762E0DD33E00296821 /* LeafraCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5732E0DD32800296821 /* LeafraCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		61D1A5772E0DD34000296821 /* llama.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5712E0DD31700296821 /* llama.framework */; };
+		61D1A5782E0DD34000296821 /* llama.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5712E0DD31700296821 /* llama.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXBuildRule section */
+		61D1A5702E0DC05700296821 /* PBXBuildRule */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			fileType = file.mlmodel;
+			inputFiles = (
+			);
+			isEditable = 1;
+			outputFiles = (
+			);
+			script = "# coremlc\n";
+		};
+/* End PBXBuildRule section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		613CC3042E0CCDB700873F3D /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				61D1A5782E0DD34000296821 /* llama.framework in Embed Frameworks */,
+				61D1A5762E0DD33E00296821 /* LeafraCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* Leafra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Leafra.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Leafra/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Leafra/Info.plist; sourceTree = "<group>"; };
+		61D1A5712E0DD31700296821 /* llama.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = llama.framework; path = /Users/arifdikici/Documents/Squirrel/LeafraSDK/sdk/install/ios/Frameworks/llama.framework; sourceTree = "<absolute>"; };
+		61D1A5732E0DD32800296821 /* LeafraCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LeafraCore.framework; path = /Users/arifdikici/Documents/Squirrel/LeafraSDK/sdk/install/ios/Frameworks/LeafraCore.framework; sourceTree = "<absolute>"; };
 		7AE1F3B7D6C0521A5B5AEDE5 /* libPods-Leafra.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Leafra.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Leafra/SplashScreen.storyboard; sourceTree = "<group>"; };
 		AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Leafra/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
@@ -38,6 +73,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				19669B267E7C9C00D440C947 /* libPods-Leafra.a in Frameworks */,
+				61D1A5772E0DD34000296821 /* llama.framework in Frameworks */,
+				61D1A5752E0DD33E00296821 /* LeafraCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,6 +137,8 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				C76104BFA83DCF9A1DC1B361 /* ExpoModulesProviders */,
 				02CA399627FDC64B7F867E28 /* Pods */,
+				61D1A5712E0DD31700296821 /* llama.framework */,
+				61D1A5732E0DD32800296821 /* LeafraCore.framework */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -146,8 +185,10 @@
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				D8ED55D3DD31A2CB0E0DE917 /* [CP] Embed Pods Frameworks */,
 				D45CB081BE4A5B24B2C6673A /* [CP] Copy Pods Resources */,
+				613CC3042E0CCDB700873F3D /* Embed Frameworks */,
 			);
 			buildRules = (
+				61D1A5702E0DC05700296821 /* PBXBuildRule */,
 			);
 			dependencies = (
 			);
@@ -371,11 +412,21 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MK756PG77H;
 				ENABLE_BITCODE = NO;
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/../../../sdk/install/ios/Frameworks",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/../../../sdk/install/ios-simulator/Frameworks",
+				);
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					"FB_SONARKIT_ENABLED=1",
 				);
 				INFOPLIST_FILE = Leafra/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Leafra;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -408,6 +459,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MK756PG77H;
 				INFOPLIST_FILE = Leafra/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Leafra;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

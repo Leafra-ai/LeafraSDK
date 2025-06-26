@@ -69,7 +69,7 @@ target_compile_definitions(sdkcmdline PRIVATE
     LEAFRA_HAS_SENTENCEPIECE=1
     LEAFRA_HAS_ICU=1
     LEAFRA_HAS_PDFIUM=1
-    LEAFRA_MODELS_ROOT="${LEAFRA_FRAMEWORK_PATH}/Resources/models"
+    LEAFRA_MODELS_ROOT="${LEAFRA_FRAMEWORK_PATH}/LeafraResources.bundle/models"
 )
 
 # Set output directory
