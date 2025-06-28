@@ -132,15 +132,6 @@ Pod::Spec.new do |s|
     "**/.*"
   ]
 
-  # Resource bundles - include the LeafraResources.bundle
-  s.ios.resource_bundles = {
-    'LeafraSDKResources' => ['ios/LeafraCore.framework/LeafraResources.bundle/**/*']
-  }
-  
-  s.osx.resource_bundles = {
-    'LeafraSDKResources' => ['macos/LeafraCore.framework/LeafraResources.bundle/**/*']
-  }
-
   # Minimum deployment targets
   s.ios.deployment_target = "13.0"
   s.osx.deployment_target = "10.15"

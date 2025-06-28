@@ -17,10 +17,10 @@
     "declaration": true,
     "declarationMap": true,
     "outDir": "lib",
-    "rootDir": "src"
+    "rootDir": "."
   },
   "include": [
-    "src/**/*"
+    "common/**/*"
   ],
   "exclude": [
     "node_modules",

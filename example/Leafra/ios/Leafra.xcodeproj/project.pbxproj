@@ -8,15 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		19669B267E7C9C00D440C947 /* libPods-Leafra.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7AE1F3B7D6C0521A5B5AEDE5 /* libPods-Leafra.a */; };
 		24F792D9F00738FC0524946B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5B202CD46E9F2F48D1493AAA /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */; };
-		61D1A5752E0DD33E00296821 /* LeafraCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5732E0DD32800296821 /* LeafraCore.framework */; };
-		61D1A5762E0DD33E00296821 /* LeafraCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5732E0DD32800296821 /* LeafraCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		61D1A5772E0DD34000296821 /* llama.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5712E0DD31700296821 /* llama.framework */; };
-		61D1A5782E0DD34000296821 /* llama.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 61D1A5712E0DD31700296821 /* llama.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		DC072CB1C05DDF4A5BB29014 /* libPods-Leafra.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 40D6B42BB0718587C93AB731 /* libPods-Leafra.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -41,8 +37,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				61D1A5782E0DD34000296821 /* llama.framework in Embed Frameworks */,
-				61D1A5762E0DD33E00296821 /* LeafraCore.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -50,18 +44,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		077F71371F61F97B3502A7E8 /* Pods-Leafra.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.debug.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.debug.xcconfig"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Leafra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Leafra.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Leafra/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Leafra/Info.plist; sourceTree = "<group>"; };
-		61D1A5712E0DD31700296821 /* llama.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = llama.framework; path = /Users/arifdikici/Documents/Squirrel/LeafraSDK/sdk/install/ios/Frameworks/llama.framework; sourceTree = "<absolute>"; };
-		61D1A5732E0DD32800296821 /* LeafraCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LeafraCore.framework; path = /Users/arifdikici/Documents/Squirrel/LeafraSDK/sdk/install/ios/Frameworks/LeafraCore.framework; sourceTree = "<absolute>"; };
-		7AE1F3B7D6C0521A5B5AEDE5 /* libPods-Leafra.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Leafra.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		40D6B42BB0718587C93AB731 /* libPods-Leafra.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Leafra.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		52ACEC0B09CB779AD1EB9D71 /* Pods-Leafra.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.release.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Leafra/SplashScreen.storyboard; sourceTree = "<group>"; };
 		AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Leafra/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		BA8BE572B26B43639D8EBFFB /* Pods-Leafra.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.release.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = Leafra/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		D72A48946E69FB2A6846288A /* Pods-Leafra.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.debug.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Leafra/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Leafra-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Leafra-Bridging-Header.h"; path = "Leafra/Leafra-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -72,9 +64,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				19669B267E7C9C00D440C947 /* libPods-Leafra.a in Frameworks */,
-				61D1A5772E0DD34000296821 /* llama.framework in Frameworks */,
-				61D1A5752E0DD33E00296821 /* LeafraCore.framework in Frameworks */,
+				DC072CB1C05DDF4A5BB29014 /* libPods-Leafra.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,8 +74,8 @@
 		02CA399627FDC64B7F867E28 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				D72A48946E69FB2A6846288A /* Pods-Leafra.debug.xcconfig */,
-				BA8BE572B26B43639D8EBFFB /* Pods-Leafra.release.xcconfig */,
+				077F71371F61F97B3502A7E8 /* Pods-Leafra.debug.xcconfig */,
+				52ACEC0B09CB779AD1EB9D71 /* Pods-Leafra.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -108,7 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				7AE1F3B7D6C0521A5B5AEDE5 /* libPods-Leafra.a */,
+				40D6B42BB0718587C93AB731 /* libPods-Leafra.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -137,8 +127,6 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				C76104BFA83DCF9A1DC1B361 /* ExpoModulesProviders */,
 				02CA399627FDC64B7F867E28 /* Pods */,
-				61D1A5712E0DD31700296821 /* llama.framework */,
-				61D1A5732E0DD32800296821 /* LeafraCore.framework */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -177,15 +165,15 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Leafra" */;
 			buildPhases = (
-				A9032F16143CD772C3587C87 /* [CP] Check Pods Manifest.lock */,
+				D8967C4D9527D4F125C8E623 /* [CP] Check Pods Manifest.lock */,
 				4B2A64ACB5F824AF6AAB2D9C /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				D8ED55D3DD31A2CB0E0DE917 /* [CP] Embed Pods Frameworks */,
-				D45CB081BE4A5B24B2C6673A /* [CP] Copy Pods Resources */,
 				613CC3042E0CCDB700873F3D /* Embed Frameworks */,
+				31E3ED10E6DDC88FA6399404 /* [CP] Embed Pods Frameworks */,
+				808EB689846EB54D457909E0 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 				61D1A5702E0DC05700296821 /* PBXBuildRule */,
@@ -258,6 +246,28 @@
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
 		};
+		31E3ED10E6DDC88FA6399404 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-frameworks.sh",
+				"${PODS_ROOT}/../../node_modules/react-native-leafra-sdk/ios/LeafraCore.framework",
+				"${PODS_ROOT}/../../node_modules/react-native-leafra-sdk/ios/llama.framework",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/LeafraCore.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/llama.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		4B2A64ACB5F824AF6AAB2D9C /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -277,29 +287,7 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Leafra/expo-configure-project.sh\"\n";
 		};
-		A9032F16143CD772C3587C87 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Leafra-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		D45CB081BE4A5B24B2C6673A /* [CP] Copy Pods Resources */ = {
+		808EB689846EB54D457909E0 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -369,22 +357,26 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		D8ED55D3DD31A2CB0E0DE917 /* [CP] Embed Pods Frameworks */ = {
+		D8967C4D9527D4F125C8E623 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			inputFileListPaths = (
 			);
-			name = "[CP] Embed Pods Frameworks";
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
 			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+				"$(DERIVED_FILE_DIR)/Pods-Leafra-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-frameworks.sh\"\n";
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -404,7 +396,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D72A48946E69FB2A6846288A /* Pods-Leafra.debug.xcconfig */;
+			baseConfigurationReference = 077F71371F61F97B3502A7E8 /* Pods-Leafra.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -412,14 +404,6 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MK756PG77H;
 				ENABLE_BITCODE = NO;
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/../../../sdk/install/ios/Frameworks",
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/../../../sdk/install/ios-simulator/Frameworks",
-				);
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					"FB_SONARKIT_ENABLED=1",
@@ -451,7 +435,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = BA8BE572B26B43639D8EBFFB /* Pods-Leafra.release.xcconfig */;
+			baseConfigurationReference = 52ACEC0B09CB779AD1EB9D71 /* Pods-Leafra.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -537,7 +521,10 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = "$(inherited)  ";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -592,7 +579,10 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = "$(inherited)  ";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
