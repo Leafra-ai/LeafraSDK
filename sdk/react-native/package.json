@@ -11,6 +11,7 @@
     "common/src",
     "lib",
     "ios",
+    "macos", 
     "android",
     "windows",
     "cpp",

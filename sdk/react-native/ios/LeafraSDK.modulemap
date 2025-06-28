@@ -1,0 +1,9 @@
+framework module LeafraSDK {
+  umbrella header "LeafraSDKModule.h"
+  
+  header "LeafraSDKModule.h"
+  header "LeafraSDKBridge.h"
+  
+  export *
+  module * { export * }
+} 

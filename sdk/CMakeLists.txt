@@ -60,7 +60,7 @@ endif()
 option(LEAFRA_BUILD_SHARED "Build shared library" ON)
 option(LEAFRA_BUILD_TESTS "Build tests" OFF)
 option(LEAFRA_BUILD_EXAMPLES "Build examples" OFF)
-option(LEAFRA_BUILD_RN_BINDINGS "Build React Native bindings" ON)
+
 
 # PDFium Integration
 set(PDFIUM_ROOT_DIR "${LEAFRA_SDK_PREBUILT_ROOT}/pdfium/paulocoutinhox")
@@ -1144,20 +1144,7 @@ endif()
 # Add subdirectories
 add_subdirectory(corecpp)
 
-# Platform-specific bindings
-if(LEAFRA_BUILD_RN_BINDINGS)
-    if(LEAFRA_PLATFORM_IOS OR LEAFRA_PLATFORM_MACOS)
-        # React Native bridge is now integrated directly into LeafraCore
-    endif()
-    
-    if(LEAFRA_PLATFORM_ANDROID)
-        add_subdirectory(react-native/android)
-    endif()
-    
-    if(LEAFRA_PLATFORM_WINDOWS)
-        add_subdirectory(react-native/windows)
-    endif()
-endif()
+
 
 # Export targets
 export(TARGETS LeafraCore FILE LeafraSDKTargets.cmake)

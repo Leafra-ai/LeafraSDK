@@ -185,6 +185,149 @@ clean_sentencepiece_intermediates() {
     fi
 }
 
+# Copy frameworks/libraries to React Native package structure for distribution
+copy_frameworks_to_react_native() {
+    local platform="$1"
+    local simulator="${2:-false}"
+    
+    print_info "📦 Copying frameworks/libraries to React Native package structure..."
+    
+    # Define source and destination paths
+    local src_dir="$INSTALL_DIR"
+    local rn_dir="react-native"
+    
+    # Platform-specific paths and file extensions
+    case "$platform" in
+        "ios")
+            if [ "$simulator" = true ]; then
+                local src_platform_dir="$src_dir/ios-simulator"
+                local dest_platform_dir="$rn_dir/ios"
+            else
+                local src_platform_dir="$src_dir/ios"
+                local dest_platform_dir="$rn_dir/ios"
+            fi
+            local framework_ext=".framework"
+            local lib_subdir="Frameworks"
+            ;;
+        "macos")
+            local src_platform_dir="$src_dir/macos"
+            local dest_platform_dir="$rn_dir/macos"
+            local framework_ext=".framework"
+            local lib_subdir="Frameworks"
+            ;;
+        "android")
+            local src_platform_dir="$src_dir/android"
+            local dest_platform_dir="$rn_dir/android"
+            local framework_ext=".so"
+            local lib_subdir="lib"
+            ;;
+        "windows")
+            local src_platform_dir="$src_dir/windows"
+            local dest_platform_dir="$rn_dir/windows"
+            local framework_ext=".dll"
+            local lib_subdir="bin"
+            ;;
+        "linux")
+            local src_platform_dir="$src_dir/linux"
+            local dest_platform_dir="$rn_dir/linux"
+            local framework_ext=".so"
+            local lib_subdir="lib"
+            ;;
+        *)
+            print_error "Unsupported platform for React Native framework copying: $platform"
+            return 1
+            ;;
+    esac
+    
+    # Check if source libraries exist
+    if [ ! -d "$src_platform_dir/$lib_subdir" ]; then
+        print_error "Source libraries directory not found: $src_platform_dir/$lib_subdir"
+        print_error "Make sure the build completed successfully before copying frameworks."
+        return 1
+    fi
+    
+    # Create destination directory
+    mkdir -p "$dest_platform_dir"
+    
+    # Platform-specific copying logic
+    case "$platform" in
+        "ios"|"macos")
+            # Copy frameworks for Apple platforms
+            if [ -d "$src_platform_dir/$lib_subdir/LeafraCore$framework_ext" ]; then
+                print_info "  → Copying LeafraCore$framework_ext to $dest_platform_dir/"
+                cp -R "$src_platform_dir/$lib_subdir/LeafraCore$framework_ext" "$dest_platform_dir/"
+                print_info "    ✅ LeafraCore$framework_ext copied successfully"
+            else
+                print_error "LeafraCore$framework_ext not found in $src_platform_dir/$lib_subdir/"
+                return 1
+            fi
+            
+            if [ -d "$src_platform_dir/$lib_subdir/llama$framework_ext" ]; then
+                print_info "  → Copying llama$framework_ext to $dest_platform_dir/"
+                cp -R "$src_platform_dir/$lib_subdir/llama$framework_ext" "$dest_platform_dir/"
+                print_info "    ✅ llama$framework_ext copied successfully"
+            else
+                print_error "llama$framework_ext not found in $src_platform_dir/$lib_subdir/"
+                return 1
+            fi
+            ;;
+        "android"|"windows"|"linux")
+            # Copy shared libraries for other platforms
+            # Create lib subdirectory in destination
+            mkdir -p "$dest_platform_dir/$lib_subdir"
+            
+            # Define expected library names based on platform
+            case "$platform" in
+                "android"|"linux")
+                    local leafra_lib="libLeafraCore$framework_ext"
+                    local llama_lib="libllama$framework_ext"
+                    ;;
+                "windows")
+                    local leafra_lib="LeafraCore$framework_ext"
+                    local llama_lib="llama$framework_ext"
+                    ;;
+            esac
+            
+            if [ -f "$src_platform_dir/$lib_subdir/$leafra_lib" ]; then
+                print_info "  → Copying $leafra_lib to $dest_platform_dir/$lib_subdir/"
+                cp "$src_platform_dir/$lib_subdir/$leafra_lib" "$dest_platform_dir/$lib_subdir/"
+                print_info "    ✅ $leafra_lib copied successfully"
+            else
+                print_error "$leafra_lib not found in $src_platform_dir/$lib_subdir/"
+                return 1
+            fi
+            
+            if [ -f "$src_platform_dir/$lib_subdir/$llama_lib" ]; then
+                print_info "  → Copying $llama_lib to $dest_platform_dir/$lib_subdir/"
+                cp "$src_platform_dir/$lib_subdir/$llama_lib" "$dest_platform_dir/$lib_subdir/"
+                print_info "    ✅ $llama_lib copied successfully"
+            else
+                print_error "$llama_lib not found in $src_platform_dir/$lib_subdir/"
+                return 1
+            fi
+            
+            # Copy any additional runtime dependencies if they exist
+            if [ "$platform" = "windows" ]; then
+                # Copy any .pdb files for debugging (optional)
+                if [ -f "$src_platform_dir/$lib_subdir/LeafraCore.pdb" ]; then
+                    print_info "  → Copying LeafraCore.pdb (debug symbols) to $dest_platform_dir/$lib_subdir/"
+                    cp "$src_platform_dir/$lib_subdir/LeafraCore.pdb" "$dest_platform_dir/$lib_subdir/"
+                    print_info "    ✅ LeafraCore.pdb copied successfully"
+                fi
+                if [ -f "$src_platform_dir/$lib_subdir/llama.pdb" ]; then
+                    print_info "  → Copying llama.pdb (debug symbols) to $dest_platform_dir/$lib_subdir/"
+                    cp "$src_platform_dir/$lib_subdir/llama.pdb" "$dest_platform_dir/$lib_subdir/"
+                    print_info "    ✅ llama.pdb copied successfully"
+                fi
+            fi
+            ;;
+    esac
+    
+    print_info "📦 Framework/library copying completed for $platform"
+    print_info "    Libraries are now available in: $dest_platform_dir/"
+    print_info "    The React Native package can now be used with these libraries."
+}
+
 clean_build() {
     local platform=${1:-"all"}
     
@@ -242,6 +385,10 @@ build_ios() {
     make install
     
     cd ../..
+    
+    # Copy frameworks to React Native package after successful build
+    print_info "🚀 Build completed successfully for iOS!"
+    copy_frameworks_to_react_native "ios" "$simulator"
 }
 
 build_macos() {
@@ -270,6 +417,10 @@ build_macos() {
     make install
     
     cd ../..
+    
+    # Copy frameworks to React Native package after successful build
+    print_info "🚀 Build completed successfully for macOS!"
+    copy_frameworks_to_react_native "macos"
 }
 
 build_android() {
@@ -302,6 +453,10 @@ build_android() {
     make install
     
     cd ../..
+    
+    # Copy libraries to React Native package after successful build
+    print_info "🚀 Build completed successfully for Android!"
+    copy_frameworks_to_react_native "android"
 }
 
 build_current_platform() {
@@ -324,6 +479,18 @@ build_current_platform() {
     make install
     
     cd ../..
+    
+    # Copy libraries to React Native package after successful build (for supported platforms)
+    case "$PLATFORM" in
+        "windows"|"linux")
+            print_info "🚀 Build completed successfully for $PLATFORM!"
+            copy_frameworks_to_react_native "$PLATFORM"
+            ;;
+        *)
+            print_info "🚀 Build completed successfully for $PLATFORM!"
+            print_info "Note: React Native package copying not yet implemented for $PLATFORM"
+            ;;
+    esac
 }
 
 # Parse arguments
