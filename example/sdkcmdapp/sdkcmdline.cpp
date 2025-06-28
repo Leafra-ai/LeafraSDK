@@ -309,28 +309,28 @@ int main(int argc, char* argv[]) {
         config.chunking.include_metadata = true;
         
         // Configure SentencePiece tokenization (optional - will fallback if model not found)
-        config.tokenizer.enable_sentencepiece = true;
+        config.tokenizer.enabled = true;
         
         //TODO AD: change this to model path like we do for the embedding_inference.model_path
         config.tokenizer.model_name = "multilingual-e5-small"; // Model name corresponds to folder in models - it's important to keep this name correct as there's a HACK in the code now 
-        config.tokenizer.sentencepiece_model_path = std::string(LEAFRA_MODELS_ROOT) + "/sentencepiece.bpe.model";
-        config.tokenizer.sentencepiece_json_path = std::string(LEAFRA_MODELS_ROOT) + "/tokenizer_config.json";
+        config.tokenizer.model_path = std::string(LEAFRA_MODELS_ROOT) + "/sentencepiece.bpe.model";
+        config.tokenizer.model_json_path = std::string(LEAFRA_MODELS_ROOT) + "/tokenizer_config.json";
         // Resolve the model path from the model name
         
-        if (std::filesystem::exists(config.tokenizer.sentencepiece_model_path) && 
-            (config.tokenizer.sentencepiece_json_path.empty() || std::filesystem::exists(config.tokenizer.sentencepiece_json_path))) {
+        if (std::filesystem::exists(config.tokenizer.model_path) && 
+            (config.tokenizer.model_json_path.empty() || std::filesystem::exists(config.tokenizer.model_json_path))) {
             std::cout << "📍 Found SentencePiece model: " << config.tokenizer.model_name << std::endl;
-            std::cout << "   Model file: " << config.tokenizer.sentencepiece_model_path << std::endl;
-            if (!config.tokenizer.sentencepiece_json_path.empty()) {
-                std::cout << "   Config file: " << config.tokenizer.sentencepiece_json_path << std::endl;
+            std::cout << "   Model file: " << config.tokenizer.model_path << std::endl;
+            if (!config.tokenizer.model_json_path.empty()) {
+                std::cout << "   Config file: " << config.tokenizer.model_json_path << std::endl;
             } else {
                 std::cout << "   Config file: not found (optional)" << std::endl;
             }
         } else {
             std::cout << "⚠️  SentencePiece model '" << config.tokenizer.model_name << "' not found" << std::endl;
-            std::cout << "   Expected model_path location: " << config.tokenizer.sentencepiece_model_path << std::endl;
-            std::cout << "   Expected json path location: "  << config.tokenizer.sentencepiece_json_path << std::endl;
-            std::cout << "   Using fallback: " << config.tokenizer.sentencepiece_model_path << std::endl;
+            std::cout << "   Expected model_path location: " << config.tokenizer.model_path << std::endl;
+            std::cout << "   Expected json path location: "  << config.tokenizer.model_json_path << std::endl;
+            std::cout << "   Using fallback: " << config.tokenizer.model_path << std::endl;
         }
         
         // Set chunk printing options based on command line flags
@@ -364,9 +364,9 @@ int main(int argc, char* argv[]) {
         std::cout << "Overlap: " << (config.chunking.overlap_percentage * 100) << "%" << std::endl;
         std::cout << "Token Method: Simple approximation" << std::endl;
         std::cout << "Preserve Word Boundaries: " << (config.chunking.preserve_word_boundaries ? "Yes" : "No") << std::endl;
-        std::cout << "SentencePiece Enabled: " << (config.tokenizer.enable_sentencepiece ? "Yes" : "No") << std::endl;
-        if (config.tokenizer.enable_sentencepiece && !config.tokenizer.sentencepiece_model_path.empty()) {
-            std::cout << "SentencePiece Model: " << config.tokenizer.sentencepiece_model_path << std::endl;
+        std::cout << "SentencePiece Enabled: " << (config.tokenizer.enabled ? "Yes" : "No") << std::endl;
+        if (config.tokenizer.enabled && !config.tokenizer.model_path.empty()) {
+            std::cout << "SentencePiece Model: " << config.tokenizer.model_path << std::endl;
         }
         std::cout << "Embedding Inference Enabled: " << (config.embedding_inference.enabled ? "Yes" : "No") << std::endl;
         std::cout << "Embedding Framework: " << config.embedding_inference.framework << std::endl;

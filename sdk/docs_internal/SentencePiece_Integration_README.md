@@ -28,7 +28,7 @@ config.chunking.overlap_percentage = 0.10; // Now accurately 10% token overlap
 config.chunking.size_unit = leafra::ChunkSizeUnit::TOKENS;
 
 // SentencePiece Configuration (separate from chunking) - NEW: Model Name Approach
-config.tokenizer.enable_sentencepiece = true;
+config.tokenizer.enabled = true;
 config.tokenizer.model_name = "llama2"; // Model name corresponds to folder in prebuilt/models/
 config.tokenizer.model_path = "...."
 
@@ -76,14 +76,14 @@ Set `config.tokenizer.model_name` to one of:
 
 **Basic Usage:**
 ```cpp
-config.tokenizer.enable_sentencepiece = true;
+config.tokenizer.enabled = true;
 config.tokenizer.model_name = "llama2";
 config.tokenizer.resolve_model_path();
 ```
 
 **Custom Model:**
 ```cpp
-config.tokenizer.enable_sentencepiece = true;
+config.tokenizer.enabled = true;
 config.tokenizer.model_name = "my_custom_model";
 if (!config.tokenizer.resolve_model_path()) {
     std::cout << "Custom model not found, using fallback" << std::endl;
@@ -93,7 +93,7 @@ if (!config.tokenizer.resolve_model_path()) {
 **Manual Path (if needed):**
 ```cpp
 // If you need specific control
-config.tokenizer.sentencepiece_model_path = "/custom/path/to/model.model";
+config.tokenizer.model_path = "/custom/path/to/model.model";
 ```
 
 ### 3. Integration Example
@@ -114,7 +114,7 @@ int main() {
     config.chunking.size_unit = leafra::ChunkSizeUnit::TOKENS;
     
     // Configure SentencePiece tokenization (separate configuration)
-    config.tokenizer.enable_sentencepiece = true;
+    config.tokenizer.enabled = true;
     config.tokenizer.model_name = "llama2";
     config.tokenizer.resolve_model_path();
     
@@ -160,10 +160,10 @@ int main() {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `enable_sentencepiece` | `bool` | `false` | Enable SentencePiece tokenization |
+| `enabled` | `bool` | `false` | Enable SentencePiece tokenization |
 | `model_name` | `string` | `"default"` | Model name corresponding to folder in sdk/corecpp/third_party/models/ |
-| `sentencepiece_model_path` | `string` | `""` | Path to `.model` file - can be set manually or resolved from model_name |
-| `sentencepiece_json_path` | `string` | `""` | Path to `tokenizer_config.json` file - auto-resolved from model_name |
+| `model_path` | `string` | `""` | Path to `.model` file - can be set manually or resolved from model_name |
+| `model_json_path` | `string` | `""` | Path to `tokenizer_config.json` file - auto-resolved from model_name |
 
 ### ChunkingConfig (config.chunking)
 
@@ -229,7 +229,7 @@ If you see significantly different token counts, this is expected! The estimates
 
 ### From Character-based Chunking
 1. **Set your desired token count**: Use the same chunk size but now in actual tokens
-2. **Enable SentencePiece**: Configure `config.tokenizer.enable_sentencepiece = true`
+2. **Enable SentencePiece**: Configure `config.tokenizer.enabled = true`
 3. **Set model name**: Configure `config.tokenizer.model_name = "your_model_name"`
 4. **Provide a model**: Download or train a SentencePiece model for your use case
 5. **Test and adjust**: Your chunk sizes may change since estimates were inaccurate

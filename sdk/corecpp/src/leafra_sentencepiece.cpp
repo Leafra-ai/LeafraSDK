@@ -69,18 +69,18 @@ SentencePieceTokenizer& SentencePieceTokenizer::operator=(SentencePieceTokenizer
 
 bool SentencePieceTokenizer::load_model(const TokenizerConfig& config) {
 #ifdef LEAFRA_HAS_SENTENCEPIECE
-    LEAFRA_INFO() << "Loading SentencePiece model from config: " << config.sentencepiece_model_path;
+    LEAFRA_INFO() << "Loading SentencePiece model from config: " << config.model_path;
     
     pImpl->clear_error();
     
-    if (config.sentencepiece_model_path.empty()) {
+    if (config.model_path.empty()) {
         pImpl->set_error("Model path is empty in TokenizerConfig");
         pImpl->loaded = false;
         pImpl->config = TokenizerConfig();  // Clear config on failure
         return false;
     }
     
-    const auto status = pImpl->processor.Load(config.sentencepiece_model_path);
+    const auto status = pImpl->processor.Load(config.model_path);
     if (!status.ok()) {
         pImpl->set_error("Failed to load model: " + status.ToString());
         pImpl->loaded = false;
@@ -91,7 +91,7 @@ bool SentencePieceTokenizer::load_model(const TokenizerConfig& config) {
     pImpl->loaded = true;
     pImpl->config = config;  // Save the tokenizer config
     LEAFRA_INFO() << "SentencePiece model loaded successfully";
-    LEAFRA_INFO() << "Model path: " << config.sentencepiece_model_path;
+    LEAFRA_INFO() << "Model path: " << config.model_path;
     LEAFRA_INFO() << "Vocabulary size: " << pImpl->processor.GetPieceSize();
     
     return true;

@@ -7,102 +7,102 @@ const { LeafraSDK: LeafraSDKNative } = NativeModules;
 // Chunking configuration
 export interface ChunkingConfig {
   enabled?: boolean;
-  chunkSize?: number;
-  overlapPercentage?: number;
-  preserveWordBoundaries?: boolean;
-  includeMetadata?: boolean;
-  sizeUnit?: string; // "CHARACTERS" or "TOKENS"
-  tokenMethod?: string; // "SIMPLE" or "SENTENCEPIECE"
-  printChunksFull?: boolean;
-  printChunksBrief?: boolean;
-  maxLines?: number;
+  chunk_size?: number;
+  overlap_percentage?: number;
+  preserve_word_boundaries?: boolean;
+  include_metadata?: boolean;
+  size_unit?: string; // "CHARACTERS" or "TOKENS"
+  token_method?: string; // "SIMPLE" or "SENTENCEPIECE"
+  print_chunks_full?: boolean;
+  print_chunks_brief?: boolean;
+  max_lines?: number;
 }
 
 // Tokenizer configuration
 export interface TokenizerConfig {
-  enableSentencepiece?: boolean;
-  modelName?: string;
-  sentencepieceModelPath?: string;
-  sentencepieceJsonPath?: string;
+  enabled?: boolean;
+  model_name?: string;
+  model_path?: string;
+  model_json_path?: string;
 }
 
 // Embedding model configuration
 export interface EmbeddingModelConfig {
   enabled?: boolean;
   framework?: string; // "coreml", "tensorflow_lite", "tensorflow"
-  modelPath?: string;
+  model_path?: string;
   // CoreML specific
-  coremlComputeUnits?: string; // "all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"
+  coreml_compute_units?: string; // "all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"
   // TensorFlow Lite specific
-  tfliteEnableCoremLDelegate?: boolean;
-  tfliteEnableMetalDelegate?: boolean;
-  tfliteEnableXnnpackDelegate?: boolean;
-  tfliteNumThreads?: number;
-  tfliteUseNnapi?: boolean;
+  tflite_enable_coreml_delegate?: boolean;
+  tflite_enable_metal_delegate?: boolean;
+  tflite_enable_xnnpack_delegate?: boolean;
+  tflite_num_threads?: number;
+  tflite_use_nnapi?: boolean;
 }
 
 // Vector search configuration
 export interface VectorSearchConfig {
   enabled?: boolean;
   dimension?: number;
-  indexType?: string; // "FLAT", "IVF_FLAT", "IVF_PQ", "HNSW", "LSH"
+  index_type?: string; // "FLAT", "IVF_FLAT", "IVF_PQ", "HNSW", "LSH"
   metric?: string; // "L2", "INNER_PRODUCT", "COSINE"
   nlist?: number;
   nprobe?: number;
   m?: number;
   nbits?: number;
-  hnswM?: number;
-  lshNbits?: number;
-  indexDefinition?: string;
-  autoSave?: boolean;
-  autoLoad?: boolean;
+  hnsw_m?: number;
+  lsh_nbits?: number;
+  index_definition?: string;
+  auto_save?: boolean;
+  auto_load?: boolean;
 }
 
 // LLM configuration
 export interface LLMConfig {
   enabled?: boolean;
-  modelPath?: string;
+  model_path?: string;
   framework?: string; // "llamacpp", "ollama", etc.
   // Context and processing parameters
-  nCtx?: number;
-  nPredict?: number;
-  nBatch?: number;
-  nUbatch?: number;
-  nThreads?: number;
-  nThreadsBatch?: number;
+  n_ctx?: number;
+  n_predict?: number;
+  n_batch?: number;
+  n_ubatch?: number;
+  n_threads?: number;
+  n_threads_batch?: number;
   // Generation parameters
   temperature?: number;
-  topP?: number;
-  topK?: number;
-  minP?: number;
-  repeatPenalty?: number;
-  repeatLastN?: number;
-  tfsZ?: number;
-  typicalP?: number;
+  top_p?: number;
+  top_k?: number;
+  min_p?: number;
+  repeat_penalty?: number;
+  repeat_last_n?: number;
+  tfs_z?: number;
+  typical_p?: number;
   // Performance and hardware parameters
-  nGpuLayers?: number;
-  useMmap?: boolean;
-  useMlock?: boolean;
+  n_gpu_layers?: number;
+  use_mmap?: boolean;
+  use_mlock?: boolean;
   numa?: boolean;
   // System configuration
-  systemPrompt?: string;
+  system_prompt?: string;
   seed?: number;
-  debugMode?: boolean;
-  verbosePrompt?: boolean;
+  debug_mode?: boolean;
+  verbose_prompt?: boolean;
 }
 
 // Main configuration interface
 export interface LeafraConfig {
   name?: string;
   version?: string;
-  debugMode?: boolean;
-  maxThreads?: number;
-  bufferSize?: number;
-  leafraDocumentDatabaseName?: string;
+  debug_mode?: boolean;
+  max_threads?: number;
+  buffer_size?: number;
+  leafra_document_database_name?: string;
   chunking?: ChunkingConfig;
   tokenizer?: TokenizerConfig;
-  embeddingInference?: EmbeddingModelConfig;
-  vectorSearch?: VectorSearchConfig;
+  embedding_inference?: EmbeddingModelConfig;
+  vector_search?: VectorSearchConfig;
   llm?: LLMConfig;
 }
 

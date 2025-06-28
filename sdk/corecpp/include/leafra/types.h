@@ -93,10 +93,10 @@ enum class ResultCode : int32_t {
  */
 struct LEAFRA_API TokenizerConfig {
     // SentencePiece tokenizer configuration
-    bool enable_sentencepiece = false;      // Whether to use SentencePiece for accurate token counting
+    bool enabled = false;      // Whether to use SentencePiece for accurate token counting
     std::string model_name ;         // Model name (corresponds to folder in sdk/corecpp/third_party/models/)
-    std::string sentencepiece_model_path;       // Path to SentencePiece model file (.model) - can be set manually or resolved from model_name
-    std::string sentencepiece_json_path;        // Path to tokenizer config JSON file (tokenizer_config.json) - resolved from model_name
+    std::string model_path;       // Path to SentencePiece model file (.model) - can be set manually or resolved from model_name
+    std::string model_json_path;        // Path to tokenizer config JSON file (tokenizer_config.json) - resolved from model_name
     // Future tokenizer options can be added here
     // bool enable_tiktoken = false;         // For OpenAI models
     // bool enable_huggingface_tokenizer = false; // For HuggingFace models
@@ -107,7 +107,7 @@ struct LEAFRA_API TokenizerConfig {
     
     // Constructor with model name
     TokenizerConfig(const std::string& model_name_param, bool enable = true) 
-        : enable_sentencepiece(enable), model_name(model_name_param) {}
+        : enabled(enable), model_name(model_name_param) {}
     
 };
 

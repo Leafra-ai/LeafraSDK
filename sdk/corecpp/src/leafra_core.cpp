@@ -717,7 +717,7 @@ public:
         size_t total_actual_tokens = 0;
         bool using_sentencepiece = false;
         
-        if (!config_.tokenizer.enable_sentencepiece || !tokenizer_ || !tokenizer_->is_loaded()) {
+        if (!config_.tokenizer.enabled || !tokenizer_ || !tokenizer_->is_loaded()) {
             LEAFRA_WARNING() << "SentencePiece requested but not available, using estimates";
             return {total_actual_tokens, using_sentencepiece};
         }
@@ -1064,21 +1064,21 @@ ResultCode LeafraCore::initialize(const Config& config) {
         }
         
         // Initialize SentencePiece tokenizer if enabled
-        if (pImpl->tokenizer_ && config.tokenizer.enable_sentencepiece) {
+        if (pImpl->tokenizer_ && config.tokenizer.enabled) {
             LEAFRA_INFO() << "Initializing SentencePiece tokenizer";
             
-            if (!config.tokenizer.sentencepiece_model_path.empty()) {
+            if (!config.tokenizer.model_path.empty()) {
                 bool loaded = pImpl->tokenizer_->load_model(config.tokenizer);
                 if (loaded) {
-                    LEAFRA_INFO() << "✅ SentencePiece model loaded from: " << config.tokenizer.sentencepiece_model_path;
+                    LEAFRA_INFO() << "✅ SentencePiece model loaded from: " << config.tokenizer.model_path;
                     LEAFRA_INFO() << "  - Vocabulary size: " << pImpl->tokenizer_->get_vocab_size();
                 } else {
-                    LEAFRA_WARNING() << "⚠️  Failed to load SentencePiece model from: " << config.tokenizer.sentencepiece_model_path;                    
+                    LEAFRA_WARNING() << "⚠️  Failed to load SentencePiece model from: " << config.tokenizer.model_path;                    
                 }
             } else {
                 LEAFRA_WARNING() << "⚠️  SentencePiece enabled but no model path specified";
             }
-        } else if (config.tokenizer.enable_sentencepiece) {
+        } else if (config.tokenizer.enabled) {
             LEAFRA_WARNING() << "⚠️  SentencePiece requested but tokenizer not available";
         }
 

@@ -54,6 +54,46 @@
 
 #pragma mark - Helper Methods
 
+- (NSString *)resolveFrameworkResourcePath:(NSString *)frameworkRelativePath {
+    // Check if path is already absolute
+    if ([frameworkRelativePath hasPrefix:@"/"]) {
+        return frameworkRelativePath;
+    }
+    
+    // Check if it's a framework-relative path
+    if ([frameworkRelativePath hasPrefix:@"LeafraCore.framework/"]) {
+        // Get the LeafraCore framework bundle
+        NSBundle *frameworkBundle = [NSBundle bundleWithIdentifier:@"com.leafra.core"];
+        if (!frameworkBundle) {
+            // Fallback: try to find framework bundle by path
+            NSString *frameworkPath = [[NSBundle mainBundle] pathForResource:@"LeafraCore" ofType:@"framework"];
+            if (frameworkPath) {
+                frameworkBundle = [NSBundle bundleWithPath:frameworkPath];
+            }
+        }
+        
+        if (frameworkBundle) {
+            // Remove "LeafraCore.framework/" prefix and resolve within framework
+            NSString *resourcePath = [frameworkRelativePath substringFromIndex:[@"LeafraCore.framework/" length]];
+            NSString *fullPath = [[frameworkBundle bundlePath] stringByAppendingPathComponent:resourcePath];
+            
+            // Verify the file exists
+            if ([[NSFileManager defaultManager] fileExistsAtPath:fullPath]) {
+                return fullPath;
+            } else {
+                NSLog(@"⚠️ Framework resource not found: %@", fullPath);
+                return frameworkRelativePath; // Return original path as fallback
+            }
+        } else {
+            NSLog(@"⚠️ LeafraCore framework bundle not found");
+            return frameworkRelativePath; // Return original path as fallback
+        }
+    }
+    
+    // For other relative paths, return as-is (they'll be resolved by the C++ SDK)
+    return frameworkRelativePath;
+}
+
 - (leafra::Config)configFromDictionary:(NSDictionary *)dict {
     leafra::Config config;
     
@@ -64,17 +104,17 @@
     if (dict[@"version"]) {
         config.version = [dict[@"version"] UTF8String];
     }
-    if (dict[@"debugMode"]) {
-        config.debug_mode = [dict[@"debugMode"] boolValue];
+    if (dict[@"debug_mode"]) {
+        config.debug_mode = [dict[@"debug_mode"] boolValue];
     }
-    if (dict[@"maxThreads"]) {
-        config.max_threads = [dict[@"maxThreads"] intValue];
+    if (dict[@"max_threads"]) {
+        config.max_threads = [dict[@"max_threads"] intValue];
     }
-    if (dict[@"bufferSize"]) {
-        config.buffer_size = [dict[@"bufferSize"] unsignedIntegerValue];
+    if (dict[@"buffer_size"]) {
+        config.buffer_size = [dict[@"buffer_size"] unsignedIntegerValue];
     }
-    if (dict[@"leafraDocumentDatabaseName"]) {
-        config.leafra_document_database_name = [dict[@"leafraDocumentDatabaseName"] UTF8String];
+    if (dict[@"leafra_document_database_name"]) {
+        config.leafra_document_database_name = [dict[@"leafra_document_database_name"] UTF8String];
     }
     
     // Chunking configuration
@@ -83,105 +123,108 @@
         if (chunkingDict[@"enabled"]) {
             config.chunking.enabled = [chunkingDict[@"enabled"] boolValue];
         }
-        if (chunkingDict[@"chunkSize"]) {
-            config.chunking.chunk_size = [chunkingDict[@"chunkSize"] unsignedIntegerValue];
+        if (chunkingDict[@"chunk_size"]) {
+            config.chunking.chunk_size = [chunkingDict[@"chunk_size"] unsignedIntegerValue];
         }
-        if (chunkingDict[@"overlapPercentage"]) {
-            config.chunking.overlap_percentage = [chunkingDict[@"overlapPercentage"] doubleValue];
+        if (chunkingDict[@"overlap_percentage"]) {
+            config.chunking.overlap_percentage = [chunkingDict[@"overlap_percentage"] doubleValue];
         }
-        if (chunkingDict[@"preserveWordBoundaries"]) {
-            config.chunking.preserve_word_boundaries = [chunkingDict[@"preserveWordBoundaries"] boolValue];
+        if (chunkingDict[@"preserve_word_boundaries"]) {
+            config.chunking.preserve_word_boundaries = [chunkingDict[@"preserve_word_boundaries"] boolValue];
         }
-        if (chunkingDict[@"includeMetadata"]) {
-            config.chunking.include_metadata = [chunkingDict[@"includeMetadata"] boolValue];
+        if (chunkingDict[@"include_metadata"]) {
+            config.chunking.include_metadata = [chunkingDict[@"include_metadata"] boolValue];
         }
-        if (chunkingDict[@"sizeUnit"]) {
-            NSString *sizeUnit = chunkingDict[@"sizeUnit"];
+        if (chunkingDict[@"size_unit"]) {
+            NSString *sizeUnit = chunkingDict[@"size_unit"];
             if ([sizeUnit isEqualToString:@"TOKENS"]) {
                 config.chunking.size_unit = leafra::ChunkSizeUnit::TOKENS;
             } else {
                 config.chunking.size_unit = leafra::ChunkSizeUnit::CHARACTERS;
             }
         }
-        if (chunkingDict[@"tokenMethod"]) {
-            NSString *tokenMethod = chunkingDict[@"tokenMethod"];
+        if (chunkingDict[@"token_method"]) {
+            NSString *tokenMethod = chunkingDict[@"token_method"];
             if ([tokenMethod isEqualToString:@"SIMPLE"]) {
                 config.chunking.token_method = leafra::TokenApproximationMethod::SIMPLE;
             } else {
                 config.chunking.token_method = leafra::TokenApproximationMethod::SIMPLE; // Default to SIMPLE since it's the only available option
             }
         }
-        if (chunkingDict[@"printChunksFull"]) {
-            config.chunking.print_chunks_full = [chunkingDict[@"printChunksFull"] boolValue];
+        if (chunkingDict[@"print_chunks_full"]) {
+            config.chunking.print_chunks_full = [chunkingDict[@"print_chunks_full"] boolValue];
         }
-        if (chunkingDict[@"printChunksBrief"]) {
-            config.chunking.print_chunks_brief = [chunkingDict[@"printChunksBrief"] boolValue];
+        if (chunkingDict[@"print_chunks_brief"]) {
+            config.chunking.print_chunks_brief = [chunkingDict[@"print_chunks_brief"] boolValue];
         }
-        if (chunkingDict[@"maxLines"]) {
-            config.chunking.max_lines = [chunkingDict[@"maxLines"] intValue];
+        if (chunkingDict[@"max_lines"]) {
+            config.chunking.max_lines = [chunkingDict[@"max_lines"] intValue];
         }
     }
     
     // Tokenizer configuration
     if (dict[@"tokenizer"]) {
         NSDictionary *tokenizerDict = dict[@"tokenizer"];
-        if (tokenizerDict[@"enableSentencepiece"]) {
-            config.tokenizer.enable_sentencepiece = [tokenizerDict[@"enableSentencepiece"] boolValue];
+        if (tokenizerDict[@"enabled"]) {
+            config.tokenizer.enabled = [tokenizerDict[@"enabled"] boolValue];
         }
-        if (tokenizerDict[@"modelName"]) {
-            config.tokenizer.model_name = [tokenizerDict[@"modelName"] UTF8String];
+        if (tokenizerDict[@"model_name"]) {
+            config.tokenizer.model_name = [tokenizerDict[@"model_name"] UTF8String];
         }
-        if (tokenizerDict[@"sentencepieceModelPath"]) {
-            config.tokenizer.sentencepiece_model_path = [tokenizerDict[@"sentencepieceModelPath"] UTF8String];
+        if (tokenizerDict[@"model_path"]) {
+            NSString *resolvedPath = [self resolveFrameworkResourcePath:tokenizerDict[@"model_path"]];
+            config.tokenizer.model_path = [resolvedPath UTF8String];
         }
-        if (tokenizerDict[@"sentencepieceJsonPath"]) {
-            config.tokenizer.sentencepiece_json_path = [tokenizerDict[@"sentencepieceJsonPath"] UTF8String];
+        if (tokenizerDict[@"model_json_path"]) {
+            NSString *resolvedPath = [self resolveFrameworkResourcePath:tokenizerDict[@"model_json_path"]];
+            config.tokenizer.model_json_path = [resolvedPath UTF8String];
         }
     }
     
     // Embedding model configuration
-    if (dict[@"embeddingInference"]) {
-        NSDictionary *embeddingDict = dict[@"embeddingInference"];
+    if (dict[@"embedding_inference"]) {
+        NSDictionary *embeddingDict = dict[@"embedding_inference"];
         if (embeddingDict[@"enabled"]) {
             config.embedding_inference.enabled = [embeddingDict[@"enabled"] boolValue];
         }
         if (embeddingDict[@"framework"]) {
             config.embedding_inference.framework = [embeddingDict[@"framework"] UTF8String];
         }
-        if (embeddingDict[@"modelPath"]) {
-            config.embedding_inference.model_path = [embeddingDict[@"modelPath"] UTF8String];
+        if (embeddingDict[@"model_path"]) {
+            NSString *resolvedPath = [self resolveFrameworkResourcePath:embeddingDict[@"model_path"]];
+            config.embedding_inference.model_path = [resolvedPath UTF8String];
         }
-        if (embeddingDict[@"coremlComputeUnits"]) {
-            config.embedding_inference.coreml_compute_units = [embeddingDict[@"coremlComputeUnits"] UTF8String];
+        if (embeddingDict[@"coreml_compute_units"]) {
+            config.embedding_inference.coreml_compute_units = [embeddingDict[@"coreml_compute_units"] UTF8String];
         }
-        if (embeddingDict[@"tfliteEnableCoremLDelegate"]) {
-            config.embedding_inference.tflite_enable_coreml_delegate = [embeddingDict[@"tfliteEnableCoremLDelegate"] boolValue];
+        if (embeddingDict[@"tflite_enable_coreml_delegate"]) {
+            config.embedding_inference.tflite_enable_coreml_delegate = [embeddingDict[@"tflite_enable_coreml_delegate"] boolValue];
         }
-        if (embeddingDict[@"tfliteEnableMetalDelegate"]) {
-            config.embedding_inference.tflite_enable_metal_delegate = [embeddingDict[@"tfliteEnableMetalDelegate"] boolValue];
+        if (embeddingDict[@"tflite_enable_metal_delegate"]) {
+            config.embedding_inference.tflite_enable_metal_delegate = [embeddingDict[@"tflite_enable_metal_delegate"] boolValue];
         }
-        if (embeddingDict[@"tfliteEnableXnnpackDelegate"]) {
-            config.embedding_inference.tflite_enable_xnnpack_delegate = [embeddingDict[@"tfliteEnableXnnpackDelegate"] boolValue];
+        if (embeddingDict[@"tflite_enable_xnnpack_delegate"]) {
+            config.embedding_inference.tflite_enable_xnnpack_delegate = [embeddingDict[@"tflite_enable_xnnpack_delegate"] boolValue];
         }
-        if (embeddingDict[@"tfliteNumThreads"]) {
-            config.embedding_inference.tflite_num_threads = [embeddingDict[@"tfliteNumThreads"] intValue];
+        if (embeddingDict[@"tflite_num_threads"]) {
+            config.embedding_inference.tflite_num_threads = [embeddingDict[@"tflite_num_threads"] intValue];
         }
-        if (embeddingDict[@"tfliteUseNnapi"]) {
-            config.embedding_inference.tflite_use_nnapi = [embeddingDict[@"tfliteUseNnapi"] boolValue];
+        if (embeddingDict[@"tflite_use_nnapi"]) {
+            config.embedding_inference.tflite_use_nnapi = [embeddingDict[@"tflite_use_nnapi"] boolValue];
         }
     }
     
     // Vector search configuration
-    if (dict[@"vectorSearch"]) {
-        NSDictionary *vectorDict = dict[@"vectorSearch"];
+    if (dict[@"vector_search"]) {
+        NSDictionary *vectorDict = dict[@"vector_search"];
         if (vectorDict[@"enabled"]) {
             config.vector_search.enabled = [vectorDict[@"enabled"] boolValue];
         }
         if (vectorDict[@"dimension"]) {
             config.vector_search.dimension = [vectorDict[@"dimension"] intValue];
         }
-        if (vectorDict[@"indexType"]) {
-            config.vector_search.index_type = [vectorDict[@"indexType"] UTF8String];
+        if (vectorDict[@"index_type"]) {
+            config.vector_search.index_type = [vectorDict[@"index_type"] UTF8String];
         }
         if (vectorDict[@"metric"]) {
             config.vector_search.metric = [vectorDict[@"metric"] UTF8String];
@@ -198,20 +241,20 @@
         if (vectorDict[@"nbits"]) {
             config.vector_search.nbits = [vectorDict[@"nbits"] intValue];
         }
-        if (vectorDict[@"hnswM"]) {
-            config.vector_search.hnsw_m = [vectorDict[@"hnswM"] intValue];
+        if (vectorDict[@"hnsw_m"]) {
+            config.vector_search.hnsw_m = [vectorDict[@"hnsw_m"] intValue];
         }
-        if (vectorDict[@"lshNbits"]) {
-            config.vector_search.lsh_nbits = [vectorDict[@"lshNbits"] intValue];
+        if (vectorDict[@"lsh_nbits"]) {
+            config.vector_search.lsh_nbits = [vectorDict[@"lsh_nbits"] intValue];
         }
-        if (vectorDict[@"indexDefinition"]) {
-            config.vector_search.index_definition = [vectorDict[@"indexDefinition"] UTF8String];
+        if (vectorDict[@"index_definition"]) {
+            config.vector_search.index_definition = [vectorDict[@"index_definition"] UTF8String];
         }
-        if (vectorDict[@"autoSave"]) {
-            config.vector_search.auto_save = [vectorDict[@"autoSave"] boolValue];
+        if (vectorDict[@"auto_save"]) {
+            config.vector_search.auto_save = [vectorDict[@"auto_save"] boolValue];
         }
-        if (vectorDict[@"autoLoad"]) {
-            config.vector_search.auto_load = [vectorDict[@"autoLoad"] boolValue];
+        if (vectorDict[@"auto_load"]) {
+            config.vector_search.auto_load = [vectorDict[@"auto_load"] boolValue];
         }
     }
     
@@ -221,77 +264,78 @@
         if (llmDict[@"enabled"]) {
             config.llm.enabled = [llmDict[@"enabled"] boolValue];
         }
-        if (llmDict[@"modelPath"]) {
-            config.llm.model_path = [llmDict[@"modelPath"] UTF8String];
+        if (llmDict[@"model_path"]) {
+            NSString *resolvedPath = [self resolveFrameworkResourcePath:llmDict[@"model_path"]];
+            config.llm.model_path = [resolvedPath UTF8String];
         }
         if (llmDict[@"framework"]) {
             config.llm.framework = [llmDict[@"framework"] UTF8String];
         }
-        if (llmDict[@"nCtx"]) {
-            config.llm.n_ctx = [llmDict[@"nCtx"] intValue];
+        if (llmDict[@"n_ctx"]) {
+            config.llm.n_ctx = [llmDict[@"n_ctx"] intValue];
         }
-        if (llmDict[@"nPredict"]) {
-            config.llm.n_predict = [llmDict[@"nPredict"] intValue];
+        if (llmDict[@"n_predict"]) {
+            config.llm.n_predict = [llmDict[@"n_predict"] intValue];
         }
-        if (llmDict[@"nBatch"]) {
-            config.llm.n_batch = [llmDict[@"nBatch"] intValue];
+        if (llmDict[@"n_batch"]) {
+            config.llm.n_batch = [llmDict[@"n_batch"] intValue];
         }
-        if (llmDict[@"nUbatch"]) {
-            config.llm.n_ubatch = [llmDict[@"nUbatch"] intValue];
+        if (llmDict[@"n_ubatch"]) {
+            config.llm.n_ubatch = [llmDict[@"n_ubatch"] intValue];
         }
-        if (llmDict[@"nThreads"]) {
-            config.llm.n_threads = [llmDict[@"nThreads"] intValue];
+        if (llmDict[@"n_threads"]) {
+            config.llm.n_threads = [llmDict[@"n_threads"] intValue];
         }
-        if (llmDict[@"nThreadsBatch"]) {
-            config.llm.n_threads_batch = [llmDict[@"nThreadsBatch"] intValue];
+        if (llmDict[@"n_threads_batch"]) {
+            config.llm.n_threads_batch = [llmDict[@"n_threads_batch"] intValue];
         }
         if (llmDict[@"temperature"]) {
             config.llm.temperature = [llmDict[@"temperature"] floatValue];
         }
-        if (llmDict[@"topP"]) {
-            config.llm.top_p = [llmDict[@"topP"] floatValue];
+        if (llmDict[@"top_p"]) {
+            config.llm.top_p = [llmDict[@"top_p"] floatValue];
         }
-        if (llmDict[@"topK"]) {
-            config.llm.top_k = [llmDict[@"topK"] intValue];
+        if (llmDict[@"top_k"]) {
+            config.llm.top_k = [llmDict[@"top_k"] intValue];
         }
-        if (llmDict[@"minP"]) {
-            config.llm.min_p = [llmDict[@"minP"] floatValue];
+        if (llmDict[@"min_p"]) {
+            config.llm.min_p = [llmDict[@"min_p"] floatValue];
         }
-        if (llmDict[@"repeatPenalty"]) {
-            config.llm.repeat_penalty = [llmDict[@"repeatPenalty"] floatValue];
+        if (llmDict[@"repeat_penalty"]) {
+            config.llm.repeat_penalty = [llmDict[@"repeat_penalty"] floatValue];
         }
-        if (llmDict[@"repeatLastN"]) {
-            config.llm.repeat_last_n = [llmDict[@"repeatLastN"] intValue];
+        if (llmDict[@"repeat_last_n"]) {
+            config.llm.repeat_last_n = [llmDict[@"repeat_last_n"] intValue];
         }
-        if (llmDict[@"tfsZ"]) {
-            config.llm.tfs_z = [llmDict[@"tfsZ"] floatValue];
+        if (llmDict[@"tfs_z"]) {
+            config.llm.tfs_z = [llmDict[@"tfs_z"] floatValue];
         }
-        if (llmDict[@"typicalP"]) {
-            config.llm.typical_p = [llmDict[@"typicalP"] floatValue];
+        if (llmDict[@"typical_p"]) {
+            config.llm.typical_p = [llmDict[@"typical_p"] floatValue];
         }
-        if (llmDict[@"nGpuLayers"]) {
-            config.llm.n_gpu_layers = [llmDict[@"nGpuLayers"] intValue];
+        if (llmDict[@"n_gpu_layers"]) {
+            config.llm.n_gpu_layers = [llmDict[@"n_gpu_layers"] intValue];
         }
-        if (llmDict[@"useMmap"]) {
-            config.llm.use_mmap = [llmDict[@"useMmap"] boolValue];
+        if (llmDict[@"use_mmap"]) {
+            config.llm.use_mmap = [llmDict[@"use_mmap"] boolValue];
         }
-        if (llmDict[@"useMlock"]) {
-            config.llm.use_mlock = [llmDict[@"useMlock"] boolValue];
+        if (llmDict[@"use_mlock"]) {
+            config.llm.use_mlock = [llmDict[@"use_mlock"] boolValue];
         }
         if (llmDict[@"numa"]) {
             config.llm.numa = [llmDict[@"numa"] boolValue];
         }
-        if (llmDict[@"systemPrompt"]) {
-            config.llm.system_prompt = [llmDict[@"systemPrompt"] UTF8String];
+        if (llmDict[@"system_prompt"]) {
+            config.llm.system_prompt = [llmDict[@"system_prompt"] UTF8String];
         }
         if (llmDict[@"seed"]) {
             config.llm.seed = [llmDict[@"seed"] intValue];
         }
-        if (llmDict[@"debugMode"]) {
-            config.llm.debug_mode = [llmDict[@"debugMode"] boolValue];
+        if (llmDict[@"debug_mode"]) {
+            config.llm.debug_mode = [llmDict[@"debug_mode"] boolValue];
         }
-        if (llmDict[@"verbosePrompt"]) {
-            config.llm.verbose_prompt = [llmDict[@"verbosePrompt"] boolValue];
+        if (llmDict[@"verbose_prompt"]) {
+            config.llm.verbose_prompt = [llmDict[@"verbose_prompt"] boolValue];
         }
     }
     

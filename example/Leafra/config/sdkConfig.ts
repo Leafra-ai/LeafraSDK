@@ -1,4 +1,12 @@
 // SDK Configuration
+
+// Helper function to resolve paths to LeafraCore.framework's resource bundle
+const addFrameworkResourcePathPrefix = (filename: string): string => {
+  // For React Native, we need to resolve to the framework's resource bundle
+  // The framework structure is: LeafraCore.framework/LeafraResources.bundle/models/
+  return `LeafraCore.framework/LeafraResources.bundle/models/${filename}`;
+};
+
 export class SDKConfigManager {
   private static instance: SDKConfigManager;
   private debugMode: boolean = __DEV__;
@@ -19,21 +27,11 @@ export class SDKConfigManager {
   }
   
   getConfig(type: 'chat' | 'test' = 'chat') {
-    const baseConfig = type === 'chat' ? {
-      name: 'LeafraChatApp',
-      version: '1.0.0',
-      maxThreads: 2,
-      bufferSize: 1024,
-    } : {
-      name: 'LeafraTestApp',
-      version: '1.0.0',
-      maxThreads: 2,
-      bufferSize: 512,
-    };
+    const baseConfig = type === 'chat' ? SDKConfig.CHAT_CONFIG : SDKConfig.TEST_CONFIG;
     
     return {
       ...baseConfig,
-      debugMode: this.debugMode,
+      debug_mode: this.debugMode, // Override with current debug mode from manager
     };
   }
 }
@@ -57,6 +55,58 @@ const getDebugMode = (): boolean => {
   return __DEV__; // Default to React Native's __DEV__
 };
 
+// Chat-specific config - matches sdkcmdline.cpp configuration
+const CHAT_CONFIG = {
+  name: 'LeafraSDK-Chat',
+  version: '1.0.0',
+  debug_mode: getDebugMode(),
+  
+  // Chunking configuration (matching sdkcmdline.cpp)
+  chunking: {
+    enabled: true,
+    chunk_size: 400,  // 400 tokens per chunk (matches sdkcmdline)
+    overlap_percentage: 0.2,  // 20% overlap
+    size_unit: 'TOKENS',
+    token_method: 'SIMPLE',
+    preserve_word_boundaries: true,
+    include_metadata: true,
+    print_chunks_full: false,
+    print_chunks_brief: true,
+    max_lines: 5,
+  },
+  
+  // Tokenizer configuration - resolved to framework bundle
+  tokenizer: {
+    enabled: true,
+    model_name: 'multilingual-e5-small',
+    model_path: addFrameworkResourcePathPrefix('sentencepiece.bpe.model'),
+    model_json_path: addFrameworkResourcePathPrefix('tokenizer_config.json'),
+  },
+  
+  // Embedding inference configuration - resolved to framework bundle
+  embedding_inference: {
+    enabled: true,
+    framework: 'coreml',
+    model_path: addFrameworkResourcePathPrefix('e5_embedding_model_i512a512_FP32.mlmodelc'),
+  },
+  
+  // Vector search configuration
+  vector_search: {
+    enabled: true,
+    index_type: 'FLAT',  // matches sdkcmdline.cpp
+    metric: 'COSINE',
+    dimension: 384,
+  },
+  
+  // LLM configuration - resolved to framework bundle
+  llm: {
+    enabled: true,
+    model_path: addFrameworkResourcePathPrefix('Llama-3.2-3B-Instruct-Q4_K_M.gguf'),
+    n_ctx: 4096,  // max tokens for context
+    n_predict: 256,  // max tokens to generate
+  },
+};
+
 export const SDKConfig = {
   // Smart debug mode - respects environment overrides
   DEBUG_MODE: getDebugMode(),
@@ -65,32 +115,16 @@ export const SDKConfig = {
   // DEBUG_MODE: true,  // Force debug on
   // DEBUG_MODE: false, // Force debug off
   
-  // Common settings
-  DEFAULT_CONFIG: {
-    name: 'LeafraApp',
-    version: '1.0.0',
-    debugMode: getDebugMode(),
-    maxThreads: 2,
-    bufferSize: 1024,
-  },
+
+  // Chat-specific config - matches sdkcmdline.cpp configuration
+  CHAT_CONFIG,
   
-  // Chat-specific config
-  CHAT_CONFIG: {
-    name: 'LeafraChatApp',
-    version: '1.0.0',
-    debugMode: getDebugMode(),
-    maxThreads: 2,
-    bufferSize: 1024,
-  },
-  
-  // Test-specific config
-  TEST_CONFIG: {
-    name: 'LeafraTestApp',
-    version: '1.0.0',
-    debugMode: getDebugMode(),
-    maxThreads: 2,
-    bufferSize: 512,
-  },
+  // Test-specific config - assignment from chat config with name override
+  TEST_CONFIG: (() => {
+    const config = { ...CHAT_CONFIG };
+    config.name = 'LeafraSDK-Test';
+    return config;
+  })(),
   
   // Environment info
   ENV: {
