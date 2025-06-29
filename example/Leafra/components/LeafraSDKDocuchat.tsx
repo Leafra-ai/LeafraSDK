@@ -10,13 +10,18 @@ import {
   Platform,
   Alert,
   NativeModules,
+  NativeEventEmitter,
 } from 'react-native';
 
 import FileBrowserModal from './FileBrowserModal';
+import SearchResultsModal from './SearchResultsModal';
 import { getSDKConfig } from '../config/sdkConfig';
 
 // SDK Integration
 const { LeafraSDK: LeafraSDKNative } = NativeModules;
+
+// Event Emitter for token streaming
+const leafraEventEmitter = new NativeEventEmitter(LeafraSDKNative);
 
 // SDK Types (copied from TestInterface for consistency)
 interface LeafraConfig {
@@ -98,6 +103,7 @@ interface Message {
   text: string;
   timestamp: Date;
   isUser: boolean;
+  isClickable?: boolean;
 }
 
 interface LeafraSDKDocuchatProps {
@@ -124,11 +130,37 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
   const [inputText, setInputText] = useState('');
   const [fileBrowserVisible, setFileBrowserVisible] = useState(false);
   const [sdkInitialized, setSdkInitialized] = useState(false);
+  const [streamingResponse, setStreamingResponse] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResultsModalVisible, setSearchResultsModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const streamingResponseRef = useRef('');
+  const autoScrollEnabled = useRef(true);
 
   // Initialize SDK when component mounts
   useEffect(() => {
     initializeSDK();
+    
+    // Set up token event listener
+    const tokenSubscription = leafraEventEmitter.addListener('LeafraSDKTokenEvent', (event) => {
+      console.log('🔤 Received token:', event.token);
+      const newResponse = streamingResponseRef.current + event.token;
+      streamingResponseRef.current = newResponse;
+      setStreamingResponse(newResponse);
+      
+      // Auto-scroll to bottom when receiving tokens (only if auto-scroll is enabled)
+      if (autoScrollEnabled.current) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: false });
+        }, 10);
+      }
+    });
+    
+    // Cleanup subscription on unmount
+    return () => {
+      tokenSubscription.remove();
+    };
   }, []);
 
   const initializeSDK = async () => {
@@ -167,19 +199,35 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
     }
   };
 
-  const addMessage = (text: string, isUser: boolean = false) => {
+  const addMessage = (text: string, isUser: boolean = false, isClickable: boolean = false) => {
     const message: Message = {
       id: Date.now().toString() + Math.random(),
       text,
       timestamp: new Date(),
       isUser,
+      isClickable,
     };
     setMessages(prev => [...prev, message]);
     
-    // Scroll to bottom
+    // Enable auto-scroll and scroll to bottom for new messages
+    autoScrollEnabled.current = true;
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
+  };
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+    
+    // Enable auto-scroll only if user is at the bottom
+    autoScrollEnabled.current = isAtBottom;
+  };
+
+  const handleMessagePress = (message: Message) => {
+    if (message.isClickable && message.text.includes('document chunks')) {
+      setSearchResultsModalVisible(true);
+    }
   };
 
   const sendMessage = async () => {
@@ -211,31 +259,44 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
     addMessage('🔄 Searching through your documents...');
 
     try {
+      // Reset streaming state and start streaming
+      setStreamingResponse('');
+      streamingResponseRef.current = '';
+      setIsStreaming(true);
+      
       // Call semanticSearchWithLLM with the user's query
-      const result = await LeafraSDK.semanticSearchWithLLM(userQuery, 5);
+      const result = await LeafraSDK.semanticSearchWithLLM(userQuery, 3);
       
       console.log('🔍 Semantic search result:', result);
       
-      if (result && result.response) {
-        // Add the LLM response to the chat
-        addMessage(result.response);
-      } else if (result && result.results && result.results.length > 0) {
-        // If we have search results but no LLM response, format the results
-        let responseText = `Found ${result.results.length} relevant results:\n\n`;
-        result.results.forEach((item: any, index: number) => {
-          responseText += `${index + 1}. ${item.text || item.content || 'Result'}\n`;
-          if (item.score) {
-            responseText += `   (Relevance: ${(item.score * 100).toFixed(1)}%)\n`;
-          }
-          responseText += '\n';
-        });
-        addMessage(responseText);
+      // Stop streaming and add the final response as a message
+      setIsStreaming(false);
+      
+      // Re-enable auto-scroll for the final message
+      autoScrollEnabled.current = true;
+      
+      // Add the final streamed response as a proper message
+      const finalResponse = streamingResponseRef.current.trim();
+      if (finalResponse) {
+        addMessage(finalResponse);
       } else {
-        addMessage('No relevant results found in your documents. Try uploading some PDF files first.');
+        addMessage('No response generated.');
       }
+      
+      // Store search results and add clickable link if we have results
+      if (result && result.results && result.results.length > 0) {
+        setSearchResults(result.results);
+        addMessage(`📚 Found ${result.results.length} relevant document chunks. Tap to view details →`, false, true);
+      }
+      
+      // Clear streaming response for next use
+      setStreamingResponse('');
+      streamingResponseRef.current = '';
       
     } catch (error) {
       console.error('💥 Semantic search error:', error);
+      setIsStreaming(false);
+      setStreamingResponse('');
       addMessage(`❌ Search error: ${error}`);
     }
 
@@ -306,26 +367,6 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
     }
   };
 
-  const generateAIResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
-    
-    if (input.includes('hello') || input.includes('hi')) {
-      return `Hello! I'm here to help you with LeafraSDK Docuchat. The SDK is ${sdkInitialized ? '✅ initialized and ready' : '⚠️ not yet initialized'}. You can ask me about SDK features, upload PDF files for processing, or use the settings menu to access the test interface.`;
-    } else if (input.includes('sdk') || input.includes('leafra')) {
-      return `LeafraSDK is ${sdkInitialized ? '✅ active and ready for processing' : '⚠️ initializing'}. It provides powerful PDF processing with PDFium integration, data processing, and mathematical operations. You can upload PDF files using the + button or access advanced testing through the settings menu.`;
-    } else if (input.includes('test')) {
-      return 'You can test the SDK in two ways:\n• Upload PDF files using the + button for real-time processing\n• Use the settings button (⚙️) → "Test Interface" for comprehensive SDK testing';
-    } else if (input.includes('help')) {
-      return `I can help you with:\n• ${sdkInitialized ? '✅' : '⚠️'} SDK integration and features\n• PDF file processing (use + button)\n• Understanding SDK capabilities\n• Accessing the test interface\n\nWhat would you like to know?`;
-    } else if (input.includes('file') || input.includes('pdf')) {
-      return `You can upload PDF files using the + button in the top right. ${sdkInitialized ? 'The SDK is ready to process them with PDFium for text extraction and analysis!' : 'I\'ll initialize the SDK and process them for you.'}`;
-    } else if (input.includes('status') || input.includes('initialized')) {
-      return `SDK Status: ${sdkInitialized ? '✅ Initialized and ready for processing' : '⚠️ Not initialized - will initialize when needed'}`;
-    } else {
-      return `That's interesting! The LeafraSDK is ${sdkInitialized ? '✅ ready to help' : '⚠️ initializing'}. Feel free to ask me about SDK features, upload PDF files for processing, or use the settings menu to access the test interface.`;
-    }
-  };
-
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -353,18 +394,25 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
         ref={scrollViewRef}
         style={styles.messagesContainer}
         contentContainerStyle={styles.messagesContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={100}
       >
         {messages.map((message) => (
-          <View
+          <TouchableOpacity
             key={message.id}
             style={[
               styles.messageContainer,
               message.isUser ? styles.userMessage : styles.aiMessage,
+              message.isClickable && styles.clickableMessage,
             ]}
+            onPress={() => handleMessagePress(message)}
+            disabled={!message.isClickable}
+            activeOpacity={message.isClickable ? 0.7 : 1}
           >
             <Text style={[
               styles.messageText,
               message.isUser ? styles.userMessageText : styles.aiMessageText,
+              message.isClickable && styles.clickableMessageText,
             ]}>
               {message.text}
             </Text>
@@ -374,8 +422,20 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
             ]}>
               {formatTime(message.timestamp)}
             </Text>
-          </View>
+          </TouchableOpacity>
         ))}
+        
+        {/* Show streaming response in real-time */}
+        {isStreaming && (
+          <View style={[styles.messageContainer, styles.aiMessage]}>
+            <Text style={[styles.messageText, styles.aiMessageText]}>
+              {streamingResponse || '🤖 Thinking...'}
+            </Text>
+            <Text style={[styles.messageTime, styles.aiMessageTime]}>
+              {formatTime(new Date())}
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Input */}
@@ -405,6 +465,13 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
         visible={fileBrowserVisible}
         onClose={() => setFileBrowserVisible(false)}
         onFilesSelected={handleFilesSelected}
+      />
+
+      {/* Search Results Modal */}
+      <SearchResultsModal
+        visible={searchResultsModalVisible}
+        onClose={() => setSearchResultsModalVisible(false)}
+        results={searchResults}
       />
     </KeyboardAvoidingView>
   );
@@ -471,6 +538,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
+  clickableMessage: {
+    borderColor: '#007AFF',
+    borderWidth: 2,
+    backgroundColor: '#f0f8ff',
+  },
   messageText: {
     fontSize: 16,
     lineHeight: 20,
@@ -480,6 +552,10 @@ const styles = StyleSheet.create({
   },
   aiMessageText: {
     color: '#333',
+  },
+  clickableMessageText: {
+    color: '#007AFF',
+    fontWeight: '500',
   },
   messageTime: {
     fontSize: 12,

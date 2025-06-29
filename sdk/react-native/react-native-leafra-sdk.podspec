@@ -77,7 +77,8 @@ Pod::Spec.new do |s|
   s.libraries = ["sqlite3", "icucore"]
 
   # Compiler settings
-  s.compiler_flags = folly_compiler_flags + ' -DRCT_NEW_ARCH_ENABLED=1'
+  leafra_definitions = ' -DLEAFRA_HAS_FAISS=1 -DLEAFRA_HAS_LLAMACPP=1 -DLEAFRA_HAS_COREML=1 -DLEAFRA_HAS_SQLITE=1 -DLEAFRA_HAS_SENTENCEPIECE=1 -DLEAFRA_HAS_ICU=1 -DLEAFRA_HAS_PDFIUM=1'
+  s.compiler_flags = folly_compiler_flags + ' -DRCT_NEW_ARCH_ENABLED=1' + leafra_definitions
   s.pod_target_xcconfig = {
     "HEADER_SEARCH_PATHS" => [
       "\"$(PODS_ROOT)/boost\"",
@@ -96,7 +97,7 @@ Pod::Spec.new do |s|
     ].join(" "),
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
     "CLANG_CXX_LIBRARY" => "libc++",
-    "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
+    "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1" + leafra_definitions,
     "OTHER_CFLAGS" => "$(inherited)"
   }
 
@@ -108,10 +109,10 @@ Pod::Spec.new do |s|
 
     # Don't install the dependencies when we run `pod install` in the old architecture.
     if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
-      s.compiler_flags = folly_compiler_flags + " -DRCT_NEW_ARCH_ENABLED=1"
+      s.compiler_flags = folly_compiler_flags + " -DRCT_NEW_ARCH_ENABLED=1" + leafra_definitions
       s.pod_target_xcconfig    = {
         "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
-        "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
+        "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1" + leafra_definitions,
         "CLANG_CXX_LANGUAGE_STANDARD" => "c++17"
       }
       s.dependency "React-Codegen"

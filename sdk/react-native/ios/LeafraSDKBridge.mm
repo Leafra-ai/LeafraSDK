@@ -3,10 +3,7 @@
 #include "leafra/math_utils.h"
 #include "leafra/data_processor.h"
 #include "leafra/leafra_chunker.h"
-
-#ifdef LEAFRA_HAS_FAISS
 #include "leafra/leafra_faiss.h"
-#endif
 
 #include <memory>
 
@@ -602,8 +599,6 @@
 
 #pragma mark - Semantic Search Methods
 
-#ifdef LEAFRA_HAS_FAISS
-
 - (NSDictionary *)dictionaryFromSearchResult:(const leafra::FaissIndex::SearchResult&)result {
     NSMutableDictionary *dict = [NSMutableDictionary dictionary];
     
@@ -706,27 +701,6 @@
         @"results": resultsArray
     };
 }
-
-#else
-
-// Fallback implementations when FAISS is not available
-- (NSDictionary *)semanticSearch:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error {
-    if (error) {
-        *error = [self errorFromResultCode:leafra::ResultCode::ERROR_NOT_IMPLEMENTED
-                                   message:@"FAISS support not compiled"];
-    }
-    return @{@"result": @((int)leafra::ResultCode::ERROR_NOT_IMPLEMENTED), @"results": @[]};
-}
-
-- (NSDictionary *)semanticSearchWithLLM:(NSString *)query maxResults:(NSNumber *)maxResults error:(NSError **)error {
-    if (error) {
-        *error = [self errorFromResultCode:leafra::ResultCode::ERROR_NOT_IMPLEMENTED
-                                   message:@"FAISS support not compiled"];
-    }
-    return @{@"result": @((int)leafra::ResultCode::ERROR_NOT_IMPLEMENTED), @"results": @[]};
-}
-
-#endif
 
 - (void)setEventCallback:(void (^)(NSString *message))callback {
     _eventCallback = [callback copy];
