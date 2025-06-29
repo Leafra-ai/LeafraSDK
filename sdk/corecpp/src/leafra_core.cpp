@@ -1005,9 +1005,12 @@ ResultCode LeafraCore::initialize(const Config& config) {
         Logger& logger = Logger::getInstance();
         if (config.debug_mode) {
             logger.setLogLevel(LogLevel::LEAFRA_DEBUG);
-            LEAFRA_INFO() << "Debug logging enabled";
+            LEAFRA_WARNING() << "LeafraCore: Debug logging enabled - LogLevel set to DEBUG";
+            fprintf(stderr, "[LeafraSDK] Debug mode enabled\n");
         } else {
             logger.setLogLevel(LogLevel::LEAFRA_INFO);
+            LEAFRA_WARNING() << "LeafraCore: Debug logging disabled - LogLevel set to INFO";
+            fprintf(stderr, "[LeafraSDK] Debug mode disabled\n");
         }
         
         LEAFRA_INFO() << "Initializing LeafraSDK v" << get_version();

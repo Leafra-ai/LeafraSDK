@@ -88,6 +88,9 @@ const LeafraSDK = {
   async getVersion(): Promise<string> {
     return LeafraSDKNative.getVersion();
   },
+  async semanticSearchWithLLM(query: string, maxResults: number): Promise<any> {
+    return LeafraSDKNative.semanticSearchWithLLM(query, maxResults);
+  },
 };
 
 interface Message {
@@ -97,7 +100,7 @@ interface Message {
   isUser: boolean;
 }
 
-interface ChatInterfaceProps {
+interface LeafraSDKDocuchatProps {
   onAddFiles: () => void;
   onSettings: () => void;
 }
@@ -109,11 +112,11 @@ interface SelectedFile {
   type: string;
 }
 
-export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceProps) {
+export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKDocuchatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your LeafraSDK assistant. How can I help you today?',
+      text: 'Hello! I\'m your LeafraSDK Docuchat assistant. How can I help you today?',
       timestamp: new Date(),
       isUser: false,
     },
@@ -150,7 +153,7 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
       
       if (result === ResultCode.SUCCESS) {
         setSdkInitialized(true);
-        console.log('✅ SDK initialized successfully in ChatInterface');
+        console.log('✅ SDK initialized successfully in LeafraSDKDocuchat');
         
         // Get SDK version for logging
         const version = await LeafraSDK.getVersion();
@@ -179,12 +182,13 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
     }, 100);
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (inputText.trim() === '') return;
 
+    const userQuery = inputText.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim(),
+      text: userQuery,
       timestamp: new Date(),
       isUser: true,
     };
@@ -192,16 +196,48 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: generateAIResponse(inputText.trim()),
-        timestamp: new Date(),
-        isUser: false,
-      };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1000);
+    // Check if SDK is initialized
+    if (!sdkInitialized) {
+      addMessage('⚠️ SDK not initialized. Attempting to initialize...');
+      await initializeSDK();
+      
+      if (!sdkInitialized) {
+        addMessage('❌ Failed to initialize SDK. Please try again.');
+        return;
+      }
+    }
+
+    // Show processing message
+    addMessage('🔄 Searching through your documents...');
+
+    try {
+      // Call semanticSearchWithLLM with the user's query
+      const result = await LeafraSDK.semanticSearchWithLLM(userQuery, 5);
+      
+      console.log('🔍 Semantic search result:', result);
+      
+      if (result && result.response) {
+        // Add the LLM response to the chat
+        addMessage(result.response);
+      } else if (result && result.results && result.results.length > 0) {
+        // If we have search results but no LLM response, format the results
+        let responseText = `Found ${result.results.length} relevant results:\n\n`;
+        result.results.forEach((item: any, index: number) => {
+          responseText += `${index + 1}. ${item.text || item.content || 'Result'}\n`;
+          if (item.score) {
+            responseText += `   (Relevance: ${(item.score * 100).toFixed(1)}%)\n`;
+          }
+          responseText += '\n';
+        });
+        addMessage(responseText);
+      } else {
+        addMessage('No relevant results found in your documents. Try uploading some PDF files first.');
+      }
+      
+    } catch (error) {
+      console.error('💥 Semantic search error:', error);
+      addMessage(`❌ Search error: ${error}`);
+    }
 
     // Scroll to bottom
     setTimeout(() => {
@@ -274,7 +310,7 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
     const input = userInput.toLowerCase();
     
     if (input.includes('hello') || input.includes('hi')) {
-      return `Hello! I'm here to help you with LeafraSDK. The SDK is ${sdkInitialized ? '✅ initialized and ready' : '⚠️ not yet initialized'}. You can ask me about SDK features, upload PDF files for processing, or use the settings menu to access the test interface.`;
+      return `Hello! I'm here to help you with LeafraSDK Docuchat. The SDK is ${sdkInitialized ? '✅ initialized and ready' : '⚠️ not yet initialized'}. You can ask me about SDK features, upload PDF files for processing, or use the settings menu to access the test interface.`;
     } else if (input.includes('sdk') || input.includes('leafra')) {
       return `LeafraSDK is ${sdkInitialized ? '✅ active and ready for processing' : '⚠️ initializing'}. It provides powerful PDF processing with PDFium integration, data processing, and mathematical operations. You can upload PDF files using the + button or access advanced testing through the settings menu.`;
     } else if (input.includes('test')) {
@@ -301,7 +337,7 @@ export default function ChatInterface({ onAddFiles, onSettings }: ChatInterfaceP
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>LeafraSDK Chat</Text>
+        <Text style={styles.headerTitle}>LeafraSDK Docuchat</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity style={styles.headerButton} onPress={handleAddFiles}>
             <Text style={styles.headerButtonText}>+</Text>

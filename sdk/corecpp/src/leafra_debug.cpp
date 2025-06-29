@@ -1,4 +1,5 @@
 #include "leafra/leafra_debug.h"
+#include "leafra/logger.h"
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -129,26 +130,8 @@ void debug_log(const std::string& category, const std::string& message) {
     oss << "[DEBUG:" << category << "] " << message;
     std::string log_message = oss.str();
     
-#ifdef __ANDROID__
-    // Android: Use Android log
-    __android_log_print(ANDROID_LOG_DEBUG, "LeafraSDK", "%s", log_message.c_str());
-#elif defined(__APPLE__)
-    // iOS/macOS: Use fprintf to stderr
-    #if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
-        // iOS: Use standard error
-        std::fprintf(stderr, "%s\n", log_message.c_str());
-    #else
-        // macOS: Use standard error
-        std::fprintf(stderr, "%s\n", log_message.c_str());
-    #endif
-#elif defined(_WIN32)
-    // Windows: Use OutputDebugString and console
-    OutputDebugStringA((log_message + "\n").c_str());
-    std::fprintf(stderr, "%s\n", log_message.c_str());
-#else
-    // Linux and others: Use standard error
-    std::fprintf(stderr, "%s\n", log_message.c_str());
-#endif
+    // Use centralized logger system instead of platform-specific implementations
+    Logger::getInstance().debug(log_message);
 }
 
 void debug_log_performance(const std::string& operation, 

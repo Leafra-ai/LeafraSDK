@@ -6,6 +6,10 @@ namespace leafra {
 namespace debug {
 
 // Enable/disable debug functionality
+// NOTE: This separate debug mechanism exists for performance reasons.
+// Debug logging involves expensive operations (string formatting, calculations, etc.)
+// that we want to avoid entirely when debug is disabled, rather than just filtering
+// at the Logger level. This provides a fast early-exit before any processing occurs.
 void set_debug_enabled(bool enabled);
 bool is_debug_enabled();
 
