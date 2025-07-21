@@ -28,7 +28,7 @@ interface SearchResultsModalProps {
 export default function SearchResultsModal({ visible, onClose, results }: SearchResultsModalProps) {
   const formatDistance = (distance: number): string => {
     // Convert distance to similarity percentage (assuming cosine distance)
-    const similarity = Math.max(0, (1 - distance) * 100);
+    const similarity = Math.max(0, (distance) * 100);
     return `${similarity.toFixed(1)}%`;
   };
 

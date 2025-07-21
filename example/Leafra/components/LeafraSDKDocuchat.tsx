@@ -339,7 +339,7 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
         
         if (result.result === ResultCode.SUCCESS) {
           addMessage(`✅ Successfully processed ${files.length} PDF files through LeafraSDK!`);
-          addMessage(`📊 Processing completed. The files have been analyzed using PDFium and are ready for further operations.`);
+
           
           // Log additional details if available
           if (result.output && result.output.length > 0) {
