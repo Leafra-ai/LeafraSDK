@@ -7,14 +7,13 @@ podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties
 ENV['RCT_NEW_ARCH_ENABLED'] = '0' if podfile_properties['newArchEnabled'] == 'false'
 ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] = podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
 
-
 platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 install! 'cocoapods',
   :deterministic_uuids => false
 
 prepare_react_native_project!
 
-target 'Leafra' do
+target 'DokuChat' do
   use_expo_modules!
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
@@ -31,15 +30,10 @@ target 'Leafra' do
   end
 
   config = use_native_modules!(config_command)
-  
 
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 
-  # Note: LeafraSDK comes through bridge module's internal podspec automatically.
-  # note that expo needs to use :static linkage for LeafraSDK to work in the pod file properties 
-  
-  
   use_react_native!(
     :path => config[:reactNativePath],
     :hermes_enabled => podfile_properties['expo.jsEngine'] == nil || podfile_properties['expo.jsEngine'] == 'hermes',
@@ -55,6 +49,27 @@ target 'Leafra' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
+
+    # Configure dSYM generation for all pods (including Hermes framework)
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # Enable dSYM generation for App Store submission
+        if config.name == 'Release'
+          config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+        else
+          config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
+        end
+        
+        # Ensure minimum iOS version compatibility
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        
+        # Disable stripping to preserve debug symbols
+        config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'NO'
+        config.build_settings['SEPARATE_STRIP'] = 'NO'
+        config.build_settings['DEPLOYMENT_POSTPROCESSING'] = 'NO'
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+      end
+    end
 
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.

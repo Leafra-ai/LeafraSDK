@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => "13.0", :osx => "10.15" }
+  s.platforms    = { :ios => "15.1", :osx => "10.15" }
   s.source       = { :git => "https://github.com/your-org/LeafraSDK.git", :tag => "#{s.version}" }
 
   # Source files for the React Native bridge
@@ -25,7 +25,9 @@ Pod::Spec.new do |s|
     "ios/**/*.h"
   ]
 
-  # TypeScript/JavaScript files
+  # TypeScript/JavaScript files for debugging
+  # Note: dSYM files are NOT included in preserve_paths to avoid embedding them in the app bundle
+  # They are placed alongside frameworks and handled automatically by Xcode for App Store uploads
   s.preserve_paths = [
     "common/src/**/*",
     "lib/**/*",
@@ -47,6 +49,8 @@ Pod::Spec.new do |s|
     "macos/LeafraCore.framework", 
     "macos/llama.framework"
   ]
+
+
 
 
 

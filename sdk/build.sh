@@ -89,19 +89,15 @@ print_usage() {
     echo "  --ios               Build for iOS"
     echo "  --macos             Build for macOS"
     echo "  --android           Build for Android"
-    echo "  --simulator         Build for iOS Simulator (when using --ios)"
-    echo "  --embedding-fw=FW   Set embedding inference framework:"
-    echo "                        tflite  - TensorFlow Lite (iOS/Android only, from prebuilds) [NOT IMPLEMENTED]"
-    echo "                        tf      - TensorFlow (macOS/Windows, must be preinstalled v2.17) [NOT IMPLEMENTED]"
-    echo "                        coreml  - CoreML (iOS/macOS only, from platform SDK)"
+    echo "  --embedding-fw=FW   Specify embedding framework (coreml, tflite)"
     echo ""
     echo "Targets:"
-    echo "  core                Build core C++ library only"
-    echo "  bindings            Build React Native bindings"
-    echo "  all                 Build everything (default)"
+    echo "  all                 Build all targets (default)"
+    echo "  core                Build core library only"
+    echo "  tests               Build tests only"
     echo ""
     echo "Examples:"
-    echo "  $0                              # Build everything for current platform"
+    echo "  $0                              # Build all targets for current platform"
     echo "  $0 --ios core                   # Build core library for iOS"
     echo "  $0 --macos --embedding-fw=tf    # Build for macOS with TensorFlow"
     echo "  $0 --ios --embedding-fw=coreml  # Build for iOS with CoreML"
@@ -114,6 +110,76 @@ print_info() {
 
 print_error() {
     echo "[ERROR] $1" >&2
+}
+
+# Function to run pod install for React Native integration
+run_pod_install() {
+    local platform=$1
+    local react_native_dir="../example/Leafra"
+    
+    # Ask user if they want to run pod install
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════════════════"
+    echo "📦 COCOAPODS INTEGRATION"
+    echo "═══════════════════════════════════════════════════════════════════════════════"
+    echo "The build is complete, but you may want to update CocoaPods dependencies"
+    echo "to ensure the React Native app uses the newly built $platform frameworks."
+    echo ""
+    echo "⚠️  Note: This step is not always required and can be skipped if:"
+    echo "   • You're not working with the React Native example app"
+    echo "   • You've already run pod install recently"
+    echo "   • You only need the native SDK libraries"
+    echo ""
+    read -p "Do you want to run 'pod install' for React Native integration? (Y/n): " -n 1 -r
+    echo ""
+    
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "⏭️  Skipping pod install. You can run it manually later if needed:"
+        print_info "   cd example/Leafra/ios && pod install"
+        echo "═══════════════════════════════════════════════════════════════════════════════"
+        return 0
+    fi
+    
+    print_info "📦 Running pod install for React Native integration ($platform)..."
+    echo "═══════════════════════════════════════════════════════════════════════════════"
+    echo "🔄 UPDATING COCOAPODS DEPENDENCIES - This ensures the updated frameworks are linked"
+    echo "═══════════════════════════════════════════════════════════════════════════════"
+    
+    if [ -d "$react_native_dir" ]; then
+        cd "$react_native_dir"
+        if [ -f "ios/Podfile" ]; then
+            cd ios
+            if command -v pod >/dev/null 2>&1; then
+                print_info "  → Running 'pod install' in $react_native_dir/ios/"
+                pod install --verbose || {
+                    print_error "pod install failed! You may need to run it manually."
+                    cd ../../..
+                    return 1
+                }
+                print_info "  ✅ CocoaPods integration completed successfully!"
+                echo "🚀 React Native app is now ready with updated $platform frameworks!"
+            else
+                print_error "CocoaPods not found! Please install with: sudo gem install cocoapods"
+                cd ../../..
+                return 1
+            fi
+            cd ../..
+        else
+            print_error "Podfile not found in $react_native_dir/ios/"
+            cd ../..
+            return 1
+        fi
+        cd ..
+    else
+        print_error "React Native directory not found: $react_native_dir"
+        return 1
+    fi
+    
+    echo "═══════════════════════════════════════════════════════════════════════════════"
+    echo "📱 IMPORTANT: If you have Xcode open, please close and reopen the workspace"
+    echo "   to ensure all framework changes are properly loaded:"
+    echo "   → open example/Leafra/ios/DokuChat.xcworkspace"
+    echo "═══════════════════════════════════════════════════════════════════════════════"
 }
 
 check_and_build_dependencies() {
@@ -257,6 +323,25 @@ copy_frameworks_to_react_native() {
                 print_info "  → Copying LeafraCore$framework_ext to $dest_platform_dir/"
                 cp -R "$src_platform_dir/$lib_subdir/LeafraCore$framework_ext" "$dest_platform_dir/"
                 print_info "    ✅ LeafraCore$framework_ext copied successfully"
+                
+                # Copy corresponding dSYM files with proper App Store naming
+                local framework_dsym_name="LeafraCore.framework.dSYM"
+                if [ -d "$src_platform_dir/$lib_subdir/$framework_dsym_name" ]; then
+                    print_info "  → Copying $framework_dsym_name to $dest_platform_dir/"
+                    cp -R "$src_platform_dir/$lib_subdir/$framework_dsym_name" "$dest_platform_dir/"
+                    print_info "    ✅ $framework_dsym_name copied successfully"
+                else
+                    print_info "  ⚠️  $framework_dsym_name not found at $src_platform_dir/$lib_subdir/"
+                    
+                    # Check if it might be in the parent directory
+                    if [ -d "$src_platform_dir/$framework_dsym_name" ]; then
+                        print_info "  → Found $framework_dsym_name in parent directory, copying..."
+                        cp -R "$src_platform_dir/$framework_dsym_name" "$dest_platform_dir/"
+                        print_info "    ✅ $framework_dsym_name copied from parent directory"
+                    else
+                        print_info "  ⚠️  $framework_dsym_name not found in parent directory either"
+                    fi
+                fi
             else
                 print_error "LeafraCore$framework_ext not found in $src_platform_dir/$lib_subdir/"
                 return 1
@@ -266,6 +351,20 @@ copy_frameworks_to_react_native() {
                 print_info "  → Copying llama$framework_ext to $dest_platform_dir/"
                 cp -R "$src_platform_dir/$lib_subdir/llama$framework_ext" "$dest_platform_dir/"
                 print_info "    ✅ llama$framework_ext copied successfully"
+                
+                # Copy and rename llama dSYM files for App Store compliance
+                local llama_framework_dsym_name="llama.framework.dSYM"
+                if [ -d "$src_platform_dir/$lib_subdir/llama.dSYM" ]; then
+                    print_info "  → Copying and renaming llama.dSYM to $llama_framework_dsym_name"
+                    cp -R "$src_platform_dir/$lib_subdir/llama.dSYM" "$dest_platform_dir/$llama_framework_dsym_name"
+                    print_info "    ✅ $llama_framework_dsym_name copied successfully"
+                elif [ -d "$src_platform_dir/$lib_subdir/$llama_framework_dsym_name" ]; then
+                    print_info "  → Copying $llama_framework_dsym_name to $dest_platform_dir/"
+                    cp -R "$src_platform_dir/$lib_subdir/$llama_framework_dsym_name" "$dest_platform_dir/"
+                    print_info "    ✅ $llama_framework_dsym_name copied successfully"
+                else
+                    print_info "  ⚠️  llama dSYM not found (llama.framework comes from prebuilt XCFramework)"
+                fi
             else
                 print_error "llama$framework_ext not found in $src_platform_dir/$lib_subdir/"
                 return 1
@@ -377,6 +476,9 @@ build_ios() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/$install_dir" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \
+        -DCMAKE_STRIP="" \
+        -DCMAKE_C_FLAGS_RELEASE="-O2 -g -DNDEBUG" \
+        -DCMAKE_CXX_FLAGS_RELEASE="-O2 -g -DNDEBUG" \
         ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
         ${BUNDLED_MODEL_PATHS:+-DLEAFRA_BUNDLED_MODEL_PATHS="$(IFS=';'; echo "${BUNDLED_MODEL_PATHS[*]}")"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
@@ -389,6 +491,9 @@ build_ios() {
     # Copy frameworks to React Native package after successful build
     print_info "🚀 Build completed successfully for iOS!"
     copy_frameworks_to_react_native "ios" "$simulator"
+    if [ "$simulator" = false ]; then
+        run_pod_install "ios"
+    fi
 }
 
 build_macos() {
@@ -409,6 +514,9 @@ build_macos() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/macos" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \
+        -DCMAKE_STRIP="" \
+        -DCMAKE_C_FLAGS_RELEASE="-O2 -g -DNDEBUG" \
+        -DCMAKE_CXX_FLAGS_RELEASE="-O2 -g -DNDEBUG" \
         ${EMBEDDING_FW:+-DLEAFRA_EMBEDDING_FRAMEWORK="$EMBEDDING_FW"} \
         ${BUNDLED_MODEL_PATHS:+-DLEAFRA_BUNDLED_MODEL_PATHS="$(IFS=';'; echo "${BUNDLED_MODEL_PATHS[*]}")"} \
         ${VERBOSE:+-DCMAKE_VERBOSE_MAKEFILE=ON}
@@ -421,6 +529,7 @@ build_macos() {
     # Copy frameworks to React Native package after successful build
     print_info "🚀 Build completed successfully for macOS!"
     copy_frameworks_to_react_native "macos"
+    run_pod_install "macos"
 }
 
 build_android() {

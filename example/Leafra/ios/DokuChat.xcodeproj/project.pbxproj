@@ -8,55 +8,28 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		24F792D9F00738FC0524946B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		5B202CD46E9F2F48D1493AAA /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */; };
+		A06A38ACCAFFB22004B4B97B /* libPods-DokuChat.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D1ED49BD026C365F04D6DFCB /* libPods-DokuChat.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		DC072CB1C05DDF4A5BB29014 /* libPods-Leafra.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 40D6B42BB0718587C93AB731 /* libPods-Leafra.a */; };
+		D69E98B22391622E0AE7F043 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E1476B14661D7A534BF119 /* ExpoModulesProvider.swift */; };
+		E85EBF2150DA1A4FC7CB4C4F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CC8DA63A4E0E8E7B7518CF6E /* PrivacyInfo.xcprivacy */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXBuildRule section */
-		61D1A5702E0DC05700296821 /* PBXBuildRule */ = {
-			isa = PBXBuildRule;
-			compilerSpec = com.apple.compilers.proxy.script;
-			fileType = file.mlmodel;
-			inputFiles = (
-			);
-			isEditable = 1;
-			outputFiles = (
-			);
-			script = "# coremlc\n";
-		};
-/* End PBXBuildRule section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		613CC3042E0CCDB700873F3D /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
-		077F71371F61F97B3502A7E8 /* Pods-Leafra.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.debug.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.debug.xcconfig"; sourceTree = "<group>"; };
-		13B07F961A680F5B00A75B9A /* Leafra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Leafra.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Leafra/Images.xcassets; sourceTree = "<group>"; };
-		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Leafra/Info.plist; sourceTree = "<group>"; };
-		40D6B42BB0718587C93AB731 /* libPods-Leafra.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Leafra.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		52ACEC0B09CB779AD1EB9D71 /* Pods-Leafra.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Leafra.release.xcconfig"; path = "Target Support Files/Pods-Leafra/Pods-Leafra.release.xcconfig"; sourceTree = "<group>"; };
-		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Leafra/SplashScreen.storyboard; sourceTree = "<group>"; };
-		AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Leafra/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* DokuChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DokuChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = DokuChat/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = DokuChat/Info.plist; sourceTree = "<group>"; };
+		1E987F50062B367FB632A268 /* Pods-DokuChat.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DokuChat.release.xcconfig"; path = "Target Support Files/Pods-DokuChat/Pods-DokuChat.release.xcconfig"; sourceTree = "<group>"; };
+		A2E1476B14661D7A534BF119 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-DokuChat/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = DokuChat/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = Leafra/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C3B8B3125A4A35B48D99F4E5 /* Pods-DokuChat.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DokuChat.debug.xcconfig"; path = "Target Support Files/Pods-DokuChat/Pods-DokuChat.debug.xcconfig"; sourceTree = "<group>"; };
+		CC8DA63A4E0E8E7B7518CF6E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = DokuChat/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		D1ED49BD026C365F04D6DFCB /* libPods-DokuChat.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-DokuChat.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Leafra/AppDelegate.swift; sourceTree = "<group>"; };
-		F11748442D0722820044C1D9 /* Leafra-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Leafra-Bridging-Header.h"; path = "Leafra/Leafra-Bridging-Header.h"; sourceTree = "<group>"; };
+		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = DokuChat/AppDelegate.swift; sourceTree = "<group>"; };
+		F11748442D0722820044C1D9 /* DokuChat-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "DokuChat-Bridging-Header.h"; path = "DokuChat/DokuChat-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,51 +37,59 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DC072CB1C05DDF4A5BB29014 /* libPods-Leafra.a in Frameworks */,
+				A06A38ACCAFFB22004B4B97B /* libPods-DokuChat.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		02CA399627FDC64B7F867E28 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				077F71371F61F97B3502A7E8 /* Pods-Leafra.debug.xcconfig */,
-				52ACEC0B09CB779AD1EB9D71 /* Pods-Leafra.release.xcconfig */,
-			);
-			path = Pods;
-			sourceTree = "<group>";
-		};
-		13B07FAE1A68108700A75B9A /* Leafra */ = {
+		13B07FAE1A68108700A75B9A /* DokuChat */ = {
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
-				F11748442D0722820044C1D9 /* Leafra-Bridging-Header.h */,
+				F11748442D0722820044C1D9 /* DokuChat-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				D42DFB1CDA78399484C6BE64 /* PrivacyInfo.xcprivacy */,
+				CC8DA63A4E0E8E7B7518CF6E /* PrivacyInfo.xcprivacy */,
 			);
-			name = Leafra;
+			name = DokuChat;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				40D6B42BB0718587C93AB731 /* libPods-Leafra.a */,
+				D1ED49BD026C365F04D6DFCB /* libPods-DokuChat.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		4709FCFE21A56624BFE586FE /* Leafra */ = {
+		479142351D403659BF0D4990 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				AC7AF465F40713AD4F05EED0 /* ExpoModulesProvider.swift */,
+				6269BF9600D31CDECD90632B /* DokuChat */,
 			);
-			name = Leafra;
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+		61DFA60837F6F00E84683B74 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				C3B8B3125A4A35B48D99F4E5 /* Pods-DokuChat.debug.xcconfig */,
+				1E987F50062B367FB632A268 /* Pods-DokuChat.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		6269BF9600D31CDECD90632B /* DokuChat */ = {
+			isa = PBXGroup;
+			children = (
+				A2E1476B14661D7A534BF119 /* ExpoModulesProvider.swift */,
+			);
+			name = DokuChat;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -121,12 +102,12 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				13B07FAE1A68108700A75B9A /* Leafra */,
+				13B07FAE1A68108700A75B9A /* DokuChat */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				C76104BFA83DCF9A1DC1B361 /* ExpoModulesProviders */,
-				02CA399627FDC64B7F867E28 /* Pods */,
+				61DFA60837F6F00E84683B74 /* Pods */,
+				479142351D403659BF0D4990 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -136,7 +117,7 @@
 		83CBBA001A601CBA00E9B192 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13B07F961A680F5B00A75B9A /* Leafra.app */,
+				13B07F961A680F5B00A75B9A /* DokuChat.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -147,42 +128,32 @@
 				BB2F792C24A3F905000567C9 /* Expo.plist */,
 			);
 			name = Supporting;
-			path = Leafra/Supporting;
-			sourceTree = "<group>";
-		};
-		C76104BFA83DCF9A1DC1B361 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				4709FCFE21A56624BFE586FE /* Leafra */,
-			);
-			name = ExpoModulesProviders;
+			path = DokuChat/Supporting;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		13B07F861A680F5B00A75B9A /* Leafra */ = {
+		13B07F861A680F5B00A75B9A /* DokuChat */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Leafra" */;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "DokuChat" */;
 			buildPhases = (
-				D8967C4D9527D4F125C8E623 /* [CP] Check Pods Manifest.lock */,
-				4B2A64ACB5F824AF6AAB2D9C /* [Expo] Configure project */,
+				310D5F2C53F8456832765237 /* [CP] Check Pods Manifest.lock */,
+				E39516BF7041A7835C50E31E /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				613CC3042E0CCDB700873F3D /* Embed Frameworks */,
-				31E3ED10E6DDC88FA6399404 /* [CP] Embed Pods Frameworks */,
-				808EB689846EB54D457909E0 /* [CP] Copy Pods Resources */,
+				C21BF1ADF9C941E495C7ADCF /* [CP] Embed Pods Frameworks */,
+				1BF60FA1E338033775E89628 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
-				61D1A5702E0DC05700296821 /* PBXBuildRule */,
 			);
 			dependencies = (
 			);
-			name = Leafra;
-			productName = Leafra;
-			productReference = 13B07F961A680F5B00A75B9A /* Leafra.app */;
+			name = DokuChat;
+			productName = DokuChat;
+			productReference = 13B07F961A680F5B00A75B9A /* DokuChat.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -198,7 +169,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Leafra" */;
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "DokuChat" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -211,7 +182,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13B07F861A680F5B00A75B9A /* Leafra */,
+				13B07F861A680F5B00A75B9A /* DokuChat */,
 			);
 		};
 /* End PBXProject section */
@@ -224,7 +195,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				24F792D9F00738FC0524946B /* PrivacyInfo.xcprivacy in Resources */,
+				E85EBF2150DA1A4FC7CB4C4F /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -246,54 +217,13 @@
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
 		};
-		31E3ED10E6DDC88FA6399404 /* [CP] Embed Pods Frameworks */ = {
+		1BF60FA1E338033775E89628 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-frameworks.sh",
-				"${PODS_ROOT}/../../node_modules/react-native-leafra-sdk/ios/LeafraCore.framework",
-				"${PODS_ROOT}/../../node_modules/react-native-leafra-sdk/ios/llama.framework",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/LeafraCore.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/llama.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		4B2A64ACB5F824AF6AAB2D9C /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Leafra/expo-configure-project.sh\"\n";
-		};
-		808EB689846EB54D457909E0 /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-resources.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-DokuChat/Pods-DokuChat-resources.sh",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
@@ -354,10 +284,10 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Leafra/Pods-Leafra-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DokuChat/Pods-DokuChat-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		D8967C4D9527D4F125C8E623 /* [CP] Check Pods Manifest.lock */ = {
+		310D5F2C53F8456832765237 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -372,12 +302,53 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Leafra-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-DokuChat-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
+		};
+		C21BF1ADF9C941E495C7ADCF /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-DokuChat/Pods-DokuChat-frameworks.sh",
+				"${PODS_ROOT}/../../node_modules/react-native-leafra-sdk/ios/LeafraCore.framework",
+				"${PODS_ROOT}/../../node_modules/react-native-leafra-sdk/ios/llama.framework",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/LeafraCore.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/llama.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DokuChat/Pods-DokuChat-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E39516BF7041A7835C50E31E /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-DokuChat/expo-configure-project.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -387,7 +358,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				5B202CD46E9F2F48D1493AAA /* ExpoModulesProvider.swift in Sources */,
+				D69E98B22391622E0AE7F043 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -396,11 +367,11 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 077F71371F61F97B3502A7E8 /* Pods-Leafra.debug.xcconfig */;
+			baseConfigurationReference = C3B8B3125A4A35B48D99F4E5 /* Pods-DokuChat.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = Leafra/Leafra.entitlements;
+				CODE_SIGN_ENTITLEMENTS = DokuChat/DokuChat.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MK756PG77H;
 				ENABLE_BITCODE = NO;
@@ -408,9 +379,7 @@
 					"$(inherited)",
 					"FB_SONARKIT_ENABLED=1",
 				);
-				INFOPLIST_FILE = Leafra/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Leafra;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_FILE = DokuChat/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -423,9 +392,9 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.leafra.app;
-				PRODUCT_NAME = Leafra;
-				SWIFT_OBJC_BRIDGING_HEADER = "Leafra/Leafra-Bridging-Header.h";
+				PRODUCT_BUNDLE_IDENTIFIER = ai.dokuchat.app;
+				PRODUCT_NAME = DokuChat;
+				SWIFT_OBJC_BRIDGING_HEADER = "DokuChat/DokuChat-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -435,16 +404,14 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 52ACEC0B09CB779AD1EB9D71 /* Pods-Leafra.release.xcconfig */;
+			baseConfigurationReference = 1E987F50062B367FB632A268 /* Pods-DokuChat.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = Leafra/Leafra.entitlements;
+				CODE_SIGN_ENTITLEMENTS = DokuChat/DokuChat.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MK756PG77H;
-				INFOPLIST_FILE = Leafra/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Leafra;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_FILE = DokuChat/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -457,9 +424,9 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.leafra.app;
-				PRODUCT_NAME = Leafra;
-				SWIFT_OBJC_BRIDGING_HEADER = "Leafra/Leafra-Bridging-Header.h";
+				PRODUCT_BUNDLE_IDENTIFIER = ai.dokuchat.app;
+				PRODUCT_NAME = DokuChat;
+				SWIFT_OBJC_BRIDGING_HEADER = "DokuChat/DokuChat-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
@@ -496,6 +463,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -562,6 +530,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -593,7 +562,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Leafra" */ = {
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "DokuChat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
@@ -602,7 +571,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Leafra" */ = {
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "DokuChat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,

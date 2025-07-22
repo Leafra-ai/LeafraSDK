@@ -122,7 +122,7 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your LeafraSDK Docuchat assistant. How can I help you today?',
+      text: 'Hello! I\'m DokuChat, your AI assistant. How can I help you today?',
       timestamp: new Date(),
       isUser: false,
     },
@@ -327,7 +327,7 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
       }
 
       // Show processing message
-      addMessage('🔄 Processing your files through LeafraSDK...');
+      addMessage('🔄 DokuChat is processing your files...');
 
       // Extract file URLs for SDK processing
       const fileUrls = files.map(file => file.uri);
@@ -338,7 +338,7 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
         const result = await LeafraSDK.processUserFiles(fileUrls);
         
         if (result.result === ResultCode.SUCCESS) {
-          addMessage(`✅ Successfully processed ${files.length} PDF files through LeafraSDK!`);
+          addMessage(`✅ Successfully processed ${files.length} PDF files.`);
 
           
           // Log additional details if available
@@ -378,7 +378,7 @@ export default function LeafraSDKDocuchat({ onAddFiles, onSettings }: LeafraSDKD
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>LeafraSDK Docuchat</Text>
+        <Text style={styles.headerTitle}>DokuChat</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity style={styles.headerButton} onPress={handleAddFiles}>
             <Text style={styles.headerButtonText}>+</Text>
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'purple',
   },
   headerButtons: {
     flexDirection: 'row',

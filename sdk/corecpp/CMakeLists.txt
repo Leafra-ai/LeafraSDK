@@ -258,7 +258,7 @@ if(APPLE)
         if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
             set(PLIST_SUPPORTED_PLATFORMS "iPhoneSimulator")
             set(PLIST_PLATFORM_NAME "iphonesimulator")
-            set(PLIST_MIN_OS_VERSION "16.4")
+            set(PLIST_MIN_OS_VERSION "15.1")
             set(PLIST_DEVICE_FAMILY_SECTION "
     <key>UIDeviceFamily</key>
     <array>
@@ -268,7 +268,7 @@ if(APPLE)
         else()
             set(PLIST_SUPPORTED_PLATFORMS "iPhoneOS")
             set(PLIST_PLATFORM_NAME "iphoneos")
-            set(PLIST_MIN_OS_VERSION "16.4")
+            set(PLIST_MIN_OS_VERSION "15.1")
             set(PLIST_DEVICE_FAMILY_SECTION "
     <key>UIDeviceFamily</key>
     <array>
@@ -317,10 +317,42 @@ if(APPLE)
         MACOSX_FRAMEWORK_BUNDLE_VERSION ${PROJECT_VERSION}
     )
     
+    # Configure debug information and dSYM generation for command-line builds
+    target_compile_options(LeafraCore PRIVATE
+        $<$<CONFIG:Debug>:-g>
+        $<$<CONFIG:Release>:-g>
+        $<$<CONFIG:RelWithDebInfo>:-g>
+    )
+    
+    # For iOS builds, ensure proper deployment target
     if(LEAFRA_PLATFORM_IOS)
         set_target_properties(LeafraCore PROPERTIES
             XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
             XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
+            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.1"
+        )
+        
+        # Add custom command to generate dSYM bundle after framework is built
+        # Note: Generate dSYM OUTSIDE the framework bundle to prevent App Store validation errors
+        # For frameworks, TARGET_FILE_DIR resolves to inside the framework, so we need to go up one level
+        add_custom_command(TARGET LeafraCore POST_BUILD
+            COMMAND dsymutil $<TARGET_FILE:LeafraCore> -o $<TARGET_FILE_DIR:LeafraCore>/../LeafraCore.framework.dSYM
+            COMMENT "Generating dSYM for LeafraCore.framework (iOS) - OUTSIDE framework bundle"
+            VERBATIM
+        )
+    else()
+        # macOS
+        set_target_properties(LeafraCore PROPERTIES
+            OSX_DEPLOYMENT_TARGET "10.15"
+        )
+        
+        # Add custom command to generate dSYM bundle after framework is built
+        # Note: Generate dSYM OUTSIDE the framework bundle to prevent App Store validation errors
+        # For frameworks, TARGET_FILE_DIR resolves to inside the framework, so we need to go up one level
+        add_custom_command(TARGET LeafraCore POST_BUILD
+            COMMAND dsymutil $<TARGET_FILE:LeafraCore> -o $<TARGET_FILE_DIR:LeafraCore>/../LeafraCore.framework.dSYM
+            COMMENT "Generating dSYM for LeafraCore.framework (macOS) - OUTSIDE framework bundle"
+            VERBATIM
         )
     endif()
 endif()
@@ -334,6 +366,19 @@ install(TARGETS LeafraCore
     FRAMEWORK DESTINATION Frameworks
     PUBLIC_HEADER DESTINATION include/leafra
 )
+
+# Install dSYM files for Apple platforms with proper naming
+if(APPLE)
+    # Install LeafraCore.framework.dSYM (generated outside framework bundle)
+    install(CODE "
+        set(SOURCE_DSYM \"$<TARGET_FILE_DIR:LeafraCore>/../LeafraCore.framework.dSYM\")
+        set(DEST_DSYM \"\${CMAKE_INSTALL_PREFIX}/Frameworks/LeafraCore.framework.dSYM\")
+        if(EXISTS \"\${SOURCE_DSYM}\")
+            message(STATUS \"Installing LeafraCore dSYM: \${SOURCE_DSYM} -> \${DEST_DSYM}\")
+            file(COPY \"\${SOURCE_DSYM}\" DESTINATION \"\${CMAKE_INSTALL_PREFIX}/Frameworks/\")
+        endif()
+    ")
+endif()
 
 # For Apple frameworks, manually install headers to Headers/leafra subdirectory
 if(APPLE)
