@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => "15.1", :osx => "10.15" }
+  s.platforms    = { :ios => "16.4", :osx => "10.15" }
   s.source       = { :git => "https://github.com/your-org/LeafraSDK.git", :tag => "#{s.version}" }
 
   # Source files for the React Native bridge
@@ -138,7 +138,7 @@ Pod::Spec.new do |s|
   ]
 
   # Minimum deployment targets
-  s.ios.deployment_target = "13.0"
+  s.ios.deployment_target = "16.4"
   s.osx.deployment_target = "10.15"
 
   # Module map for proper Swift/ObjC interop

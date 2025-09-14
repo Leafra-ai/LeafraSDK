@@ -122,7 +122,7 @@ if(APPLE)
         
         # Configure test target as iOS app bundle with Info.plist and model resource
         set_target_properties(test_llamacpp_basic PROPERTIES
-            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "13.0"
+            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "16.4"
             MACOSX_BUNDLE TRUE  # Note: MACOSX_BUNDLE works for both macOS and iOS (legacy CMake naming)
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
             XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.leafra.llamacpp.test_llamacpp_basic"

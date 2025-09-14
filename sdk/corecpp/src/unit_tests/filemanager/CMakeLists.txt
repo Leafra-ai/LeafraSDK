@@ -86,7 +86,7 @@ if(APPLE)
         
         foreach(TARGET ${TEST_TARGETS})
             set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "13.0"
+                XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "16.4"
                 MACOSX_BUNDLE TRUE
                 MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
                 XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.leafra.filemanager.${TARGET}"

@@ -473,6 +473,7 @@ build_ios() {
         -DCMAKE_SYSTEM_NAME=iOS \
         -DCMAKE_OSX_SYSROOT="$sdk" \
         -DCMAKE_OSX_ARCHITECTURES="$arch" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="16.4" \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_INSTALL_PREFIX="../../$INSTALL_DIR/$install_dir" \
         -DLEAFRA_BUILD_RN_BINDINGS=ON \

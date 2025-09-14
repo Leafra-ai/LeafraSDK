@@ -258,7 +258,7 @@ if(APPLE)
         if(CMAKE_OSX_SYSROOT MATCHES "iPhoneSimulator")
             set(PLIST_SUPPORTED_PLATFORMS "iPhoneSimulator")
             set(PLIST_PLATFORM_NAME "iphonesimulator")
-            set(PLIST_MIN_OS_VERSION "15.1")
+            set(PLIST_MIN_OS_VERSION "16.4")
             set(PLIST_DEVICE_FAMILY_SECTION "
     <key>UIDeviceFamily</key>
     <array>
@@ -268,7 +268,7 @@ if(APPLE)
         else()
             set(PLIST_SUPPORTED_PLATFORMS "iPhoneOS")
             set(PLIST_PLATFORM_NAME "iphoneos")
-            set(PLIST_MIN_OS_VERSION "15.1")
+            set(PLIST_MIN_OS_VERSION "16.4")
             set(PLIST_DEVICE_FAMILY_SECTION "
     <key>UIDeviceFamily</key>
     <array>
@@ -329,7 +329,8 @@ if(APPLE)
         set_target_properties(LeafraCore PROPERTIES
             XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
             XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
-            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.1"
+            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "16.4"
+            OSX_DEPLOYMENT_TARGET "16.4"
         )
         
         # Add custom command to generate dSYM bundle after framework is built

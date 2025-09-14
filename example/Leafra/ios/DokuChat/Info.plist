@@ -34,9 +34,9 @@
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>MinimumOSVersion</key>
-    <string>15.1</string>
+    <string>16.4</string>
     <key>LSMinimumSystemVersion</key>
-    <string>15.1</string>
+    <string>16.4</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSAppTransportSecurity</key>
