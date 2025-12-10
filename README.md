@@ -1,205 +1,347 @@
-📘 Leafra SDK — Overview & Documentation
-❓ What’s Leafra SDK?
+# Leafra SDK Documentation
 
-Leafra is a cross-platform, on-device LLM engineering SDK.
-The core is written primarily in C++, using carefully selected cross-platform libraries, and is designed to run on:
+## What's Leafra SDK?
 
-iOS
+Leafra is a cross platform on device LLM engineering solution SDK. Most of core SDK is written in C++ with carefully selected cross platform C++ libraries. It's designed to run on iOS/Android/Linux/MacOS/Windows. It supports Chat, Question Answering and RAG scenarios for text. Leafra SDK comes with a sample react native app called "Dokuchat".
 
-Android
+SDK and DokuChat is tested on iOS/MacOS. Android/Linux/Windows support is under development.
 
-Linux
 
-macOS
+---
 
-Windows
+# Design Principles
 
-It supports Chat, Question Answering, and RAG workflows for text.
+## Principles: “Leafra SDK Package”
+Consists of:
+- example apps (`example/`)
+- the core sdk (`sdk/`)
 
-Leafra SDK includes a sample React Native app called Dokuchat.
+### Apps and SDK clearly separated
+Example apps (be it command line or GUI based) are clearly separated from the core of the sdk.  
+The sdk’s entry points form the Leafra SDK API—this is also the entry point for iOS/Android apps and MacOS/Linux command line apps.
 
-Currently tested: iOS & macOS
-In development: Android, Linux, Windows
+### Cross platformness
+We try to keep `sdk/` as cross platform as possible, using cross-platform C++ libraries when needed.  
+The only exception so far is CoreML support for embeddings — which uses a single Objective-C file for iOS/macOS targets.
 
-🎯 Design Principles
-Separation of Apps & SDK
+### Open Source
+The libraries `sdk/` depends on are under `sdk/corecpp/thirdparty/`,  
+where I got them from / how they were built will be indicated separately.  
+All libraries must be MIT or Apache 2.0 licensed — **no GPL or derivatives**.
 
-Example apps live under example/
 
-Core SDK lives under sdk/
+---
 
-Clean entry points form the official Leafra SDK API
+# Language bindings / build environments for actual mobile apps
 
-Cross-Platform First
+## Goal
+- iOS Apps (RN or Swift) can be built on MacOS with XCode using RN/Swift bindings.
+- Android Apps (RN or Kotlin) can be built on MacOS/Windows/Linux with Android Studio via RN/Kotlin bindings.
 
-Uses C++ cross-platform libraries wherever possible
+## Current Status
+- iOS Apps (RN) can be built on MacOS with XCode using RN bindings.
+- No Swift bindings or Swift example app yet.  
+- **SDK is not ported to Android yet.**
 
-Only platform-specific file so far: leafra_coreml.mm (for embeddings on iOS/macOS)
+iOS apps are built on macOS via XCode (RN/Swift).  
+Android apps can be built via Android Studio (RN/Kotlin).
 
-Open Source Dependencies
+3rd-party apps (RN, Swift, Kotlin) are expected to link to libraries output from `sdk/`.  
+We will support iOS and Android (and potentially MacOS/Windows/Linux in the future — references may exist in code, but Windows/Linux are not tested).
 
-Third-party sources stored in sdk/corecpp/thirdparty/
 
-Must be MIT or Apache 2.0 licensed
+---
 
-No GPL
+# Language bindings / build environments for command line apps
 
-📱 Language Bindings & Mobile Build Environments
-Goal
+## Goal
+Command line apps can be built using our build system and used on Linux/MacOS.
 
-iOS apps (RN or Swift) build via Xcode
+## Current Status
+Command line apps can be built using our build system and used on MacOS.
 
-Android apps (RN or Kotlin) build via Android Studio
+These CLI apps are used internally for development, but can be used by customers for quick experimentation.
 
-Apps link directly to SDK output libraries
+MacOS is supported for commandline `example/` already; supporting Linux is desirable.
 
-Current Status
-Platform	Supported?	Notes
-iOS (RN)	✅	RN bindings complete
-iOS (Swift)	❌	Planned
-Android	🚧	SDK not yet ported
-macOS/Linux/Windows	🚧	CLI partially supported
-💻 Command Line Apps
 
-Built using CMake
+---
 
-Used internally during SDK development
+# High Level Leafra SDK Structure
 
-Available for experimentation
+```
+example/ → this folder has the example apps built with sdk  
+example_files/ → sample files used for testing, development (pdf, txt)  
 
-🏗️ High-Level Leafra SDK Structure
+Leafra/ → React Native app (uses Expo)  
+  android → generated android project  
+  assets → icons  
+  components → actual typescript files  
+  config → SDK configuration bindings exposed to RN apps  
+  ios → generated XCode project for iOS  
+  node_modules → react native node modules  
+  app.json  
+  App.tsx  
+  BUILD_INSTRUCTIONS  
+  index.ts  
+  metro.config.js  
+  package-lock.json  
+  package.json  
+  react-native.conf  
+  README.md  
 
-Below is the full structure with the original annotations restored, including:
+sdkcmdapp/ → command line app  
+  build/ → temp build files  
+  CMakeLists.txt  
+  README  
+  sdkcmdline.cpp → command line app  
 
-✔ “→ wrapper class for llama.cpp”
-✔ “→ wrapper class for faiss”
-✔ “→ parsing adapter for pdf”
-etc.
+sdk/ → this folder contains the core sdk  
+  build/ → temp build files  
+  corecpp/  
+    build/ → temp build files  
+    src/  
+      unit_tests/ → working unit tests  
+      data_processor.cpp  
+      leafra_chunker.cpp → chunker for RAG  
+      leafra_core.cpp → core logic and API of the SDK resides here (RAG/Chat etc.)  
+      leafra_coreml.mm → wrapper class for coreml (mainly used for embeddings)  
+      leafra_debug.cpp  
+      leafra_faiss.cpp → wrapper class for faiss  
+      leafra_filemanager.cpp → x platform file management facilities  
+      leafra_llamacpp.cpp → wrapper class for llama.cpp  
+      leafra_parsing_adapter_docx.cpp → not implemented yet  
+      leafra_parsing_adapter_excel.cpp → not implemented yet  
+      leafra_parsing_adapter_pdf.cpp → parsing adapter for pdf files  
+      leafra_parsing_adapter_txt.cpp → parsing adapter for txt files  
+      leafra_parsing.cpp → top level parsing class for documents  
+      leafra_sentencepiece.cpp → wrapper for sentencepiece tokenizer  
+      leafra_sqlite.cpp → wrapper and high level functions for sqlite for RAG  
+      leafra_unicode_cacher.cpp → helper class for unicode, used by chunker  
+      leafra_unicode.cpp → helper class for unicode, used by chunker  
+      logger.cpp → x platform logging facilities  
+      math_utils.cpp → used for bring up of RN bridge code - can be removed  
+      platform_utils.cpp  
 
-Folder Structure
-example/                      # Example applications
-  example_files/              # Sample test files (PDF, TXT)
-  Leafra/                     # React Native app (Expo)
-    android/
-    ios/
-    assets/
-    components/
-    config/                   # SDK configuration exposed to RN
-    ...
+    third_party → these are 3p libs checked in as git submodules  
+      executorch/ → not used yet, will be useful if we’d like to support executorch  
+      executorch_builder/ → not used yet  
+      faiss-mobile/ → in memory vector database / search engine from Facebook  
+      llamacpp/ → current LLM framework we are using for the LLMs  
+      models/  
+        prebuilt/ —> this is where we put libs - and this is what core sdk links  
+      sentencepiece/ → tokenizer library by Google  
+      tensorflow/ → not used yet  
+      tensorflow_builder/ → not used yet  
 
-sdkcmdapp/                    # Command-line example app
-  build/
-  CMakeLists.txt
-  README
-  sdkcmdline.cpp
+install/ → final installables after a successful build  
 
-sdk/                          # Core SDK
-  build/
-  corecpp/
-    build/
-    src/
-      unit_tests/             # Critical tests (AI code needs coverage)
-      data_processor.cpp
-      leafra_chunker.cpp           → chunker for RAG
-      leafra_core.cpp              → core logic & API (RAG/Chat, etc.)
-      leafra_coreml.mm             → wrapper class for CoreML (embeddings)
-      leafra_debug.cpp
-      leafra_faiss.cpp             → wrapper class for Faiss
-      leafra_filemanager.cpp       → cross-platform file management
-      leafra_llamacpp.cpp          → wrapper class for llama.cpp
-      leafra_parsing_adapter_docx.cpp    → not implemented yet
-      leafra_parsing_adapter_excel.cpp   → not implemented yet
-      leafra_parsing_adapter_pdf.cpp     → parsing adapter for PDF files
-      leafra_parsing_adapter_txt.cpp     → parsing adapter for TXT files
-      leafra_parsing.cpp                → top-level document parser
-      leafra_sentencepiece.cpp          → wrapper for SentencePiece tokenizer
-      leafra_sqlite.cpp                 → wrapper & high-level SQLite for RAG
-      leafra_unicode_cacher.cpp         → unicode helper
-      leafra_unicode.cpp                → unicode helper
-      logger.cpp                        → cross-platform logging
-      math_utils.cpp                    → used for RN bridge bring-up
-      platform_utils.cpp
+native/ → bridge code from Swift/Kotlin to C++ core (not implemented yet)  
+  iOS/ → (should be named Swift)  
+  Android/ → (should be named Kotlin)  
 
-    third_party/                  # Git submodules for dependencies
-      executorch/                 → not used yet (future support)
-      executorch_builder/         → not used yet
-      faiss-mobile/               → in-memory vector DB/search engine
-      llamacpp/                   → llama.cpp library used for LLMs
-      models/
-        prebuilt/                 # Prebuilt libs copied into SDK
-      sentencepiece/              # SentencePiece tokenizer
-      tensorflow/                 → not used yet
-      tensorflow_builder/         → not used yet
+react-native/ → RN bridge to core SDK (C++)  
+  iOS/ → contains bridge code and all deliverables  
+    LeafraCore.framework  
+    llama.framework  
+  Android/ → not implemented yet  
 
-install/                         # Final framework outputs after build
+docs_internal/ → internal documentation (some outdated)  
 
-native/                          # Swift/Kotlin bindings (not implemented yet)
-  iOS/                            # (Should be named Swift)
-  Android/                        # (Should be named Kotlin)
+utility/  
+  build.sh → START HERE: entry point for building core sdk  
+  CMakeLists.txt  
+  .gitattributes  
+  .gitignore  
+  .gitmodules  
+```
 
-react-native/                    # RN bindings → C++ bridge
-  iOS/
-    LeafraCore.framework          # Copied by build.sh
-    llama.framework               # Copied by build.sh
-  Android/                        # Not implemented yet
 
-docs_internal/                   # Auto-generated docs (may be outdated)
+---
 
-utility/
-  build.sh                        # Main build entrypoint
-  CMakeLists.txt
-  .gitmodules                     # Tracks 3rd-party sources
+# Building SDK and Example Apps
 
-🏗️ Building the SDK
-Clone
+## Prerequisites
+Install git and git-lfs.
+
+### Cloning the git repository
+
+```bash
 git clone https://github.com/Leafra-ai/LeafraSDK.git
 cd LeafraSDK
 git submodule update --init --recursive
+```
 
-Build Core SDK
+We keep 3rd-party libs as submodules.
+
+
+---
+
+# Build System High-Level View
+
+## Core SDK
+We use CMake as the build system for core SDK.
+
+The core SDK uses a top-level script (`sdk/build.sh`) as the entry point.  
+This script and CMakeLists files should be actively maintained.
+
+## Commandline Apps
+CMake is also used.
+
+Build on MacOS:
+
+```bash
+cd build/
+cmake ../
+make
+```
+
+## RN/Swift/Kotlin Apps
+- RN apps on iOS/Android can be built using Expo CLI.  
+- GUI-based builds possible via XCode (iOS).  
+- Swift/Kotlin GUIs planned.
+
+## Build Order
+1. Build core SDK first  
+2. Build CLI app **or** GUI apps (RN/Swift/Kotlin)
+
+
+---
+
+# How to Build the Core SDK
+
+## Build the native C++ SDK:
+
+```bash
 cd LeafraSDK/sdk
 ./build.sh
+```
 
-Target-specific builds
+## Build for specific platforms:
+
+```bash
 ./build.sh --ios
 ./build.sh --ios --simulator
 ./build.sh --macos
 ./build.sh --android
+```
 
-Build specific targets
+## Build specific targets:
+
+```bash
 ./build.sh core
 ./build.sh bindings
 ./build.sh all
+```
 
-Development flags
+## Development options:
+
+```bash
 ./build.sh --clean --debug
 ./build.sh --verbose
+```
 
-Example (tested)
+## Tested lines:
+
+Do a clean build for iOS target using CoreML for embeddings:
+
+```bash
 ./build.sh --clean --ios --embedding-fw=coreml
 ./build.sh --clean --macos --embedding-fw=coreml
+```
 
-🧪 Building the Command Line App
+This builds:
+- LeafraCore.framework  
+- llama.framework  
+
+And copies them to:
+- `sdk/install/`
+- `sdk/reactnative/ios/`
+
+
+---
+
+# Pod Install Notes (iOS RN)
+
+`build.sh` may ask for `pod install`.  
+This is usually needed once during dev unless the RN podspec changes.
+
+Changes to `.framework` files **do not** require pod install.
+
+
+---
+
+# How to Build and Run the Command Line App
+
+First build the SDK for macOS:
+
+```bash
+./build.sh --clean --macos --embedding-fw=coreml
+```
+
+Then:
+
+```bash
 cd example/sdkcmdapp
 mkdir -p build && cd build
 cmake .. -DLEAFRA_EMBEDDING_FRAMEWORK=coreml
 make
 ./sdkcmdline
+```
 
-📱 Building the React Native App
-Full native build
-cd example/Leafra
+Get help:
+
+```bash
+sdkcmdline --help
+```
+
+
+---
+
+# How to Build and Run the RN App
+
+## Start development
+
+Use when:
+- first time running the app  
+- after changing native code  
+- after pod install  
+- app not installed on simulator  
+
+```bash
+cd ../example/Leafra
 npx expo run:ios
+```
 
-Run on device
+Run on device:
+
+```bash
 npx expo run:ios --device
+```
 
-Hot reload workflow
+After install, JS-only changes hot-reload.
+
+Start bundler:
+
+```bash
+npm start
+```
+
+## Fast iteration (JS-only changes)
+
+```bash
 npm start
 # or
 npx expo start
+```
 
-Useful commands
+Useful:
+
+```bash
 npx expo start --clear
 open -a Simulator
 npx expo run:ios --no-build-cache
+```
+
+
+---
